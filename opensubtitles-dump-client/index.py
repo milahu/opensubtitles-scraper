@@ -24,9 +24,14 @@ def hexdump(bytes):
 import struct
 import math
 
-import sqlite3_types
+from . import sqlite3
 
-with open("opensubs.db", "rb") as f:
+db = sqlite3.Sqlite3.from_file("opensubs.db")
+
+print(db)
+print(db.page_size)
+
+if False:
     pos = 0
     f.seek(0)
     file_header = sqlite3_types.FileHeader()
