@@ -24,74 +24,26 @@ def hexdump(bytes):
 import struct
 import math
 
+import sqlite3_types
+
 with open("opensubs.db", "rb") as f:
     pos = 0
     f.seek(0)
-    # sqlite/src/btree.c
-    # https://www.sqlite.org/fileformat.html
-    struct_fields = [
-        # 0 16 header string: "SQLite format 3" + "\x00"
-        ("16s", "sqlite_file_header"),
-        # 16 2 The database page size in bytes.
-        # Must be a power of two between 512 and 32768 inclusive,
-        # or the value 1 representing a page size of 65536.
-        ("h", "sqlite_page_size"),
-        # 18 1 File format write version. 1 for legacy; 2 for WAL.
-        ("b", "sqlite_format_write_version"),
-        # 19 1 File format read version. 1 for legacy; 2 for WAL.
-        ("b", "sqlite_format_read_version"),
-        # 20 1 Bytes of unused "reserved" space at the end of each page. Usually 0.
-        ("b", "sqlite_reserved_space"),
-        # 21 1 Maximum embedded payload fraction. Must be 64.
-        ("b", "max_embedded_payload_fraction"),
-        # 22 1 Maximum embedded payload fraction. Must be 64.
-        ("b", "min_embedded_payload_fraction"),
-        # 23 1 Leaf payload fraction. Must be 32.
-        ("b", "leaf_payload_fraction"),
-        # 24 4 File change counter.
-        ("i", "file_change_counter"),
-        # 28 4 Size of the database file in pages. The "in-header database size".
-        ("i", "database_size_in_pages"),
-        # 32 4 Page number of the first freelist trunk page.
-        ("i", "first_freelist_page"),
-        # 36 4 Total number of freelist pages.
-        ("i", "num_freelist_page"),
-        # 40 4 The schema cookie.
-        ("i", "schema_cookie"),
-        # 44 4 The schema format number. Supported schema formats are 1, 2, 3, and 4.
-        ("i", "schema_format_number"),
-        # 48 4 Default page cache size.
-        ("i", "default_page_cache_size"),
-        # 52 4 The page number of the largest root b-tree page when in auto-vacuum or incremental-vacuum modes, or zero otherwise.
-        ("i", "largest_root_b_tree_page_number"),
-        # 56 4 The database text encoding. A value of 1 means UTF-8. A value of 2 means UTF-16le. A value of 3 means UTF-16be.
-        ("i", "database_text_encoding"),
-        # 60 4 The "user version" as read and set by the user_version pragma.
-        ("i", "pragma_user_version"),
-        # 64 4 True (non-zero) for incremental-vacuum mode. False (zero) otherwise.
-        ("i", "incremental_vacuum_mode"),
-        # 68 4 The "Application ID" set by PRAGMA application_id.
-        ("i", "pragma_application_id"),
-        # 72 20 Reserved for expansion. Must be zero.
-        ("20s", "reserved_for_expansion"),
-        # 92 4 The version-valid-for number.
-        ("i", "version_valid_for_number"),
-        # 96 4 SQLITE_VERSION_NUMBER
-        ("i", "sqlite_version_number"),
-    ]
-    fmt = ">" + "".join([f for f, n in struct_fields])
-    print("fmt:", fmt)
-    struct_len = 100 # TODO get from fmt
-    values_list = struct.unpack(fmt, f.read(struct_len))
-    values = dict()
-    for idx, value in enumerate(values_list):
-        fmt, name = struct_fields[idx]
-        values[name] = value
+    file_header = sqlite3_types.FileHeader()
+    f.readinto(file_header)
+    #print(file_header.header_string)
+    #print(file_header.page_size)
 
-    if values["sqlite_page_size"] == 1:
-        values["sqlite_page_size"] = 65536
-
-    print("values:", values)
+    # page_size: Must be a power of two between 512 and 32768 inclusive,
+    # or the value 1 representing a page size of 65536.
+    if file_header.page_size == 1:
+        file_header.page_size = 65536
+    else:
+        page_size_base = math.log(file_header.page_size, 2)
+        if int(page_size_base) != page_size_base:
+            raise Exception(f"page size must be a power of 2: {file_header.page_size}")
+        if file_header.page_size < 512 or 32768 < file_header.page_size:
+            raise Exception(f"page size must be in range (512, 32768): {file_header.page_size}")
 
 sys.exit()
 
