@@ -760,7 +760,7 @@ def extract_movie_sub(sub_number, group_tempdir, movie_name_year_original, movie
                 if not filepath.startswith(integrity.name_57bytes):
                     print(
                         f"sub {sub_number}: failed to verify file name {repr(filepath)}. "
-                        f"actual prefix {repr(filepath_57bytes)}"
+                        f"actual filepath {repr(filepath)}. "
                         f"expected prefix {repr(integrity.name_57bytes)}"
                     )
                 done_file_integrity = True
