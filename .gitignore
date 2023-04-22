@@ -1,1 +1,12 @@
 __pycache__/
+./new-subs/*.zip
+./404.txt
+./opensubs.db
+./original-zips/
+./opensubtitles_dump_client/repack-grouped/
+./opensubtitles_dump_client/index.txt
+./opensubtitles_dump_client/index-grouped/
+./opensubtitles_dump_client/opensubs.db.crc-cache
+./opensubtitles_dump_client/repack.py.log
+./opensubtitles_dump_client/index.txt.outliers
+./trash/
