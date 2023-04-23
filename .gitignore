@@ -15,3 +15,6 @@ __pycache__/
 subtitles_all.txt
 subtitles_all.txt.gz-parse-debug.txt
 subtitles_all.txt.gz-parse-errors.txt
+done-zips/
+repack-grouped/
+repack.py.log
