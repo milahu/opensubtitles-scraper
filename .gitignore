@@ -10,3 +10,4 @@ __pycache__/
 ./opensubtitles_dump_client/repack.py.log
 ./opensubtitles_dump_client/index.txt.outliers
 ./trash/
+*.db
