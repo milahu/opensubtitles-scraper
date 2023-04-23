@@ -9,24 +9,29 @@ let
   # expected https://files.pythonhosted.org/packages/f8/64/ae51d6c88406ab8a685b0c83af9fc6ef4275982f391258d9167ddde88cf1/pyppeteer_stealth-2.7.4.tar.gz
   # actual https://pypi.org/packages/source/p/pyppeteer-stealth/pyppeteer-stealth-2.7.4.tar.gz
   extraPythonPackages = {
-    pyppeteer-stealth = pkgs.python3.pkgs.callPackage ./nix/pyppeteer-stealth.nix {};
-    playwright-stealth = pkgs.python3.pkgs.callPackage ./nix/playwright-stealth.nix {};
-    undetected-playwright = pkgs.python3.pkgs.callPackage ./nix/undetected-playwright.nix {};
-    pygnuutils = pkgs.python3.pkgs.callPackage ./nix/pygnuutils.nix {};
+    #pyppeteer-stealth = pkgs.python3.pkgs.callPackage ./nix/pyppeteer-stealth.nix {};
+    #playwright-stealth = pkgs.python3.pkgs.callPackage ./nix/playwright-stealth.nix {};
+    #undetected-playwright = pkgs.python3.pkgs.callPackage ./nix/undetected-playwright.nix {};
+    #pygnuutils = pkgs.python3.pkgs.callPackage ./nix/pygnuutils.nix {};
   };
 
   python = pkgs.python3.withPackages (pp: with pp; [
     requests
     magic # libmagic
     #extraPythonPackages.pygnuutils # GNU version sort
-    playwright
+    #playwright
     #extraPythonPackages.playwright-stealth # FIXME not found
     #extraPythonPackages.pyppeteer-stealth # FIXME not found
     #extraPythonPackages.undetected-playwright # FIXME not found
     setuptools # pkg_resources for playwright-stealth
     #pyppeteer pyppeteer-stealth # puppeteer # old
-    kaitaistruct
-    sqlglot
+    #kaitaistruct
+    #sqlglot
+    # distributed processing
+    # ray is too complex, has only binary package in nixpkgs https://github.com/NixOS/nixpkgs/pull/194357
+    #ray
+    # https://github.com/tomerfiliba-org/rpyc
+    rpyc
   ]);
 
   # building sqlite took about 15 minutes on my laptop
@@ -48,29 +53,30 @@ in
 
 pkgs.mkShell rec {
 
-  PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright.browsers}";
+  #PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright.browsers}";
 
   #CHROME_BIN = "${pkgs.chromium.outPath}/bin/chromium";
 
   # https://github.com/justinwoo/my-blog-posts/blob/master/posts/2019-08-23-using-puppeteer-with-node2nix.md
   # https://github.com/puppeteer/puppeteer/issues/244 # Method to skip installing Chromium
-  PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "1";
-  PUPPETEER_EXECUTABLE_PATH = "${pkgs.chromium.outPath}/bin/chromium";
+  #PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "1";
+  #PUPPETEER_EXECUTABLE_PATH = "${pkgs.chromium.outPath}/bin/chromium";
 
-  PYPPETEER_SKIP_CHROMIUM_DOWNLOAD = PUPPETEER_SKIP_CHROMIUM_DOWNLOAD;
-  PYPPETEER_EXECUTABLE_PATH = PUPPETEER_EXECUTABLE_PATH;
+  #PYPPETEER_SKIP_CHROMIUM_DOWNLOAD = PUPPETEER_SKIP_CHROMIUM_DOWNLOAD;
+  #PYPPETEER_EXECUTABLE_PATH = PUPPETEER_EXECUTABLE_PATH;
 
 buildInputs = (with pkgs; [
   #gnumake
   #playwright
-  squashfsTools # mksquashfs
+  #squashfsTools # mksquashfs
+  sqlite
 ]) ++ [
   python
-  sqlite-debug
+  #sqlite-debug
   #extraPythonPackages.playwright-stealth
-  extraPythonPackages.pygnuutils
-  extraPythonPackages.pyppeteer-stealth
-  extraPythonPackages.undetected-playwright
+  #extraPythonPackages.pygnuutils
+  #extraPythonPackages.pyppeteer-stealth
+  #extraPythonPackages.undetected-playwright
 ];
 
 }

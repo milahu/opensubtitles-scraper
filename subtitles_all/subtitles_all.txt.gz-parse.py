@@ -36,13 +36,18 @@ lines_limit = math.inf
 #infile = "subtitles_all.txt.gz" # slow
 infile = "subtitles_all.txt"
 #outfile = "subtitles_all.txt.gz-parse-result.txt"
-db_file = "subtitles_all.txt.gz-parse-result.db"
+metadata_db_path = "opensubs-metadata.db"
+if len(sys.argv) == 2:
+    metadata_db_path = sys.argv[1]
+    print("metadata_db_path:", repr(metadata_db_path))
 dbgfile = "subtitles_all.txt.gz-parse-debug.txt"
 errfile = "subtitles_all.txt.gz-parse-errors.txt"
 
-# TODO raise error if db_file exists
+# TODO raise error if metadata_db_path exists
 
-sqlite_connection = sqlite3.connect(db_file)
+assert os.path.exists(metadata_db_path) == False, "error: output file exists"
+
+sqlite_connection = sqlite3.connect(metadata_db_path)
 # default: rows are tuples
 sqlite_connection.row_factory = sqlite3.Row # rows are dicts
 sqlite_cursor = sqlite_connection.cursor()
@@ -163,7 +168,7 @@ create_query = f"""create table if not exists subz_metadata({",".join(col_names_
 sqlite_cursor.execute(create_query)
 
 
-if not os.access(infile, os.R_OK):
+if not os.path.exists(infile):
     print(f"error: no such file: {infile}")
     print(f"hint:\ngzip -d -k -f {infile}.gz")
     sys.exit(1)
@@ -324,6 +329,13 @@ with (
         if num_done % 100000 == 0:
             print(f"done {num_done}")
 
+# DROP INDEX idx_movie_name_year;
+
+sqlite_cursor.execute("""
+    CREATE INDEX idx_movie_name_year_lang
+    ON subz_metadata (MovieName, MovieYear, ISO639)
+""")
+
 sqlite_connection.commit()
 sqlite_connection.close()
 
@@ -331,5 +343,5 @@ t2 = time.time()
 print(f"done {num_done} lines in {t2 - t1:.2f} seconds")
 print("output files:")
 #print(outfile)
-print(db_file)
+print(metadata_db_path)
 print(errfile)

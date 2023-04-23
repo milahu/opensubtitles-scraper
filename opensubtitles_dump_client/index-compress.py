@@ -55,7 +55,7 @@ add_crc = True # slow: TODO time
 
 if add_crc:
     # check if file is readable
-    assert os.access(database, os.R_OK), f"failed to read file: {database}"
+    assert os.path.exists(database), f"failed to read file: {database}"
 
 
 #store_result = False # Maximum RSS: 920MB
