@@ -11,3 +11,4 @@ __pycache__/
 ./opensubtitles_dump_client/index.txt.outliers
 ./trash/
 *.db
+*.tsv.gz
