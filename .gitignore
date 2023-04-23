@@ -12,3 +12,6 @@ __pycache__/
 ./trash/
 *.db
 *.tsv.gz
+subtitles_all.txt
+subtitles_all.txt.gz-parse-debug.txt
+subtitles_all.txt.gz-parse-errors.txt
