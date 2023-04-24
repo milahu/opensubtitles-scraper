@@ -9,8 +9,9 @@ import re
 import math
 import sqlite3
 
+
 debug_sub_number = 0 # invalid
-# corner cases:
+# edge cases:
 #debug_sub_number = 6
 #debug_sub_number = 277
 #debug_sub_number = 4473142
@@ -24,26 +25,17 @@ debug_sub_number = 85844 # MovieReleaseName is "\tAppurush" # FIXME
 
 deadloop_counter = 0
 
-# TODO auto-detect deadloops
-# = when buf_cols.get("IDSubtitle") is constant over many iterations
+subtitles_all_txt_gz_path = "opensubtitles.org.Actually.Open.Edition.2022.07.25/subtitles_all.txt.gz"
 
-lines_limit = math.inf
-#lines_limit = 10 * 1000 # debug
-
-# TODO write result to sqlite database
-# compact json file has 1.4GB which is not practical to hold in memory
-
-#infile = "subtitles_all.txt.gz" # slow
-infile = "subtitles_all.txt"
-#outfile = "subtitles_all.txt.gz-parse-result.txt"
 metadata_db_path = "opensubs-metadata.db"
 if len(sys.argv) == 2:
     metadata_db_path = sys.argv[1]
     print("metadata_db_path:", repr(metadata_db_path))
+
 dbgfile = "subtitles_all.txt.gz-parse-debug.txt"
 errfile = "subtitles_all.txt.gz-parse-errors.txt"
 
-# TODO raise error if metadata_db_path exists
+assert os.path.exists(subtitles_all_txt_gz_path), "error: missing input file"
 
 assert os.path.exists(metadata_db_path) == False, "error: output file exists"
 
@@ -53,7 +45,7 @@ sqlite_connection.row_factory = sqlite3.Row # rows are dicts
 sqlite_cursor = sqlite_connection.cursor()
 
 col_names = [
-    # head -n1 subtitles_all.txt | tr '\t' '\n' | grep -n . | sed -E 's/^([0-9]+):(.*)$/"\2", # \1/'
+    # zcat subtitles_all.txt.gz | head -n1 | tr '\t' '\n' | grep -n . | sed -E 's/^([0-9]+):(.*)$/"\2", # \1/'
     "IDSubtitle", # 1
     "MovieName", # 2
     "MovieYear", # 3
@@ -117,6 +109,7 @@ col_exprs = [
 line_start_expr = r"^" + r"\t".join(col_exprs[0:5]) + r"\t"
 #print("line_start_expr", line_start_expr); sys.exit()
 
+# TODO assert
 # we assume that the input file is well-formed
 # so that ALL lines end with "\n", also the last line
 # $ tail -c1 subtitles_all.txt | xxd -ps
@@ -167,12 +160,6 @@ create_query = f"""create table if not exists subz_metadata({",".join(col_names_
 #print(create_query)
 sqlite_cursor.execute(create_query)
 
-
-if not os.path.exists(infile):
-    print(f"error: no such file: {infile}")
-    print(f"hint:\ngzip -d -k -f {infile}.gz")
-    sys.exit(1)
-
 t1 = time.time()
 num_lines = 0
 
@@ -180,19 +167,16 @@ def escape_line(line):
     assert line[-1] == "\n", f"line must end with newline. line = {repr(line)}"
     return line[0:-1].replace("\n", "\\n") + "\n"
 
-print(f"parsing {infile} ...")
+print(f"parsing {subtitles_all_txt_gz_path} ...")
 
 with (
-    #gzip.open(infile, "r") as inf, # slow
-    open(infile, "r") as inf,
-    #open(outfile, "w") as outf,
+    gzip.open(subtitles_all_txt_gz_path, "rt") as inf,
     open(dbgfile, "w") as dbgf,
     open(errfile, "w") as errf
 ):
     # first line is not wrapped
     first_line = inf.readline()
     #print("first_line", repr(first_line))
-    #outf.write(first_line + "\n")
     expected_cols = len(first_line.split("\t"))
     expected_first_line = "\t".join(col_names) + "\n"
     assert (
@@ -255,7 +239,7 @@ with (
         # parse column MovieReleaseName
         # parse columns after MovieReleaseName
 
-        # strip: remove "\n" at end of string. not part of column URL
+        # strip: remove "\n" at end of string = last column = URL
         raw_cols = "".join(buf).strip().split("\t")
 
         if raw_cols[0] == "7587300" and raw_cols[1] == "":
@@ -263,7 +247,6 @@ with (
             print(f"sub {raw_cols[0]}: removing idx 1 of raw_cols {raw_cols}")
             raw_cols = raw_cols[0:1] + raw_cols[2:]
 
-        #parsed_cols = {}
         parsed_cols = []
         parse_failed = False
 
@@ -276,18 +259,14 @@ with (
             # re.fullmatch: match from start to end of string
             if re.fullmatch(col_expr, raw_col):
                 try:
-                    #parsed_cols[col_name] = col_type(raw_col)
                     parsed_cols.append(col_type(raw_col))
                 except ValueError:
                     if col_type == int and raw_col == "":
-                        #parsed_cols[col_name] = 0
                         parsed_cols.append(0)
                     else:
                         raise
             else:
                 parse_failed = True
-                #parsed_cols[col_name] = ""
-                #parsed_cols[f"_col{idx}"] = raw_col
 
         # parse columns before MovieReleaseName
         for idx in range(0, idx_MovieReleaseName):
@@ -304,8 +283,6 @@ with (
         num_extra_cols = len_raw_cols - len_col_names
 
         # parse column MovieReleaseName
-        col_name = "MovieReleaseName"
-        #parsed_cols[col_name] = "\t".join(raw_cols[idx_MovieReleaseName:(idx_MovieReleaseName + 1 + num_extra_cols)])
         parsed_cols.append("\t".join(raw_cols[idx_MovieReleaseName:(idx_MovieReleaseName + 1 + num_extra_cols)]).strip())
 
         # parse columns after MovieReleaseName
@@ -329,8 +306,6 @@ with (
         if num_done % 100000 == 0:
             print(f"done {num_done}")
 
-# DROP INDEX idx_movie_name_year;
-
 sqlite_cursor.execute("""
     CREATE INDEX idx_movie_name_year_lang
     ON subz_metadata (MovieName, MovieYear, ISO639)
@@ -342,6 +317,5 @@ sqlite_connection.close()
 t2 = time.time()
 print(f"done {num_done} lines in {t2 - t1:.2f} seconds")
 print("output files:")
-#print(outfile)
 print(metadata_db_path)
 print(errfile)
