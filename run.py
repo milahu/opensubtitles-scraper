@@ -9,7 +9,7 @@ import urllib.request
 import gzip
 
 
-opensubs_db_path = "opensubs.db"
+opensubs_db_path = "opensubtitles.org.Actually.Open.Edition.2022.07.25/opensubs.db"
 metadata_db_path = "opensubs-metadata.db"
 zipfiles_db_path = "opensubs-zipfiles.db"
 zipfiles_parsed_db_path = "opensubs-zipfiles-parsed.db"
@@ -19,9 +19,11 @@ imdb_title_episode_tsv_gz_path = "title.episode.tsv.gz"
 imdb_title_basics_db_path = "title.basics.db"
 imdb_title_episode_db_path = "title.episode.db"
 
+min_db_size = 4096 * 10 # sqlite db with at least 10 pages
+
 
 if os.path.exists(metadata_db_path):
-    print("found metadata_db")
+    print("found metadata_db:", metadata_db_path)
 else:
     print("building metadata_db ...")
     args = [
@@ -34,7 +36,7 @@ else:
         check=True,
     )
     print("building metadata_db done")
-assert os.path.getsize(metadata_db_path) > 0
+assert os.path.getsize(metadata_db_path) > min_db_size
 con = sqlite3.connect(metadata_db_path)
 cur = con.cursor()
 metadata_db_count, = cur.execute("select count() from subz_metadata").fetchone()
@@ -42,13 +44,16 @@ print("metadata_db_count:", metadata_db_count)
 
 
 if os.path.exists(zipfiles_db_path):
-    print("found zipfiles_db")
+    print("found zipfiles_db", zipfiles_db_path)
 else:
     #assert False
-    print("building zipfiles_db ...")
+    print(f"building zipfiles_db ...")
+    assert os.path.exists(opensubs_db_path), "missing input file"
     src_con = sqlite3.connect(opensubs_db_path)
     src_cur = src_con.cursor()
-    dst_con = sqlite3.connect(zipfiles_db_path)
+    # .tmp: atomic write
+    # TODO remove existing .tmp file
+    dst_con = sqlite3.connect(zipfiles_db_path + ".tmp")
     dst_cur = dst_con.cursor()
     # substring:
     # a: attachment; filename="alien.3.(1992).eng.2cd.(1).zip"
@@ -62,8 +67,9 @@ else:
             print("done", num_done)
     dst_con.commit()
     dst_con.close()
-    print("building zipfiles_db done")
-assert os.path.getsize(zipfiles_db_path) > 0
+    os.rename(zipfiles_db_path + ".tmp", zipfiles_db_path)
+    print(f"building zipfiles_db done {zipfiles_db_path}")
+assert os.path.getsize(zipfiles_db_path) > min_db_size
 con = sqlite3.connect(zipfiles_db_path)
 cur = con.cursor()
 zipfiles_db_count, = cur.execute("select count() from subz_zipfiles").fetchone()
@@ -88,7 +94,7 @@ else:
         check=True,
     )
     print("building zipfiles_parsed_db done")
-assert os.path.getsize(zipfiles_parsed_db_path) > 0
+assert os.path.getsize(zipfiles_parsed_db_path) > min_db_size
 con = sqlite3.connect(zipfiles_parsed_db_path)
 cur = con.cursor()
 zipfiles_parsed_db_count, = cur.execute("select count() from subz_zipfiles_parsed").fetchone()
@@ -171,7 +177,7 @@ else:
     con.commit()
     con.close()
     print(f"building {dst} done")
-assert os.path.getsize(dst) > 0
+assert os.path.getsize(dst) > min_db_size
 con = sqlite3.connect(dst)
 cur = con.cursor()
 imdb_title_basics_db_count, = cur.execute("select count() from imdb_title_basics").fetchone()
@@ -222,23 +228,24 @@ else:
     con.commit()
     con.close()
     print(f"building {dst} done")
-assert os.path.getsize(dst) > 0
+assert os.path.getsize(dst) > min_db_size
 con = sqlite3.connect(dst)
 cur = con.cursor()
 imdb_title_episode_db_count, = cur.execute("select count() from imdb_title_basics").fetchone()
 print("imdb_title_episode_db_count:", imdb_title_episode_db_count)
 
 
+"""
 if os.path.exists(movie_names_db_path):
     print("found movie_names_db")
 else:
-    raise NotImplementedError("TODO create movie_names_db from IMDB")
     # TODO index-compress.py
     # how was this generated? f"index-grouped/index.txt.grouped.{lang_code}"
     # ./opensubtitles_dump_client/num-movies-tvs.py:4:with open("index-grouped/index.txt.grouped.eng") as f:
     # ./opensubtitles_dump_client/repack.py:31:#index_file = f"index-grouped/index.txt.grouped.{lang_code}"
     # ./opensubtitles_dump_client/readme.md:10:Command being timed: "python -u index-compress.py group index.txt index.txt.grouped"
     print("building movie_names_db ...")
+    assert os.path.exists(zipfiles_db_path)
     src_con = sqlite3.connect(zipfiles_db_path)
     src_cur = src_con.cursor()
     dst_con = sqlite3.connect(movie_names_db_path)
@@ -253,11 +260,15 @@ else:
     dst_con.commit()
     dst_con.close()
     print("building movie_names_db done")
-assert os.path.getsize(movie_names_db_path) > 0
+assert os.path.getsize(movie_names_db_path) > min_db_size
 con = sqlite3.connect(movie_names_db_path)
 cur = con.cursor()
 movie_names_db_count, = cur.execute("select count() from subz_movie_names").fetchone()
 print("movie_names_db_count:", movie_names_db_count)
+"""
+
+
+raise NotImplementedError("TODO store all generated tables in one db")
 
 
 # TODO condition?
