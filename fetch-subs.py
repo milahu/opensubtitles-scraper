@@ -1,5 +1,49 @@
 #!/usr/bin/env python3
 
+# watch "ls -lt new-subs/ | head"
+
+"""
+FIXME scraper can hang
+
+
+
+2023-04-25 19:53:34,323 INFO 9211143 retry. error: html p=12.20%
+2023-04-25 19:53:34,500 INFO 9211485 200 dt=9.758 dt_avg=1.571 dt_par=0.072
+2023-04-25 19:53:37,599 INFO 9211099 200 dt=8.724 dt_avg=1.652 dt_par=0.103
+2023-04-25 19:53:38,364 INFO 9210779 200 dt=6.128 dt_avg=1.708 dt_par=0.110
+
+^CTraceback (most recent call last):
+  File "/home/user/src/opensubtitles-dump/./fetch-subs.py", line 883, in <module>
+    asyncio.get_event_loop().run_until_complete(main())
+  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 636, in run_until_complete
+    self.run_forever()
+  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 603, in run_forever
+    self._run_once()
+  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 1868, in _run_once
+    event_list = self._selector.select(timeout)
+  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/selectors.py", line 469, in select
+    fd_event_list = self._selector.poll(timeout, max_ev)
+KeyboardInterrupt
+
+
+
+2023-04-25 20:06:22,848 INFO 9216758 200 dt=8.646 dt_avg=1.399 dt_par=0.094
+2023-04-25 20:06:24,570 INFO 9216825 200 dt=8.413 dt_avg=1.477 dt_par=0.111
+
+^CTraceback (most recent call last):
+  File "/home/user/src/opensubtitles-dump/./fetch-subs.py", line 883, in <module>
+    pause_scraper = False
+  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 636, in run_until_complete
+    self.run_forever()
+  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 603, in run_forever
+    self._run_once()
+  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 1868, in _run_once
+    event_list = self._selector.select(timeout)
+  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/selectors.py", line 469, in select
+    fd_event_list = self._selector.poll(timeout, max_ev)
+KeyboardInterrupt
+"""
+
 import sys
 import os
 import re
@@ -13,18 +57,37 @@ import glob
 import collections
 import zipfile
 import base64
-import asyncio # pyppeteer
+import asyncio
 
+import aiohttp
 import requests
 import magic # libmagic
 
+
+# https://www.zenrows.com/ # Startup plan
+max_concurrency = 25
+
+
+#num_stack_size_min = 10000 # randomize the last 4 digits
+num_stack_size_min = 1000 # randomize the last 3 digits
+#num_stack_size_min = 100 # randomize the last 2 digits
+#num_stack_size_min = 10 # randomize the last 1 digit
+
+
+if False:
+#if True:
+    # debug
+    #max_concurrency = 1
+    num_stack_size_min = 10
 
 
 # captcha after 30 requests
 #proxy_provider = "chromium"
 
-proxy_provider = "pyppeteer"
+#proxy_provider = "pyppeteer"
 
+
+#fetcher_lib = "requests"
 
 
 pyppeteer_headless = True
@@ -43,9 +106,15 @@ api_key_webscraping_ai = "b948b414-dd1d-4d98-8688-67f154a74fe8"
 webscraping_ai_option_proxy = "datacenter"
 #webscraping_ai_option_proxy = "residential"
 
-#proxy_provider = "zenrows.com"
+proxy_provider = "zenrows.com"
+fetcher_lib = "aiohttp"
 #api_key_zenrows_com = "88d22df90b3a4c252b480dc8847872dac59db0e0" # expired
 from secrets import api_key_zenrows_com
+
+class Config:
+    zenrows_com_antibot = False
+    zenrows_com_js = False
+config = Config()
 
 #proxy_provider = "scraperbox.com"
 proxy_scraperbox_com_api_key = "56B1354FD63EB435CA1A9096B706BD55"
@@ -63,6 +132,19 @@ new_subs_dir = "new-subs"
 
 last_num_db = 9180517 # last num in opensubs.db
 print("last_num_db", last_num_db)
+
+# https://www.opensubtitles.org/en/search/subs
+# https://www.opensubtitles.org/ # New subtitles
+last_num_remote = 9520468 # 2023-04-25 # TODO update
+print("last_num_remote", last_num_remote)
+
+print("missing_count", last_num_remote - last_num_db)
+# 9520468 - 9180517 = 339951
+# missing_count versus num_stack_size_min:
+# 339951 / 10000 = 33.9951 stacks
+# 339951 / 1000 = 339.951 stacks
+
+
 
 # sleep X seconds after each download
 sleep_each_min, sleep_each_max = 0, 3
@@ -198,149 +280,14 @@ def new_session():
     return requests_session
 
 
-async def main():
+async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list, html_errors, config):
 
-    if proxy_provider == "zenrows.com":
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-    elif proxy_provider == "pyppeteer":
-        # puppeteer is old, chrome only, but stealth plugin works?
-        import pyppeteer
-        # https://github.com/towry/n/issues/148
-        # https://pypi.org/project/pyppeteer-stealth/
-        # https://github.com/MeiK2333/pyppeteer_stealth
-        sys.path.append("pyppeteer_stealth") # local version
-        import pyppeteer_stealth
-        print("pyppeteer_stealth", pyppeteer_stealth)
-        # TODO test sites:
-        # https://abrahamjuliot.github.io/creepjs/
-        # http://f.vision/
-        # via https://github.com/QIN2DIM/undetected-playwright/issues/2
-
-        print("pyppeteer.launch")
-        pyppeteer_browser = await pyppeteer.launch(
-            # https://pptr.dev/api/puppeteer.puppeteerlaunchoptions
-            headless=pyppeteer_headless,
-            executablePath=os.environ["PUPPETEER_EXECUTABLE_PATH"],
-            args=[
-                # no effect
-                #"--disable-blink-features=AutomationControlled",
-            ],
-        )
-
-        print("pyppeteer_browser.newPage")
-        pyppeteer_page = await pyppeteer_browser.newPage()
-
-        # TODO why is this not working?
-        print("pyppeteer_stealth.stealth")
-        await pyppeteer_stealth.stealth(pyppeteer_page)
-
-        for url, path in [
-            ('https://hmaker.github.io/selenium-detector/', 'chrome_headless_stealth.selenium-detector.png'),
-            ('https://bot.sannysoft.com/', 'chrome_headless_stealth.bot.sannysoft.com.png'), # outdated
-            #('https://whatsmyuseragent.org/', 'chrome_headless_stealth.whatsmyuseragent.org.png'),
-            #("https://dl.opensubtitles.org/en/download/sub/9184234", 'chrome_headless_stealth.dl.opensubtitles.org.png'),
-            ('https://abrahamjuliot.github.io/creepjs/', 'chrome_headless_stealth.creepjs.png'),
-            ('http://f.vision/', 'chrome_headless_stealth.fake-vision.png'),
-        ]:
-            await pyppeteer_page.goto(url)
-            if url == 'https://abrahamjuliot.github.io/creepjs/':
-                #for i in range(3):
-                #    await asyncio.sleep(10)
-                #    await pyppeteer_page.screenshot(path=path + f".{(i + 1) * 10}.png", fullPage=True)
-                await asyncio.sleep(10)
-            await pyppeteer_page.screenshot(path=path, fullPage=True)
-            print(f"done: {path}")
-
-        #await pyppeteer_browser.close()
-
-        raise NotImplementedError
-
-    #elif proxy_provider == "playwright":
-
-    first_num_file = last_num_db
-    last_num_file = 1
-
-    os.makedirs(new_subs_dir, exist_ok=True)
-    nums_done = []
-
-    for filename in os.listdir(new_subs_dir):
-        #match = re.fullmatch(r"([0-9]+)\.(.+\.)?zip", filename)
-        match = re.fullmatch(r"([0-9]+)\..*", filename)
-        if not match:
-            continue
-        num = int(match.group(1))
-        nums_done.append(num)
-        if num > last_num_file:
-            last_num_file = num
-        if num < first_num_file:
-            first_num_file = num
-
-    nums_done = sorted(nums_done)
-
-    print("first_num_file", first_num_file)
-    print("last_num_file", last_num_file)
-
-    requests_session = new_session()
-
-    num_stack_last = None
-
-    # find first missing file
-    for idx in range(0, len(nums_done) - 1):
-        if nums_done[idx] + 1 != nums_done[idx + 1]:
-            num_stack_last = nums_done[idx]
-            break
-
-    if num_stack_last == None:
-        # no missing files, continue with last file
-        #num_stack_last = first_num_file
-        num_stack_last = last_num_file
-
-    print("num_stack_last", num)
-
-    num_stack_first = num_stack_last
-
-    downloads_since_change_ipaddr = 0
-
-    # json file from https://www.useragents.me/
-    with open("user_agents.json") as f:
-        user_agents = json.load(f)
-        # there is also x["pct"] = frequency of user agent in percent
-        # but we dont need that value
-        user_agents = list(map(lambda x: x["ua"], user_agents))
-
-    user_agent = random.choice(user_agents)
-
-    num_stack_size = 1000 # randomize the last 3 digits
-    #num_stack_size = 100 # randomize the last 2 digits
-
-    nums_done_set = set(nums_done)
-    num_stack = []
-    dt_download_list = collections.deque(maxlen=100) # average the last 100 dt
-
-    #print("nums_done", nums_done)
-
-    # loop subtitle numbers
-
-    while True:
-
-        while not num_stack: # while stack is empty
-            # add random numbers to the stack
-            num_stack_first = num_stack_last + 1
-            num_stack_last = num_stack_first + num_stack_size
-            num_stack = list(
-                filter(lambda num: num not in nums_done_set,
-                    range(num_stack_first, num_stack_last + 1)
-                )
-            )
-            #print("num_stack", num_stack)
-            random.shuffle(num_stack)
+    async with semaphore: # limit parallel downloads
 
         t1_download = time.time()
 
-        num = num_stack.pop()
-
+        # handled by nums_done
+        """
         filename_glob = f"{new_subs_dir}/{num}.*"
         filename_zip = f"{new_subs_dir}/{num}.zip"
         filename_notfound = f"{new_subs_dir}/{num}.not-found"
@@ -350,10 +297,19 @@ async def main():
         existing_output_files = glob.glob(filename_glob)
         if len(existing_output_files) > 0:
             logger.info(f"{num} output file exists: {existing_output_files}")
-            continue
+            #continue
+            return
+        """
+
+        filename_zip = f"{new_subs_dir}/{num}.zip"
+        filename_notfound = f"{new_subs_dir}/{num}.not-found"
 
         filename = filename_zip
-        url = f"https://dl.opensubtitles.org/en/download/sub/{num}"
+        #url = f"https://www.opensubtitles.org/en/subtitleserve/sub/{num}"
+        # redirect location:
+        #url = f"https://dl.opensubtitles.org/en/download/sub/{num}"
+        # use http protocol to fix: aiohttp.client_exceptions.ClientConnectorCertificateError: Cannot connect to host dl.opensubtitles.org:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:997)')]
+        url = f"http://dl.opensubtitles.org/en/download/sub/{num}"
         proxies = {}
         requests_get_kwargs = {}
         content_type = None
@@ -373,12 +329,37 @@ async def main():
             status_code = response.status_code
 
         elif proxy_provider == "zenrows.com":
-            proxy = f"http://{api_key_zenrows_com}:@proxy.zenrows.com:8001"
+            #proxy = f"http://{api_key_zenrows_com}:@proxy.zenrows.com:8001"
+            zenrows_com_query_parts = []
+            if config.zenrows_com_antibot:
+                logger.info(f"{num} antibot=true")
+                zenrows_com_query_parts += ["antibot=true"]
+                # reset config for next request
+                config.zenrows_com_antibot = False
+            if config.zenrows_com_js:
+                logger.info(f"{num} js_render=true")
+                zenrows_com_query_parts += ["js_render=true"]
+                # reset config for next request
+                config.zenrows_com_js = False
+            zenrows_com_query = "&".join(zenrows_com_query_parts)
+            proxy = f"http://{api_key_zenrows_com}:{zenrows_com_query}@proxy.zenrows.com:8001"
             proxies = {"http": proxy, "https": proxy}
-            requests_get_kwargs["proxies"] = proxies
-            requests_get_kwargs["verify"] = False
-            response = requests.get(url, **requests_get_kwargs)
-            status_code = response.status_code
+            #requests_get_kwargs["proxies"] = proxies # requests
+            requests_get_kwargs["proxy"] = proxy # aiohttp
+            #requests_get_kwargs["verify"] = False # requests
+            try:
+                #response = requests.get(url, **requests_get_kwargs)
+                response = await session.get(url, **requests_get_kwargs)
+            except (
+                requests.exceptions.ProxyError,
+                asyncio.exceptions.TimeoutError,
+            ) as err:
+                # requests.exceptions.ProxyError: HTTPSConnectionPool(host='dl.opensubtitles.org', port=443): Max retries exceeded with url: /en/download/sub/9188285 (Caused by ProxyError('Cannot connect to proxy.', NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x7fa473cadcf0>: Failed to establish a new connection: [Errno -3] Temporary failure in name resolution')))
+                logger.info(f"{num} retry. error: {err}")
+                return num # retry
+            #print("response", dir(response))
+            #status_code = response.status_code # requests
+            status_code = response.status # aiohttp
             content_type = response.headers.get("Zr-Content-Type")
             content_disposition = response.headers.get("Zr-Content-Disposition")
 
@@ -524,16 +505,34 @@ async def main():
                 t2_download = time.time()
                 dt_download = t2_download - t1_download
                 dt_download_list.append(dt_download)
+                t2_download_list.append(t2_download)
                 dt_download_avg = sum(dt_download_list) / len(dt_download_list)
+                dt_download_list_parallel = []
+                t2_download_list_sorted = sorted(t2_download_list)
+                for i in range(0, len(t2_download_list_sorted) - 1):
+                    t2 = t2_download_list_sorted[i]
+                    t2_next = t2_download_list_sorted[i + 1]
+                    dt = t2_next - t2
+                    dt_download_list_parallel.append(dt)
+                if len(dt_download_list_parallel) > 0:
+                    dt_download_avg_parallel = sum(dt_download_list_parallel) / len(dt_download_list_parallel)
+                else:
+                    dt_download_avg_parallel = 0
+
+                logger.info("t2_download_list", t2_download_list)
+                logger.info("dt_download_list_parallel", dt_download_list_parallel)
 
                 #logger.debug("headers: " + repr(dict(headers)))
                 sleep_each = random.randint(sleep_each_min, sleep_each_max)
                 if sleep_each > 0:
-                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} -> waiting {sleep_each} seconds")
+                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} -> waiting {sleep_each} seconds")
                 else:
-                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}")
+                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}")
+                if dt_download_avg_parallel > 1:
+                    logger.info(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
                 time.sleep(sleep_each)
-                continue
+                #continue
+                return
             else:
                 print(f"error: found multiple downloaded files for num={num}:", downloaded_files)
                 raise NotImplementedError
@@ -566,12 +565,28 @@ async def main():
             t2_download = time.time()
             dt_download = t2_download - t1_download
             dt_download_list.append(dt_download)
+            t2_download_list.append(t2_download)
+            t2_download_list_sorted = sorted(t2_download_list)
             dt_download_avg = sum(dt_download_list) / len(dt_download_list)
-            logger.info(f"{num} {status_code} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}")
-            num += 1
-            continue
+            dt_download_list_parallel = []
+            for i in range(0, len(t2_download_list_sorted) - 1):
+                t2 = t2_download_list_sorted[i]
+                t2_next = t2_download_list_sorted[i + 1]
+                dt = t2_next - t2
+                dt_download_list_parallel.append(dt)
+            if len(dt_download_list_parallel) > 0:
+                dt_download_avg_parallel = sum(dt_download_list_parallel) / len(dt_download_list_parallel)
+            else:
+                dt_download_avg_parallel = 0
 
-        if status_code == 429:
+            logger.info(f"{num} {status_code} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}")
+            if dt_download_avg_parallel > 1:
+                logger.info(f"499: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+            #num += 1
+            #continue
+            return
+
+        if False and status_code == 429:
             # rate limiting
             # this happens after 30 sequential requests
             # only successful requests are counted (http 404 is not counted)
@@ -596,20 +611,47 @@ async def main():
             # fix: http.client.RemoteDisconnected: Remote end closed connection without response
             requests_session = new_session()
             time.sleep(sleep_change_ipaddr)
-            continue
+            #continue
+            return
 
         if status_code == 500:
-            logger.info(f"{num} {status_code} Internal Server Error -> retrying in 10 seconds")
-            time.sleep(10)
-            num_stack.append(num) # retry num. inverse of: num = num_stack.pop()
-            continue
+            logger.info(f"{num} {status_code} Internal Server Error -> retry")
+            return num
 
-        assert status_code == 200, f"{num} unexpected status_code {status_code}. headers: {response_headers}. content: {response_content[0:100]}..."
+        if status_code == 422:
+            response_json = (await response_content.read()).decode("utf8")
+            response_data = json.loads(response_json)
+            if response_data["code"] == "RESP001":
+                # Could not get content. try enabling javascript rendering for a higher success rate (RESP001)
+                #config.zenrows_com_js = True
+                #config.zenrows_com_antibot = True
+                logger.info(f"{num} retry. error: need javascript")
+                #return num # retry
+                return {"retry_num": num, "pause": True} # pause scraper and retry
+            logger.info(f"{num} retry. headers: {response_headers}. content: {await response_content.read()}")
+            return num # retry
+
+        if status_code == 429:
+            response_json = (await response_content.read()).decode("utf8")
+            response_data = json.loads(response_json)
+            if response_data["code"] == "AUTH006":
+                # The concurrency limit was reached. Please upgrade to a higher plan or sl
+                logger.info(f"{num} retry. error: concurrency limit was reached @ {response_json}")
+                return {"retry_num": num, "pause": True} # pause scraper and retry
+            logger.info(f"{num} retry. headers: {response_headers}. content: {await response_content.read()}")
+            return num # retry
+
+        # requests
+        #assert status_code == 200, f"{num} unexpected status_code {status_code}. headers: {response_headers}. content: {response_content[0:100]}..."
+        # aiohttp
+        assert status_code == 200, f"{num} unexpected status_code {status_code}. headers: {response_headers}. content: {await response_content.read(100)}..."
 
         content_type = content_type or response_headers.get("Content-Type")
 
         if content_type != "application/zip":
-            print(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
+            # blocked
+            # TODO retry download
+            #print(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
             if content_type in {"text/html", "text/html; charset=UTF-8", "text/html; charset=utf-8"}:
                 # can be "not found" or "blocked":
                 # not found: [CRITICAL ERROR] Subtitle id {num} was not found in database
@@ -621,7 +663,15 @@ async def main():
                 # blocked shows after about 30 requests
                 # can also be alert:
                 # alert: Turn off adblocker, otherwise site will not work properly. You can use different browser or browser in incognito/private mode
-                filename=f"{new_subs_dir}/{num}.html"
+                if headers.get("Zr-Final-Url") == "https://www.opensubtitles.org/en/login/vrf-on":
+                    logger.info(f"""{num} FIXME Zr-Final-Url: {headers.get("Zr-Final-Url")}""")
+                else:
+                    logger.info(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}")
+                filename = f"{new_subs_dir}/{num}.html"
+                i = 1
+                while os.path.exists(filename):
+                    i += 1
+                    filename = f"{new_subs_dir}/{num}.{i}.html"
             else:
                 filename=f"{new_subs_dir}/{num}.unknown"
                 print(f"{num} saving response_content to file: {filename}")
@@ -649,34 +699,245 @@ async def main():
         file_open_mode = "wb"
         if type(response_content) == str:
             file_open_mode = "w"
-        with open(filename_tmp, file_open_mode) as f:
-            f.write(response_content)
+        if fetcher_lib == "aiohttp":
+            with open(filename_tmp, file_open_mode) as f:
+                f.write(await response_content.read())
+        else:
+            # requests
+            with open(filename_tmp, file_open_mode) as f:
+                f.write(response_content)
         os.rename(filename_tmp, filename)
 
+        if filename.endswith(".html"):
+            html_errors.append(True)
+            html_error_probability = sum(map(lambda _: 1, filter(lambda x: x == True, html_errors))) / len(html_errors)
+            logger.info(f"{num} retry. error: html p={html_error_probability * 100:.2f}%")
+            return num # retry
+        else:
+           html_errors.append(False)
+
         # check file
-        logger.debug(f"checking zipfile {filename}")
-        try:
-            with zipfile.ZipFile(filename, "r") as z:
-                logger.debug(f"files in zipfile {filename}:")
-                for name in z.namelist():
-                    logger.debug(f"  {name}")
-        except zipfile.BadZipFile as err:
-            logger.info(f"{num} broken zipfile: {filename} - moving to {filename}.broken - error: {err}")
-            os.rename(filename, filename + ".broken")
+        if filename.endswith(".zip"):
+            logger.debug(f"checking zipfile {filename}")
+            try:
+                with zipfile.ZipFile(filename, "r") as z:
+                    logger.debug(f"files in zipfile {filename}:")
+                    for name in z.namelist():
+                        logger.debug(f"  {name}")
+            except zipfile.BadZipFile as err:
+                logger.info(f"{num} broken zipfile: {filename} - moving to {filename}.broken - error: {err}")
+                os.rename(filename, filename + ".broken")
 
         t2_download = time.time()
         dt_download = t2_download - t1_download
         dt_download_list.append(dt_download)
+        t2_download_list.append(t2_download)
+        t2_download_list_sorted = sorted(t2_download_list)
         dt_download_avg = sum(dt_download_list) / len(dt_download_list)
+        dt_download_list_parallel = []
+        for i in range(0, len(t2_download_list_sorted) - 1):
+            t2 = t2_download_list_sorted[i]
+            t2_next = t2_download_list_sorted[i + 1]
+            dt = t2_next - t2
+            dt_download_list_parallel.append(dt)
+        if len(dt_download_list_parallel) > 0:
+            dt_download_avg_parallel = sum(dt_download_list_parallel) / len(dt_download_list_parallel)
+        else:
+            dt_download_avg_parallel = 0
+
+        #logger.info("t2_download_list", t2_download_list)
+        #logger.info("dt_download_list_parallel", dt_download_list_parallel)
 
         #logger.debug("headers: " + repr(dict(headers)))
         sleep_each = random.randint(sleep_each_min, sleep_each_max)
         if sleep_each > 0:
-            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} -> waiting {sleep_each} seconds")
+            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} -> waiting {sleep_each} seconds")
         else:
-            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}")
-        time.sleep(sleep_each)
+            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}")
+        if dt_download_avg_parallel > 1:
+            logger.info(f"635: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+        #time.sleep(sleep_each)
         #break
         #num += 1
+
+
+async def main():
+
+    if proxy_provider == "zenrows.com":
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    elif proxy_provider == "pyppeteer":
+        # puppeteer is old, chrome only, but stealth plugin works?
+        import pyppeteer
+        # https://github.com/towry/n/issues/148
+        # https://pypi.org/project/pyppeteer-stealth/
+        # https://github.com/MeiK2333/pyppeteer_stealth
+        sys.path.append("pyppeteer_stealth") # local version
+        import pyppeteer_stealth
+        print("pyppeteer_stealth", pyppeteer_stealth)
+        # TODO test sites:
+        # https://abrahamjuliot.github.io/creepjs/
+        # http://f.vision/
+        # via https://github.com/QIN2DIM/undetected-playwright/issues/2
+
+        print("pyppeteer.launch")
+        pyppeteer_browser = await pyppeteer.launch(
+            # https://pptr.dev/api/puppeteer.puppeteerlaunchoptions
+            headless=pyppeteer_headless,
+            executablePath=os.environ["PUPPETEER_EXECUTABLE_PATH"],
+            args=[
+                # no effect
+                #"--disable-blink-features=AutomationControlled",
+            ],
+        )
+
+        print("pyppeteer_browser.newPage")
+        pyppeteer_page = await pyppeteer_browser.newPage()
+
+        # TODO why is this not working?
+        print("pyppeteer_stealth.stealth")
+        await pyppeteer_stealth.stealth(pyppeteer_page)
+
+        for url, path in [
+            ('https://hmaker.github.io/selenium-detector/', 'chrome_headless_stealth.selenium-detector.png'),
+            ('https://bot.sannysoft.com/', 'chrome_headless_stealth.bot.sannysoft.com.png'), # outdated
+            #('https://whatsmyuseragent.org/', 'chrome_headless_stealth.whatsmyuseragent.org.png'),
+            #("https://dl.opensubtitles.org/en/download/sub/9184234", 'chrome_headless_stealth.dl.opensubtitles.org.png'),
+            ('https://abrahamjuliot.github.io/creepjs/', 'chrome_headless_stealth.creepjs.png'),
+            ('http://f.vision/', 'chrome_headless_stealth.fake-vision.png'),
+        ]:
+            await pyppeteer_page.goto(url)
+            if url == 'https://abrahamjuliot.github.io/creepjs/':
+                #for i in range(3):
+                #    await asyncio.sleep(10)
+                #    await pyppeteer_page.screenshot(path=path + f".{(i + 1) * 10}.png", fullPage=True)
+                await asyncio.sleep(10)
+            await pyppeteer_page.screenshot(path=path, fullPage=True)
+            print(f"done: {path}")
+
+        #await pyppeteer_browser.close()
+
+        raise NotImplementedError
+
+    #elif proxy_provider == "playwright":
+
+    #first_num_file = last_num_db
+    #last_num_file = 1
+
+    os.makedirs(new_subs_dir, exist_ok=True)
+    nums_done = []
+
+    for filename in os.listdir(new_subs_dir):
+        #match = re.fullmatch(r"([0-9]+)\.(.+\.)?zip", filename)
+        # retry .html files
+        match = re.fullmatch(r"([0-9]+)\.(zip|not-found|.*\.zip)", filename)
+        if not match:
+            continue
+        num = int(match.group(1))
+        nums_done.append(num)
+
+    nums_done = sorted(nums_done)
+
+    #print("nums_done", nums_done[0:10], "...", nums_done[-10:])
+    #print("nums_done", nums_done)
+
+    first_num_file = nums_done[0]
+    last_num_file = nums_done[-1]
+
+    print("first_num_file", first_num_file)
+    print("last_num_file", last_num_file)
+
+    requests_session = new_session()
+
+    num_stack_last = None
+
+    # find first missing file
+    for idx in range(0, len(nums_done) - 1):
+        if nums_done[idx] + 1 != nums_done[idx + 1]:
+            num_stack_last = nums_done[idx]
+            break
+
+    if num_stack_last == None:
+        # no missing files, continue with last file
+        #num_stack_last = first_num_file
+        num_stack_last = last_num_file
+
+    print("num_stack_last", num)
+
+    num_stack_first = num_stack_last
+
+    downloads_since_change_ipaddr = 0
+
+    # json file from https://www.useragents.me/
+    with open("user_agents.json") as f:
+        user_agents = json.load(f)
+        # there is also x["pct"] = frequency of user agent in percent
+        # but we dont need that value
+        user_agents = list(map(lambda x: x["ua"], user_agents))
+
+    user_agent = random.choice(user_agents)
+
+    nums_done_set = set(nums_done)
+    num_stack = []
+    dt_download_list = collections.deque(maxlen=100) # last 100 dt
+    t2_download_list = collections.deque(maxlen=100) # last 100 t2
+    html_errors = collections.deque(maxlen=1000)
+
+    # loop subtitle numbers
+
+    while True:
+
+        #while not num_stack: # while stack is empty
+        while len(num_stack) < num_stack_size_min: # while stack is empty
+            # add numbers to the stack
+            num_stack_first = num_stack_last + 1
+            num_stack_last = num_stack_first + num_stack_size_min
+            #logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
+            num_stack += list(
+                filter(lambda num: num not in nums_done_set,
+                    range(num_stack_first, num_stack_last + 1),
+                    #random.sample(range(num_stack_first, last_num_remote + 1), num_stack_size_min)
+                )
+            )
+            #print("num_stack", num_stack)
+
+        random.shuffle(num_stack)
+
+        logger.info(f"batch size: {len(num_stack)}")
+        #logger.info(f"batch: {num_stack}")
+        semaphore = asyncio.Semaphore(max_concurrency)
+        # fix: aiohttp.client_exceptions.ClientConnectorCertificateError: Cannot connect to host dl.opensubtitles.org:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:997)')]
+        #async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            while num_stack:
+                num = num_stack.pop()
+                task = asyncio.create_task(fetch_num(num, session, semaphore, dt_download_list, t2_download_list, html_errors, config))
+                tasks.append(task)
+            return_values = await asyncio.gather(*tasks)
+            # TODO show progress
+            #print("return_values", return_values)
+            pause_scraper = False
+            for return_value in return_values:
+                if return_value == None:
+                    continue
+                if type(return_value) == int:
+                    # retry
+                    num_stack.append(return_value)
+                elif type(return_value) == dict:
+                    if "retry_num" in return_value:
+                        # retry
+                        num_stack.append(return_value["retry_num"])
+                    if "pause" in return_value:
+                        pause_scraper = True
+
+            if pause_scraper:
+                t_sleep = random.randrange(1*60, 3*60)
+                logger.info(f"pausing scraper for {t_sleep} seconds")
+                time.sleep(t_sleep)
+                # reset t2 values
+                while t2_download_list:
+                    t2_download_list.pop()
 
 asyncio.get_event_loop().run_until_complete(main())
