@@ -2,48 +2,6 @@
 
 # watch "ls -lt new-subs/ | head"
 
-"""
-FIXME scraper can hang
-
-
-
-2023-04-25 19:53:34,323 INFO 9211143 retry. error: html p=12.20%
-2023-04-25 19:53:34,500 INFO 9211485 200 dt=9.758 dt_avg=1.571 dt_par=0.072
-2023-04-25 19:53:37,599 INFO 9211099 200 dt=8.724 dt_avg=1.652 dt_par=0.103
-2023-04-25 19:53:38,364 INFO 9210779 200 dt=6.128 dt_avg=1.708 dt_par=0.110
-
-^CTraceback (most recent call last):
-  File "/home/user/src/opensubtitles-dump/./fetch-subs.py", line 883, in <module>
-    asyncio.get_event_loop().run_until_complete(main())
-  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 636, in run_until_complete
-    self.run_forever()
-  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 603, in run_forever
-    self._run_once()
-  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 1868, in _run_once
-    event_list = self._selector.select(timeout)
-  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/selectors.py", line 469, in select
-    fd_event_list = self._selector.poll(timeout, max_ev)
-KeyboardInterrupt
-
-
-
-2023-04-25 20:06:22,848 INFO 9216758 200 dt=8.646 dt_avg=1.399 dt_par=0.094
-2023-04-25 20:06:24,570 INFO 9216825 200 dt=8.413 dt_avg=1.477 dt_par=0.111
-
-^CTraceback (most recent call last):
-  File "/home/user/src/opensubtitles-dump/./fetch-subs.py", line 883, in <module>
-    pause_scraper = False
-  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 636, in run_until_complete
-    self.run_forever()
-  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 603, in run_forever
-    self._run_once()
-  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/asyncio/base_events.py", line 1868, in _run_once
-    event_list = self._selector.select(timeout)
-  File "/nix/store/0pyymzxf7n0fzpaqnvwv92ab72v3jq8d-python3-3.10.9/lib/python3.10/selectors.py", line 469, in select
-    fd_event_list = self._selector.poll(timeout, max_ev)
-KeyboardInterrupt
-"""
-
 import sys
 import os
 import re
