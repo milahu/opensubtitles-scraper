@@ -25,6 +25,8 @@ import magic # libmagic
 # https://www.zenrows.com/ # Startup plan
 #max_concurrency = 25 # concurrency limit was reached
 max_concurrency = 10
+# unexpected status_code 403. content: b'{"code":"BLK0001","detail":"Your IP address has been blocked for exceeding the maximum error rate al'...
+# -> change_ipaddr()
 
 
 #num_stack_size_min = 10000 # randomize the last 4 digits
@@ -197,6 +199,11 @@ def change_ipaddr():
     new_ipaddr = get_ipaddr()
     logger.info(f"changed IP address from {old_ipaddr} to {new_ipaddr}")
     return old_ipaddr, new_ipaddr
+
+
+if False:
+    print("changing IP address")
+    change_ipaddr()
 
 
 def change_ipsubnet():
@@ -577,7 +584,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             logger.info(f"{num} {status_code} Internal Server Error -> retry")
             return num
 
-        if status_code == 422:
+        if status_code in {422, 429, 403}:
             response_json = (await response_content.read()).decode("utf8")
             response_data = json.loads(response_json)
             if response_data["code"] == "RESP001":
@@ -586,17 +593,15 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 #config.zenrows_com_antibot = True
                 logger.info(f"{num} retry. error: need javascript")
                 #return num # retry
-                return {"retry_num": num, "pause": True} # pause scraper and retry
-            logger.info(f"{num} retry. headers: {response_headers}. content: {await response_content.read()}")
-            return num # retry
-
-        if status_code == 429:
-            response_json = (await response_content.read()).decode("utf8")
-            response_data = json.loads(response_json)
+                return {"retry_num": num, "pause": True} # pause scraper, retry
             if response_data["code"] == "AUTH006":
-                # The concurrency limit was reached. Please upgrade to a higher plan or sl
+                # The concurrency limit was reached. Please upgrade to a higher plan or ...
                 logger.info(f"{num} retry. error: concurrency limit was reached @ {response_json}")
-                return {"retry_num": num, "pause": True} # pause scraper and retry
+                return {"retry_num": num, "pause": True} # pause scraper, retry
+            if response_data["code"] == "BLK0001":
+                # Your IP address has been blocked for exceeding the maximum error rate ...
+                logger.info(f"{num} retry. error: IP address was blocked @ {response_json}")
+                return {"retry_num": num, "pause": True, "change_ipaddr": True} # pause scraper, change IP address, retry
             logger.info(f"{num} retry. headers: {response_headers}. content: {await response_content.read()}")
             return num # retry
 
@@ -878,6 +883,7 @@ async def main():
             # TODO show progress
             #print("return_values", return_values)
             pause_scraper = False
+            do_change_ipaddr = False
             for return_value in return_values:
                 if return_value == None:
                     continue
@@ -890,6 +896,12 @@ async def main():
                         num_stack.append(return_value["retry_num"])
                     if "pause" in return_value:
                         pause_scraper = True
+                    if "change_ipaddr" in return_value:
+                        do_change_ipaddr = True
+
+            if do_change_ipaddr:
+                logger.info("changing IP address")
+                change_ipaddr()
 
             if pause_scraper:
                 t_sleep = random.randrange(20, 60)
