@@ -2,8 +2,8 @@
 
 # workaround for: asyncio hangs
 
-# t_sleep = random.randrange(1*60, 3*60)
-dt_max = 3*60 + 10
+# t_sleep = random.randrange(20, 60)
+dt_max = 60 + 10
 
 import sys
 import subprocess

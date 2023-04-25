@@ -933,7 +933,7 @@ async def main():
                         pause_scraper = True
 
             if pause_scraper:
-                t_sleep = random.randrange(1*60, 3*60)
+                t_sleep = random.randrange(20, 60)
                 logger.info(f"pausing scraper for {t_sleep} seconds")
                 time.sleep(t_sleep)
                 # reset t2 values
