@@ -23,7 +23,8 @@ import magic # libmagic
 
 
 # https://www.zenrows.com/ # Startup plan
-max_concurrency = 25
+#max_concurrency = 25 # concurrency limit was reached
+max_concurrency = 10
 
 
 #num_stack_size_min = 10000 # randomize the last 4 digits
