@@ -16,6 +16,8 @@ let
     pycdlib = pkgs.python3.pkgs.callPackage ./nix/pycdlib.nix {};
   };
 
+  sqlite-bench = pkgs.callPackage ./nix/sqlite-bench.nix {};
+
   python = pkgs.python3.withPackages (pp: with pp; [
     requests
     magic # libmagic
@@ -85,6 +87,7 @@ buildInputs = (with pkgs; [
   #extraPythonPackages.pyppeteer-stealth
   #extraPythonPackages.undetected-playwright
   extraPythonPackages.pycdlib
+  sqlite-bench
 ];
 
 }
