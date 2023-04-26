@@ -2,6 +2,8 @@
 
 # workaround for: asyncio hangs
 
+# python -u fetch-subs-runner.py 2>&1 | tee -a fetch-subs-runner.py.log
+
 # t_sleep = random.randrange(20, 60)
 dt_max = 60 + 10
 
