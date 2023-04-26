@@ -13,6 +13,7 @@ let
     #playwright-stealth = pkgs.python3.pkgs.callPackage ./nix/playwright-stealth.nix {};
     #undetected-playwright = pkgs.python3.pkgs.callPackage ./nix/undetected-playwright.nix {};
     #pygnuutils = pkgs.python3.pkgs.callPackage ./nix/pygnuutils.nix {};
+    pycdlib = pkgs.python3.pkgs.callPackage ./nix/pycdlib.nix {};
   };
 
   python = pkgs.python3.withPackages (pp: with pp; [
@@ -31,7 +32,10 @@ let
     # ray is too complex, has only binary package in nixpkgs https://github.com/NixOS/nixpkgs/pull/194357
     #ray
     # https://github.com/tomerfiliba-org/rpyc
-    rpyc
+    #rpyc
+    aiohttp
+    natsort
+    #pycdlib
   ]);
 
   # building sqlite took about 15 minutes on my laptop
@@ -70,6 +74,9 @@ buildInputs = (with pkgs; [
   #playwright
   #squashfsTools # mksquashfs
   sqlite
+  udftools # mkudffs
+  xorriso # xorrisofs
+  #libfaketime # faketime # this was a desperate attempt at reproducible UDF images
 ]) ++ [
   python
   #sqlite-debug
@@ -77,6 +84,7 @@ buildInputs = (with pkgs; [
   #extraPythonPackages.pygnuutils
   #extraPythonPackages.pyppeteer-stealth
   #extraPythonPackages.undetected-playwright
+  extraPythonPackages.pycdlib
 ];
 
 }
