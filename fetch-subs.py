@@ -2,6 +2,11 @@
 
 # watch "ls -lt new-subs/ | head"
 
+# expected time: 1E6 * 0.1 / 3600 = 28 hours
+# no. i over-estimated the number of requests
+# it was only 300K requests, and it was done in about 1.5 days
+# not bad, zenrows.com! :)
+
 import sys
 import os
 import re
@@ -27,6 +32,20 @@ import magic # libmagic
 max_concurrency = 10
 # unexpected status_code 403. content: b'{"code":"BLK0001","detail":"Your IP address has been blocked for exceeding the maximum error rate al'...
 # -> change_ipaddr()
+
+
+# no. not needed because i over-estimated the missing number (?)
+# the last batches should run in sequential order
+# last batches = we are limited by API credits
+# we dont want holes in the dataset
+# done 300K = 30% of 1M
+# start sequential at around 80% (better too early)
+# so 80% would be
+# first_num = 9180519
+# last_num_remote = 9520468
+# 9180519 + 0.8 * 1E6 = 9980519
+# 9520468 - 0.2 * 1E6 = 9320468 # pick
+#sequential_fetching_after_num = 9320468
 
 
 #num_stack_size_min = 10000 # randomize the last 4 digits
@@ -96,7 +115,11 @@ print("last_num_db", last_num_db)
 
 # https://www.opensubtitles.org/en/search/subs
 # https://www.opensubtitles.org/ # New subtitles
-last_num_remote = 9520468 # 2023-04-25 # TODO update
+# TODO update
+#last_num_remote = 9520468 # 2023-04-25
+last_num_remote = 9521948 # 2023-04-26
+# last found 9521948
+# done 9528240
 print("last_num_remote", last_num_remote)
 
 print("missing_count", last_num_remote - last_num_db)
@@ -106,6 +129,33 @@ print("missing_count", last_num_remote - last_num_db)
 # 339951 / 1000 = 339.951 stacks
 
 
+# example: https://www.opensubtitles.org/en/subtitles/9205951
+# this is a bug in opensubtitles.org
+# the server returns infinite cyclic redirect via
+# https://www.opensubtitles.org/en/msg-dmca
+# and zenrows says: error: need javascript
+# ... so these files were deleted because of dcma takedown requests (by copyright trolls)
+missing_numbers = None
+missing_numbers_txt_path = "missing_numbers.txt"
+if os.path.exists(missing_numbers_txt_path):
+    print(f"loading missing_numbers from {missing_numbers_txt_path}")
+    with open(missing_numbers_txt_path, "r") as f:
+        missing_numbers = list(map(int, f.read().strip().split("\n")))
+if missing_numbers:
+    print(f"fetching {len(missing_numbers)} missing numbers:", missing_numbers)
+
+    # postprocess: create empty dcma files
+    # TODO detect these files while scraping
+    # in the future, zenrows may return a different error than
+    # RESP001 (Could not get content. try enabling javascript rendering)
+    # zenrows support:
+    # > The error might be misleading, but apart from changing that, we can't do anything else.
+    # > BTW, if they return a status code according to the error, you might get it back with original_status=true
+    for num in missing_numbers:
+        # create empty file
+        filename_dcma = f"{new_subs_dir}/{num}.dcma"
+        open(filename_dcma, 'a').close() # create empty file
+    raise Exception("done postprocessing")
 
 # sleep X seconds after each download
 sleep_each_min, sleep_each_max = 0, 3
@@ -494,8 +544,8 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                     logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} -> waiting {sleep_each} seconds")
                 else:
                     logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}")
-                if dt_download_avg_parallel > 1:
-                    logger.info(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+                #if dt_download_avg_parallel > 1:
+                #    logger.info(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
                 time.sleep(sleep_each)
                 #continue
                 return
@@ -546,8 +596,8 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 dt_download_avg_parallel = 0
 
             logger.info(f"{num} {status_code} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}")
-            if dt_download_avg_parallel > 1:
-                logger.info(f"499: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+            #if dt_download_avg_parallel > 1:
+            #    logger.info(f"499: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
             #num += 1
             #continue
             return
@@ -742,8 +792,8 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} -> waiting {sleep_each} seconds")
         else:
             logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}")
-        if dt_download_avg_parallel > 1:
-            logger.info(f"635: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+        #if dt_download_avg_parallel > 1:
+        #    logger.info(f"635: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
         #time.sleep(sleep_each)
         #break
         #num += 1
@@ -877,17 +927,41 @@ async def main():
     while True:
 
         #while not num_stack: # while stack is empty
+        retry_counter = 0
         while len(num_stack) < num_stack_size_min: # while stack is empty
+            if missing_numbers:
+                num_stack = missing_numbers
+                # slow but rare
+                for filename in os.listdir(new_subs_dir):
+                    for num in missing_numbers:
+                        if (
+                            filename == f"{num}.not-found" or (
+                                filename.startswith(f"{num}.") and
+                                filename.endswith(".zip")
+                            )
+                        ):
+                            missing_numbers.remove(num)
+                if len(missing_numbers) == 0:
+                    raise Exception("done all missing_numbers")
+                break
             # add numbers to the stack
             num_stack_first = num_stack_last + 1
             num_stack_last = num_stack_first + num_stack_size_min
             #logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
+            def filter_num(num):
+                return (
+                    num not in nums_done_set and
+                    num < last_num_remote
+                )
             num_stack += list(
-                filter(lambda num: num not in nums_done_set,
+                filter(filter_num,
                     range(num_stack_first, num_stack_last + 1),
                     #random.sample(range(num_stack_first, last_num_remote + 1), num_stack_size_min)
                 )
             )
+            retry_counter += 1
+            if retry_counter > 1000:
+                raise Exception(f"done all nums until {last_num_remote}")
             #print("num_stack", num_stack)
 
         random.shuffle(num_stack)
@@ -910,6 +984,7 @@ async def main():
             do_change_ipaddr = False
             for return_value in return_values:
                 if return_value == None:
+                    # success
                     continue
                 if type(return_value) == int:
                     # retry
