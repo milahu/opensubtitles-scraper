@@ -43,6 +43,9 @@ for input_name in os.listdir(input_dir):
         continue
     # create hardlink
     input_path = f"{input_dir}/{input_name}"
+    if os.path.getsize(input_path) == 0:
+        # legacy. input extension should be ".not-found"
+        continue
     #print(f"ln {shlex.quote(input_path)} {shlex.quote(output_path)}")
     os.link(input_path, output_path)
     #break # debug
