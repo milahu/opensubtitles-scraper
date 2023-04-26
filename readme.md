@@ -12,6 +12,7 @@ scrape subtitles from [opensubtitles.org](https://www.opensubtitles.org/)
 
 useful for subtitle-fetchers like
 
+- [bazarr](https://github.com/morpheus65535/bazarr)
 - [subliminal](https://github.com/Diaoul/subliminal)
 - [subdl](https://github.com/alexanderwink/subdl)
 
