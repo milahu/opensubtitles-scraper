@@ -653,13 +653,37 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             # use filename from response_headers
             content_filename = content_disposition[22:-1]
             filename = f"{new_subs_dir}/{num}.{content_filename}"
+            # remove the f".({num})" part from filename
+            # adding f"{num}." to start of filename makes the filename too long
+            # fix: OSError: [Errno 36] File name too long
+            # 258 == len("9371758.zombieland.saga.s01.e09.though.my.life.may.have.ended.once.by.some.twist.of.fate.i.have.risen.and.if.song.and.dance.are.to.be.my.fate.then.carrying.the.memories.of.my.comrades.in.my.heart.as.i.sally.forth.shall.be.my.saga.(2018).spa.1cd.(9371758).zip")
+            # 250 == len("zombieland.saga.s01.e09.though.my.life.may.have.ended.once.by.some.twist.of.fate.i.have.risen.and.if.song.and.dance.are.to.be.my.fate.then.carrying.the.memories.of.my.comrades.in.my.heart.as.i.sally.forth.shall.be.my.saga.(2018).spa.1cd.(9371758).zip")
+            # 248 == len("9371758.zombieland.saga.s01.e09.though.my.life.may.have.ended.once.by.some.twist.of.fate.i.have.risen.and.if.song.and.dance.are.to.be.my.fate.then.carrying.the.memories.of.my.comrades.in.my.heart.as.i.sally.forth.shall.be.my.saga.(2018).spa.1cd.zip")
+            # a: new-subs/1.alien.3.(1992).eng.2cd.(1).zip
+            # b: new-subs/1.alien.3.(1992).eng.2cd.zip
+            suffix = f".({num}).zip"
+            assert filename.endswith(suffix)
+            filename = filename[0:(-1 * len(suffix))] + ".zip"
         else:
             # file basename is f"{num}.zip"
             #print(f"{num} FIXME missing filename? response_headers", response_headers)
             pass
 
+        # all filenames should be ascii
+        try:
+            filename.encode("ascii")
+        except UnicodeEncodeError as err:
+            logger.error(f"{num} FIXME found non-ascii filename {repr(filename)}")
+
         # atomic write
-        filename_tmp = filename + ".tmp"
+        # limit filename length to 255 bytes
+        # fix: OSError: [Errno 36] File name too long
+        filename_tmp_base = filename
+        while len(filename_tmp_base.encode("utf8")) > (255 - 4):
+            # remove last char
+            filename_tmp_base = filename_tmp_base[0:-1]
+        filename_tmp = filename_tmp_base + ".tmp"
+
         file_open_mode = "wb"
         if type(response_content) == str:
             file_open_mode = "w"
