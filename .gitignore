@@ -24,3 +24,4 @@ done-zips/
 repack-grouped/
 repack.py.log
 secrets.py
+*.log
