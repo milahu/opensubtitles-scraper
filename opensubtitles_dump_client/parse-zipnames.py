@@ -12,8 +12,15 @@ import os
 import collections
 import math
 
-zipfiles_db_path = "opensubs-zipfiles.db"
-zipfiles_parsed_db_path = "opensubs-zipfiles-parsed.db"
+#zipfiles_db_path = "opensubs-zipfiles.db"
+#zipfiles_parsed_db_path = "opensubs-zipfiles-parsed.db"
+
+metadata_db_path = sys.argv[1]
+zipfile_names_table_name = sys.argv[2]
+zipfile_names_parsed_table_name = sys.argv[3]
+
+table_name = zipfile_names_parsed_table_name
+table_name_tmp = f"{table_name}_tmp"
 
 #min_sub_number = None
 #min_sub_number = 6562515 # resume
@@ -32,23 +39,18 @@ zipfiles_parsed_db_path = "opensubs-zipfiles-parsed.db"
 
 def main():
 
-    assert os.path.exists(zipfiles_db_path), "error: missing input file"
+    assert has_table(metadata_db_path, zipfile_names_table_name), f"error: missing input table: {zipfile_names_table_name}"
 
-    assert os.path.exists(zipfiles_parsed_db_path) == False, "error: output file exists"
+    assert has_table(metadata_db_path, zipfile_names_parsed_table_name) == False, f"error: output table exists: {zipfile_names_parsed_table_name}"
 
-    zipfiles_db_connection = sqlite3.connect(zipfiles_db_path)
+    con = sqlite3.connect(metadata_db_path)
     # default: rows are tuples
-    #zipfiles_db_connection.row_factory = sqlite3.Row # rows are dicts
-    zipfiles_db_cursor = zipfiles_db_connection.cursor()
+    #con.row_factory = sqlite3.Row # rows are dicts
+    cur = con.cursor()
 
-    zipfiles_parsed_db_connection = sqlite3.connect(zipfiles_parsed_db_path)
-    # default: rows are tuples
-    #zipfiles_parsed_db_connection.row_factory = sqlite3.Row # rows are dicts
-    zipfiles_parsed_db_cursor = zipfiles_parsed_db_connection.cursor()
-
-    print("creating table subz_zipfiles_parsed")
-    zipfiles_parsed_db_cursor.execute("""
-        CREATE TABLE subz_zipfiles_parsed (
+    print(f"creating table {table_name_tmp}")
+    cur.execute(f"""
+        CREATE TABLE {table_name_tmp} (
             num INTEGER PRIMARY KEY,
             name TEXT,
             year INTEGER,
@@ -59,14 +61,14 @@ def main():
     """)
 
     num_done = 0
-    sql_query = f"select num, zipfile from subz_zipfiles"
+    sql_query = f"SELECT num, zipfile_name FROM {zipfile_names_table_name}"
     #if min_sub_number:
-    #        sql_query += f" where num >= {min_sub_number}"
+    #        sql_query += f" WHERE num >= {min_sub_number}"
 
-    #print("looping subz_zipfiles")
-    for sub_number, filename in zipfiles_db_cursor.execute(sql_query):
-        #print("sub_number, filename", sub_number, filename)
-        filename_chunks = filename.split(".")
+    #print(f"looping {zipfile_names_table_name}")
+    for sub_number, zipfile_name in cur.execute(sql_query):
+        #print("sub_number, zipfile_name", sub_number, zipfile_name)
+        filename_chunks = zipfile_name.split(".")
         #print("filename_chunks", filename_chunks)
 
         # death.to.smoochy.(2002).slv.1cd.(10).zip
@@ -95,8 +97,8 @@ def main():
 
         # antitrust.(2001).slv.1cd.(6).zip
 
-        assert sub_extension == "zip", f"sub {sub_number}: bad filename: {filename}"
-        assert re.fullmatch(r"\(\d+\)", sub_number_parens), f"sub {sub_number}: bad filename: {filename}" # (10)
+        assert sub_extension == "zip", f"sub {sub_number}: bad zipfile_name: {zipfile_name}"
+        assert re.fullmatch(r"\(\d+\)", sub_number_parens), f"sub {sub_number}: bad zipfile_name: {zipfile_name}" # (10)
 
         year_regex = r"\((?:\d{0,4})\)"
 
@@ -108,9 +110,9 @@ def main():
             movie_year_parens = sub_lang
             sub_lang = "eng"
 
-        assert re.fullmatch(r"[a-z]{3}", sub_lang), f"sub {sub_number}: bad filename: {filename}" # slv
+        assert re.fullmatch(r"[a-z]{3}", sub_lang), f"sub {sub_number}: bad zipfile_name: {zipfile_name}" # slv
 
-        assert re.fullmatch(year_regex, movie_year_parens), f"sub {sub_number}: bad filename: {filename}" # (2002)
+        assert re.fullmatch(year_regex, movie_year_parens), f"sub {sub_number}: bad zipfile_name: {zipfile_name}" # (2002)
         if movie_year_parens == "()":
             parse_errors.append("empty year")
             # frostbite.().pob.1cd.(92027).zip
@@ -126,15 +128,15 @@ def main():
         #movie_name_year = movie_name + " " + movie_year_parens
         sub_number_filename = int(sub_number_parens[1:-1])
 
-        assert sub_number == sub_number_filename, f"sub {sub_number}: bad filename: {filename}, sub_number: {sub_number}, sub_number_filename: {sub_number_filename}"
+        assert sub_number == sub_number_filename, f"sub {sub_number}: bad zipfile_name: {zipfile_name}, sub_number: {sub_number}, sub_number_filename: {sub_number_filename}"
 
-        #assert movie_name != "", f"sub {sub_number}: bad filename: {filename}"
+        #assert movie_name != "", f"sub {sub_number}: bad zipfile_name: {zipfile_name}"
         # movie name can be empty
         if movie_name == "":
             parse_errors.append("empty movie name")
             # empty movie name: .(1971).pol.1cd.(3193794).zip
 
-        #assert movie_name != "", f"sub {sub_number}: bad filename: {filename}"
+        #assert movie_name != "", f"sub {sub_number}: bad zipfile_name: {zipfile_name}"
         # movie name can be empty
         if movie_name != movie_name.strip():
             parse_errors.append("spaced movie name")
@@ -152,26 +154,26 @@ def main():
 
         sql_query = f"insert into subz_zipfiles_parsed(num, name, year, lang, parts, errors) values(?, ?, ?, ?, ?, ?)"
         sql_data = (sub_number, movie_name, movie_year, sub_lang, sub_numparts, ", ".join(parse_errors))
-        zipfiles_parsed_db_cursor.execute(sql_query, sql_data)
+        cur.execute(sql_query, sql_data)
 
         num_done += 1
         if num_done % 100000 == 0:
             print("done", num_done)
 
     print("creating index subz_zipfiles_parsed.idx_lang")
-    zipfiles_parsed_db_cursor.execute("""
+    cur.execute("""
         CREATE INDEX idx_lang
         ON subz_zipfiles_parsed (lang)
     """)
 
     print("creating index subz_zipfiles_parsed.idx_name_year_lang")
-    zipfiles_parsed_db_cursor.execute("""
+    cur.execute("""
         CREATE INDEX idx_name_year_lang
         ON subz_zipfiles_parsed (name, year, lang)
     """)
 
-    zipfiles_parsed_db_connection.commit()
-    zipfiles_parsed_db_connection.close()
+    con.commit()
+    con.close()
 
 if __name__ == "__main__":
     sys.exit(main() or 0)
