@@ -23,26 +23,43 @@ debug_sub_number = 85844 # MovieReleaseName is "\tAppurush" # FIXME
 #debug_sub_number = 7587300 # MovieName has "\t" (only for this sub)
 
 
+def has_table(db_path, table_name):
+    con = sqlite3.connect(db_path)
+    cur = con.cursor()
+    try:
+        cur.execute(f"select 1 from {table_name} limit 1")
+    except sqlite3.OperationalError:
+        con.close()
+        return False
+    con.close()
+    return True
+
+
 deadloop_counter = 0
 
-subtitles_all_txt_gz_path = "opensubtitles.org.Actually.Open.Edition.2022.07.25/subtitles_all.txt.gz"
+metadata_db_path = sys.argv[1]
+table_name = sys.argv[2]
+subtitles_all_txt_gz_path = sys.argv[3]
+errfile = sys.argv[4]
+dbgfile = sys.argv[5]
 
-metadata_db_path = "opensubs-metadata.db"
-if len(sys.argv) == 2:
-    metadata_db_path = sys.argv[1]
-    print("metadata_db_path:", repr(metadata_db_path))
-
-dbgfile = "subtitles_all.txt.gz-parse-debug.txt"
-errfile = "subtitles_all.txt.gz-parse-errors.txt"
+table_name_tmp = f"{table_name}_tmp"
 
 assert os.path.exists(subtitles_all_txt_gz_path), "error: missing input file"
 
-assert os.path.exists(metadata_db_path) == False, "error: output file exists"
+assert has_table(metadata_db_path, table_name) == False, f"error: output table exists: {table_name}"
 
 sqlite_connection = sqlite3.connect(metadata_db_path)
 # default: rows are tuples
 sqlite_connection.row_factory = sqlite3.Row # rows are dicts
 sqlite_cursor = sqlite_connection.cursor()
+
+
+if has_table(metadata_db_path, table_name_tmp):
+    print(f"deleting tmp table {table_name_tmp}")
+    sqlite_cursor.execute(f"DROP TABLE {table_name_tmp}")
+    sqlite_connection.commit()
+
 
 col_names = [
     # zcat subtitles_all.txt.gz | head -n1 | tr '\t' '\n' | grep -n . | sed -E 's/^([0-9]+):(.*)$/"\2", # \1/'
@@ -156,7 +173,7 @@ for idx, col_name in enumerate(col_names):
     col_names_types.append(f"{col_name} {sql_type} {sql_extra}")
 
 
-create_query = f"""create table if not exists subz_metadata({",".join(col_names_types)})"""
+create_query = f"""create table if not exists {table_name_tmp}({",".join(col_names_types)})"""
 #print(create_query)
 sqlite_cursor.execute(create_query)
 
@@ -186,7 +203,7 @@ with (
     )
     buf = []
     #buf_cols = {}
-    insert_query = f"""replace into subz_metadata({",".join(col_names)}) values({",".join(["?"] * len_col_names)})"""
+    insert_query = f"""replace into {table_name_tmp}({",".join(col_names)}) values({",".join(["?"] * len_col_names)})"""
     deadloop_counter_max = 20
     deadloop_counter_raise = 30
     deadloop_counter = 0
@@ -306,10 +323,12 @@ with (
         if num_done % 100000 == 0:
             print(f"done {num_done}")
 
-sqlite_cursor.execute("""
-    CREATE INDEX idx_movie_name_year_lang
-    ON subz_metadata (MovieName, MovieYear, ISO639)
+sqlite_cursor.execute(f"""
+    CREATE INDEX idx_{table_name}_movie_name_year_lang
+    ON {table_name_tmp} (MovieName, MovieYear, ISO639)
 """)
+
+sqlite_cursor.execute(f"ALTER TABLE {table_name_tmp} RENAME TO {table_name}")
 
 sqlite_connection.commit()
 sqlite_connection.close()
