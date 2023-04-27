@@ -25,3 +25,5 @@ repack-grouped/
 repack.py.log
 secrets.py
 *.log
+new-subs-archive.py-sum_files.txt
+new-subs-archive.py-tempdir/
