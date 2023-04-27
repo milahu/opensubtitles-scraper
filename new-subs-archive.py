@@ -1,6 +1,12 @@
 #! /usr/bin/env python3
 
 
+# TODO verify all 404 URLs
+# TODO rename table to zipfiles
+# TODO add table missing_404
+# TODO add table missing_dcma
+
+
 # folders with zip files
 input_dir_short_filenames = "new-subs-num"
 input_dir_long_filenames = "new-subs"
@@ -22,7 +28,7 @@ repeat_count = 2
 #output_format = "tar"
 
 # harder to use than sqlite?
-output_format = "iso"
+#output_format = "iso"
 
 # requires mount to write files? not reproducible: cannot set file times to zero
 #output_format = "udf"
@@ -31,7 +37,7 @@ output_format = "iso"
 #output_format = "udf-pycdlib"
 
 # sqlite is reproducible by default. nice!
-#output_format = "sqlite"
+output_format = "sqlite"
 
 
 if output_format == "sqlite":
@@ -51,10 +57,10 @@ sqlite_page_size = 2**14 # 16KiB
 sqlite_page_size = 2**15 # 32KiB
 sqlite_page_size = 2**16 # 64KiB = max
 """
-sqlite_page_size = 2**12 # 4KiB = default
+sqlite_page_size = 2**11 # 2KiB # fastest in benchmark, small difference
 
 # benchmark
-sqlite_compare_page_sizes = True
+sqlite_compare_page_sizes = False
 sqlite_page_sizes = [
     2**9, # 512B = min
     #2**10, # 1KiB
@@ -160,8 +166,11 @@ dvd_size = int(4.7 * 1000 * 1000 * 1000)
 # max_size criteria:
 # - smaller than 1GB
 # - align to size of DVD
-max_size = (dvd_size // 5) - 5 # 935 MB
+#max_size = (dvd_size // 5) - 5 # 935 MB
 # remaining space on DVD: 5 * 5MB = 25MB = 0.53%
+
+# dont split, we have only 8 GB
+max_size = 100 * 1000 * 1000 * 1000 # 100 GB
 
 size_tolerance = 0.02 # reserve 2% for filesystem headers
 
@@ -454,13 +463,14 @@ def pack_files_inner(sum_files, sum_size):
         pack_files_udf_pycdlib(archive_path, sum_files, label, sum_size)
         return archive_path
     if output_format == "sqlite":
-        table_name = f"opensubtitles_zipfiles_{first_num}_{last_num}"
+        table_name = "zipfiles"
         if sqlite_compare_page_sizes:
             archive_path = None
             for page_size in sqlite_page_sizes:
                 extra_suffix = f"pagesize{page_size}"
                 archive_path = get_archive_path(first_num, last_num, "db", extra_suffix)
                 pack_files_sqlite(archive_path, sum_files, table_name, page_size)
+            raise Exception("done sqlite benchmark files")
             return archive_path
         archive_path = get_archive_path(first_num, last_num, "db")
         pack_files_sqlite(archive_path, sum_files, table_name)
@@ -507,6 +517,7 @@ def pack_files_sqlite(db_path, sum_files, table_name, page_size=None):
     if page_size == None:
         page_size = sqlite_page_size
     cur.executescript(f"PRAGMA page_size = {sqlite_page_size}; VACUUM;")
+    cur.execute("PRAGMA count_changes=OFF")
     cur.execute(
         f"CREATE TABLE {table_name} (\n"
         f"  num INTEGER PRIMARY KEY,\n"
@@ -514,6 +525,23 @@ def pack_files_sqlite(db_path, sum_files, table_name, page_size=None):
         f"  content BLOB\n"
         f")"
     )
+    """
+    # no. store missing numbers as text files
+    cur.execute(
+        f"CREATE TABLE missing_404 (\n"
+        f"  num INTEGER PRIMARY KEY\n"
+        f")"
+    )
+    sql_query = f"INSERT INTO missing_404 (num) VALUES (?)"
+    # ...
+    cur.execute(
+        f"CREATE TABLE missing_dcma (\n"
+        f"  num INTEGER PRIMARY KEY\n"
+        f")"
+    )
+    sql_query = f"INSERT INTO missing_dcma (num) VALUES (?)"
+    # ...
+    """
     sql_query = f"INSERT INTO {table_name} (num, name, content) VALUES (?, ?, ?)"
     for file_path in sum_files:
         file_name = os.path.basename(file_path)
