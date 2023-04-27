@@ -21,6 +21,8 @@ debug_sub_number = 85844 # MovieReleaseName is "\tAppurush" # FIXME
 #debug_sub_number = 226696 # MovieReleaseName has "\r" (old mac line format)
 #debug_sub_number = 5899534 # SubFormat = "oth"
 #debug_sub_number = 7587300 # MovieName has "\t" (only for this sub)
+#debug_sub_number = 9211279 # empty SubFormat
+#debug_sub_number = 9211278 # empty SubFormat
 
 
 def has_table(db_path, table_name):
@@ -95,7 +97,7 @@ col_exprs = [
     r"([a-z]{2})?", # 5 = ISO639 = LanguageCode
     r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", # 6 = SubAddDate. example: 2006-11-19 04:26:07
     r"\d*", # 7 = ImdbID
-    r"(srt|sub|txt|mpl|smi|ssa|tmp|vtt|oth)", # 8 = SubFormat # TODO more
+    r"(srt|sub|txt|mpl|smi|ssa|tmp|vtt|oth|)", # 8 = SubFormat # TODO more
     r"\d+", # 9 = SubSumCD
     None, # r".*", # 10 = MovieReleaseName. can contain "\t" -> parse until next valid field
     r"\d{1,3}\.\d{3}", # 11 = MovieFPS. values: 0.000 15.000 23.000 23.976 23.977 23.980 24.000 25.000 29.970 30.000
