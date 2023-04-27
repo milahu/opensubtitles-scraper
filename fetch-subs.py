@@ -74,6 +74,7 @@ pyppeteer_headless = True
 pyppeteer_headless = False # debug
 
 
+# note: these API keys are all expired
 
 #proxy_provider = "scrapfly.io"
 proxy_scrapfly_io_api_key = "scp-live-65607ed58a5449f791ba56baa5488098"
@@ -103,30 +104,17 @@ proxy_scraperbox_com_api_key = "56B1354FD63EB435CA1A9096B706BD55"
 api_key_scrapingant_com = "6ae0de59fad34337b2ee86814857278a"
 
 
-
-# TODO verify all 404 URLs
-
-
-
 new_subs_dir = "new-subs"
-
-last_num_db = 9180517 # last num in opensubs.db
-print("last_num_db", last_num_db)
 
 # https://www.opensubtitles.org/en/search/subs
 # https://www.opensubtitles.org/ # New subtitles
 # TODO update
 #last_num_remote = 9520468 # 2023-04-25
-last_num_remote = 9521948 # 2023-04-26
+#last_num_remote = 9521948 # 2023-04-26
+last_num_remote = 9523112 # 2023-04-27
 # last found 9521948
 # done 9528240
 print("last_num_remote", last_num_remote)
-
-print("missing_count", last_num_remote - last_num_db)
-# 9520468 - 9180517 = 339951
-# missing_count versus num_stack_size_min:
-# 339951 / 10000 = 33.9951 stacks
-# 339951 / 1000 = 339.951 stacks
 
 
 # example: https://www.opensubtitles.org/en/subtitles/9205951
@@ -151,11 +139,11 @@ if missing_numbers:
     # zenrows support:
     # > The error might be misleading, but apart from changing that, we can't do anything else.
     # > BTW, if they return a status code according to the error, you might get it back with original_status=true
-    for num in missing_numbers:
-        # create empty file
-        filename_dcma = f"{new_subs_dir}/{num}.dcma"
-        open(filename_dcma, 'a').close() # create empty file
-    raise Exception("done postprocessing")
+    #for num in missing_numbers:
+    #    # create empty file
+    #    filename_dcma = f"{new_subs_dir}/{num}.dcma"
+    #    open(filename_dcma, 'a').close() # create empty file
+    #raise Exception("done postprocessing")
 
 # sleep X seconds after each download
 sleep_each_min, sleep_each_max = 0, 3
@@ -641,9 +629,14 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 # Could not get content. try enabling javascript rendering for a higher success rate (RESP001)
                 #config.zenrows_com_js = True
                 #config.zenrows_com_antibot = True
-                logger.info(f"{num} retry. error: need javascript")
+                #logger.info(f"{num} retry. error: need javascript")
+                logger.info(f"{num} 404 dcma")
+                # create empty file
+                filename_dcma = f"{new_subs_dir}/{num}.dcma"
+                open(filename_dcma, 'a').close() # create empty file
+                return
                 #return num # retry
-                return {"retry_num": num, "pause": True} # pause scraper, retry
+                #return {"retry_num": num, "pause": True} # pause scraper, retry
             if response_data["code"] == "AUTH006":
                 # The concurrency limit was reached. Please upgrade to a higher plan or ...
                 logger.info(f"{num} retry. error: concurrency limit was reached @ {response_json}")
@@ -951,7 +944,7 @@ async def main():
             def filter_num(num):
                 return (
                     num not in nums_done_set and
-                    num < last_num_remote
+                    num <= last_num_remote
                 )
             num_stack += list(
                 filter(filter_num,
@@ -961,7 +954,10 @@ async def main():
             )
             retry_counter += 1
             if retry_counter > 1000:
-                raise Exception(f"done all nums until {last_num_remote}")
+                if len(num_stack) == 0:
+                    raise Exception(f"done all nums until {last_num_remote}")
+                else:
+                    break
             #print("num_stack", num_stack)
 
         random.shuffle(num_stack)
