@@ -1,0 +1,41 @@
+{
+  "type": "local-subtitle-providers",
+  "version": 0.1,
+  "providers": [
+    {
+      "comment": [
+        "english subs from opensubtitles.org.Actually.Open.Edition.2022.07.25 (130GB)",
+        "eng.db generated with opensubs-db-split-by-lang.py",
+        "size: 22GB"
+      ],
+      "id": "opensubtitles_org_1_9180517_eng",
+      "source": "opensubtitles.org",
+      "url": "magnet:?xt=urn:btih:c2f0b5d26a886ba12f7f667d69c0459056dcda9b&dn=opensubtitles.org.Actually.Open.Edition.2022.07.25",
+      "lang": "eng",
+      "num_range_from": 1,
+      "num_range_to": 9180517,
+      "type": "sqlite",
+      "db_path": "~/.config/subtitles/opensubtitles_org_1_9180517_eng.db",
+      "zipfiles_table": "subz",
+      "zipfiles_num_column": "num",
+      "zipfiles_zipfile_column": "file"
+    },
+    {
+      "comment": [
+        "english subs from opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26 (7GB)",
+        "size: 2GB"
+      ],
+      "id": "opensubtitles_org_9180518_9521948_eng",
+      "source": "opensubtitles.org",
+      "url": "magnet:?xt=urn:btih:30b8b5120f4b881927d81ab9f071a60004a7183a&xt=urn:btmh:122019eb63683baf6d61f33a9e34039fd9879f042d8d52c8aa9410f29d8d83a804e2&dn=opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26",
+      "lang": "eng",
+      "num_range_from": 9180518,
+      "num_range_to": 9521948,
+      "type": "sqlite",
+      "db_path": "$HOME/.config/subtitles/opensubtitles_org_9180518_9521948_eng.db",
+      "zipfiles_table": "zipfiles",
+      "zipfiles_num_column": "num",
+      "zipfiles_zipfile_column": "content"
+    }
+  ]
+}

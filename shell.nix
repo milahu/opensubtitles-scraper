@@ -21,6 +21,8 @@ let
   python = pkgs.python3.withPackages (pp: with pp; [
     requests
     magic # libmagic
+    chardet
+    guessit # parse video filenames
     #extraPythonPackages.pygnuutils # GNU version sort
     #playwright
     #extraPythonPackages.playwright-stealth # FIXME not found
