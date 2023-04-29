@@ -3,6 +3,9 @@
 # get subtitles for a video file
 # from local subtitle providers
 
+# FIXME chardet.detect is slow
+# FIXME subtitles_all.db is slow
+
 
 import sys
 import os
@@ -18,7 +21,8 @@ import chardet
 
 
 # TODO better
-data_dir = os.path.dirname(__file__)
+#data_dir = os.path.dirname(__file__)
+data_dir = os.environ["HOME"] + "/.config/subtitles"
 
 
 def main():
@@ -26,10 +30,13 @@ def main():
     with open(config_path) as f:
         config = json.load(f)
     lang_ISO639 = "en"
+    if len(sys.argv) != 2 or not os.path.exists(sys.argv[1]):
+        print_usage()
+        return
     video_path = sys.argv[1]
     print("video_path", video_path)
     video_filename = os.path.basename(video_path)
-    print("video_filename", video_filename)
+    #print("video_filename", video_filename)
     video_parsed = guessit.guessit(video_filename)
     str_list = []
     print("video_parsed", video_parsed)
@@ -45,56 +52,82 @@ def main():
     #    print(s)
 
 
+def print_usage():
+    print("usage:", file=sys.stderr)
+    #argv0 = "get-subs.py"
+    argv0 = os.path.basename(sys.argv[0])
+    print(f"{argv0} Some.Movie.2000.720p.mp4", file=sys.stderr)
+
+
 def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
     video_path_base, video_path_extension = os.path.splitext(video_path)
     # one database for metadata: 1.6GB
+    #print(f"""metadata: getting connection""")
+    # FIXME subtitles_all.db is slow
+    # add index for (MovieName, MovieYear)
+    # add full-text-search index for MovieName
+    # add index for MovieYear
     meta_con = sqlite3.connect(f"{data_dir}/subtitles_all.db")
     meta_cur = meta_con.cursor()
     # multiple databases for zipfiles: 24GB for english subs
     sql_query = "SELECT IDSubtitle FROM metadata WHERE MovieName LIKE ? AND MovieYear = ? AND ISO639 = ? AND SubSumCD = 1"
     sql_args = (video_parsed.get("title"), video_parsed.get("year"), lang_ISO639)
+    nums = []
+    #print(f"""metadata: getting results for query:""", sql_query)
     for num, in meta_cur.execute(sql_query, sql_args):
-        for provider in config["providers"]:
-            # check range of num
-            if num < provider["num_range_from"] or provider["num_range_to"] < num:
-                # num is out of range
-                #print(f"""local provider {provider["id"]}: num is out of range""")
-                continue
-            #print(f"""local provider {provider["id"]}: num is in range""")
-            if not "db_con" in provider:
-                db_path = provider["db_path"]
-                if db_path.startswith("~/"):
-                    db_path = os.environ["HOME"] + db_path[1:]
-                elif db_path.startswith("$HOME/"):
-                    db_path = os.environ["HOME"] + db_path[5:]
-                provider["db_con"] = sqlite3.connect(db_path)
-            if not "db_cur" in provider:
-                # cache the cursor for faster lookup of similar nums
-                provider["db_cur"] = provider["db_con"].cursor()
-            sql_query = (
-                f"""SELECT {provider["zipfiles_zipfile_column"]} """
-                f"""FROM {provider["zipfiles_table"]} """
-                f"""WHERE {provider["zipfiles_num_column"]} = {num}"""
-            )
-            #print("sql_query", sql_query)
-            row = provider["db_cur"].execute(sql_query).fetchone()
-            if not row:
-                #print(f"""local provider {provider["id"]}: num not found""")
-                continue
+        nums.append(num)
+    for provider in config["providers"]:
+        def filter_num(num):
+            return provider["num_range_from"] <= num and num <= provider["num_range_to"]
+        provider_nums = []
+        rest_nums = []
+        for num in nums:
+            if filter_num(num):
+                provider_nums.append(num)
+            else:
+                rest_nums.append(num)
+        nums = rest_nums
+        if not provider_nums:
+            #print(f"""local provider {provider["id"]}: num is out of range""")
+            continue
+        #print(f"""local provider {provider["id"]}: getting {len(provider_nums)} nums""")
+        if not "db_con" in provider:
+            db_path = provider["db_path"]
+            if db_path.startswith("~/"):
+                db_path = os.environ["HOME"] + db_path[1:]
+            elif db_path.startswith("$HOME/"):
+                db_path = os.environ["HOME"] + db_path[5:]
+            #print(f"""local provider {provider["id"]}: getting connection""")
+            provider["db_con"] = sqlite3.connect(db_path)
+        if not "db_cur" in provider:
+            # cache the cursor for faster lookup of similar nums
+            provider["db_cur"] = provider["db_con"].cursor()
+        sql_query = (
+            f"""SELECT {provider["zipfiles_num_column"]}, """
+            f"""{provider["zipfiles_zipfile_column"]} """
+            f"""FROM {provider["zipfiles_table"]} """
+            f"""WHERE {provider["zipfiles_num_column"]} IN """
+            f"""({", ".join(map(str, provider_nums))})"""
+        )
+        #print("sql_query", sql_query)
+        #print(f"""local provider {provider["id"]}: getting results for query:""", sql_query)
+        for num, zip_content in provider["db_cur"].execute(sql_query):
             # found
             #print(f"""found sub {num} in local provider {provider["id"]}""")
-            zip_content, = row
             extract_sub(zip_content, video_path_base, num, lang_ISO639)
             # found zipfile -> dont search other providers
-            break
+        #print(f"""local provider {provider["id"]}: done""")
 
 
 def extract_sub(zip_content, video_path_base, num, lang_ISO639):
+    #print(f"extracting sub {num}")
     with zipfile.ZipFile(io.BytesIO(zip_content)) as zip_file:
+        #print(f"extracting sub {num}: done opening zip file")
         for zipinfo in zip_file.infolist():
             if zipinfo.filename.endswith("/"):
                 continue
             filename = zipinfo.filename
+            #print(f"extracting sub {num}: filename: {repr(filename)}")
             # zip metadata is often encoded with cp437
             for encoding in ["cp437", "iso-8859-1"]:
                 try:
@@ -128,6 +161,7 @@ def extract_sub(zip_content, video_path_base, num, lang_ISO639):
             sub_path = f"{video_path_base}.{lang_ISO639}.{num_padded}{ext}"
             sub_content = zip_file.read(zipinfo)
             # recode sub_content to utf8
+            #print(f"extracting sub {num}: magic.detect_from_content")
             magic_result = magic.detect_from_content(sub_content)
             encoding = magic_result.encoding
             def recode_content(sub_content, encoding):
@@ -142,9 +176,16 @@ def extract_sub(zip_content, video_path_base, num, lang_ISO639):
                 sub_content = recode_content(sub_content, encoding)
             elif encoding == "unknown-8bit":
                 # libmagic failed to find encoding -> try chardet
+                # bug? 0000445: file/libmagic fails to detect cp1252 encoding
+                # https://bugs.astron.com/view.php?id=445
                 # note: chardet can return wrong encodings
                 # https://github.com/chardet/chardet/issues/279
+                # FIXME chardet.detect is slow
+                # example subs: 4248010 4590955
+                # result: cp1252 == Windows-1252
+                #print(f"extracting sub {num}: chardet.detect ...")
                 chardet_result = chardet.detect(sub_content)
+                #print(f"extracting sub {num}: chardet.detect done")
                 encoding = chardet_result["encoding"]
                 if not encoding in {"ascii", "utf-8"}:
                     #print(f"output {repr(sub_path)} encoding {encoding} from chardet")
