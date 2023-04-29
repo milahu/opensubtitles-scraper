@@ -24,8 +24,12 @@ zipfile_names_table_name = "zipfile_names"
 zipfile_names_parsed_table_name = "zipfile_names_parsed"
 
 # https://dl.opensubtitles.org/addons/export/
+# https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
 subtitles_all_txt_gz_path = "opensubtitles.org.Actually.Open.Edition.2022.07.25/subtitles_all.txt.gz"
 subtitles_all_table_name = "subz_metadata" # TODO rename to subtitles_all
+
+# http://www.opensubtitles.org/addons/export_languages.php
+# https://trac.opensubtitles.org/projects/opensubtitles/wiki/XMLRPC
 
 metadata_db_path = "opensubs-metadata.db"
 metadata_table_name = "subz_xxxxxxxx"
