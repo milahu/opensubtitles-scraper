@@ -45,19 +45,22 @@ if output_format == "sqlite":
     store_filenames = False # dont create filenames.txt
     repeat_count = 1 # we already know its reproducible
 
+# sqlite page size in bytes
 # average file size is 20KB
 # TODO benchmark
+# re-create db with all page sizes:
+# for page_size in 512 1024 2048 4096 8192 16384 32768 65536; do ( echo "PRAGMA page_size=$page_size;"; sqlite3 src.db .dump; ) | sqlite3 dst.pagesize-$page_size.db; done
 """
-sqlite_page_size = 2**9 # 512B = min
-sqlite_page_size = 2**10 # 1KiB
-sqlite_page_size = 2**11 # 2KiB
-sqlite_page_size = 2**12 # 4KiB = default
-sqlite_page_size = 2**13 # 8KiB
-sqlite_page_size = 2**14 # 16KiB
-sqlite_page_size = 2**15 # 32KiB
-sqlite_page_size = 2**16 # 64KiB = max
+sqlite_page_size = 2**9 # 512 = min
+sqlite_page_size = 2**10 # 1024 = 1K
+sqlite_page_size = 2**11 # 2048 = 2K
+sqlite_page_size = 2**12 # 4096 = 4K = default
+sqlite_page_size = 2**13 # 8192 = 8K
+sqlite_page_size = 2**14 # 16384 = 16K
+sqlite_page_size = 2**15 # 32768 = 32K
+sqlite_page_size = 2**16 # 65536 = 64K = max
 """
-sqlite_page_size = 2**11 # 2KiB # fastest in benchmark, small difference
+sqlite_page_size = 2**12 # 4K = default
 
 # benchmark
 sqlite_compare_page_sizes = False
@@ -464,17 +467,36 @@ def pack_files_inner(sum_files, sum_size):
         return archive_path
     if output_format == "sqlite":
         table_name = "zipfiles"
-        if sqlite_compare_page_sizes:
-            archive_path = None
-            for page_size in sqlite_page_sizes:
-                extra_suffix = f"pagesize{page_size}"
-                archive_path = get_archive_path(first_num, last_num, "db", extra_suffix)
-                pack_files_sqlite(archive_path, sum_files, table_name, page_size)
-            raise Exception("done sqlite benchmark files")
+        #if sqlite_compare_page_sizes:
+        #    archive_path = None
+        #    for page_size in sqlite_page_sizes:
+        #        extra_suffix = f"pagesize{page_size}"
+        #        archive_path = get_archive_path(first_num, last_num, "db", extra_suffix)
+        #        pack_files_sqlite(archive_path, sum_files, table_name, page_size)
+        #    raise Exception("done sqlite benchmark files")
+        #    return archive_path
+        group_by_language = True
+        if group_by_language:
+            files_by_lang = dict()
+            for filepath in sum_files:
+                # parse lang from filename
+                # 000000001.alien.3.(1992).eng.2cd.zip
+                lang = filepath.split(".")[-3]
+                assert re.match(r"^[a-z]{3}$", lang)
+                if not lang in files_by_lang:
+                    files_by_lang[lang] = list()
+                files_by_lang[lang].append(filepath)
+            archive_paths = []
+            for lang in files_by_lang:
+                archive_path = get_archive_path(first_num, last_num, "db", lang)
+                lang_files = files_by_lang[lang]
+                pack_files_sqlite(archive_path, lang_files, table_name)
+                archive_paths.append(archive_path)
+            return archive_paths
+        else:
+            archive_path = get_archive_path(first_num, last_num, "db")
+            pack_files_sqlite(archive_path, sum_files, table_name)
             return archive_path
-        archive_path = get_archive_path(first_num, last_num, "db")
-        pack_files_sqlite(archive_path, sum_files, table_name)
-        return archive_path
     #elif output_format == "fat32":
     #    archive_path = f"opensubtitles-{first_num}-{last_num}.fat32"
     #    pack_files_fat32(archive_path, sum_files, sum_size)
@@ -767,18 +789,19 @@ sum_files = []
 max_size_tolerant = max_size * (1 - size_tolerance)
 
 
-print("calling new-subs-hardlink-num.py ...")
-args = [
-    sys.executable,
-    "new-subs-hardlink-num.py",
-]
-t1 = time.time()
-subprocess.run(
-    args,
-    check=True,
-)
-t2 = time.time()
-print(f"calling new-subs-hardlink-num.py done in {t2 - t1} seconds")
+if output_format == "iso":
+    print("calling new-subs-hardlink-num.py ...")
+    args = [
+        sys.executable,
+        "new-subs-hardlink-num.py",
+    ]
+    t1 = time.time()
+    subprocess.run(
+        args,
+        check=True,
+    )
+    t2 = time.time()
+    print(f"calling new-subs-hardlink-num.py done in {t2 - t1} seconds")
 
 
 print()
