@@ -10,6 +10,9 @@ import math
 import sqlite3
 
 
+create_tmp_table = False
+
+
 debug_sub_number = 0 # invalid
 # edge cases:
 #debug_sub_number = 6
@@ -45,7 +48,9 @@ subtitles_all_txt_gz_path = sys.argv[3]
 errfile = sys.argv[4]
 dbgfile = sys.argv[5]
 
-table_name_tmp = f"{table_name}_tmp"
+table_name_tmp = table_name
+if create_tmp_table:
+    table_name_tmp = f"{table_name}_tmp"
 
 assert os.path.exists(subtitles_all_txt_gz_path), "error: missing input file"
 
@@ -171,12 +176,14 @@ for idx, col_name in enumerate(col_names):
         sql_type = "TEXT"
     sql_extra = ""
     if idx == 0:
-        sql_extra = "PRIMARY KEY"
-    col_names_types.append(f"{col_name} {sql_type} {sql_extra}")
+        sql_extra = " PRIMARY KEY"
+    col_names_types.append(f"{col_name} {sql_type}{sql_extra}")
 
 
-create_query = f"""create table if not exists {table_name_tmp}({",".join(col_names_types)})"""
-#print(create_query)
+create_query = f"CREATE TABLE IF NOT EXISTS {table_name_tmp} (\n  "
+create_query += ",\n  ".join(col_names_types)
+create_query += "\n)"
+print(create_query); raise NotImplementedError("todo")
 sqlite_cursor.execute(create_query)
 
 t1 = time.time()
@@ -330,7 +337,8 @@ sqlite_cursor.execute(f"""
     ON {table_name_tmp} (MovieName, MovieYear, ISO639)
 """)
 
-sqlite_cursor.execute(f"ALTER TABLE {table_name_tmp} RENAME TO {table_name}")
+if create_tmp_table:
+    sqlite_cursor.execute(f"ALTER TABLE {table_name_tmp} RENAME TO {table_name}")
 
 sqlite_connection.commit()
 sqlite_connection.close()
