@@ -1,111 +1,144 @@
-db_filename opensubtitles-9180519-9223801-pagesize512.db
-done sequential reading 921MB in 4.342sec
-done sequential reading 921MB in 4.375sec
-done sequential reading 921MB in 4.358sec
-average time: 4.590sec
-done random reading 921MB in 19.164sec
-done random reading 921MB in 19.166sec
-done random reading 921MB in 19.221sec
-average time: 19.545sec
-done counting 40155 rows in 4.961sec
-done counting 40155 rows in 5.004sec
-done counting 40155 rows in 4.973sec
-average time: 5.210sec
 
-db_filename opensubtitles-9180519-9223801-pagesize1024.db
-done sequential reading 921MB in 3.975sec
-done sequential reading 921MB in 4.001sec
-done sequential reading 921MB in 4.037sec
-average time: 4.245sec
-done random reading 921MB in 18.251sec
-done random reading 921MB in 18.278sec
-done random reading 921MB in 18.332sec
-average time: 18.642sec
-done counting 40155 rows in 4.709sec
-done counting 40155 rows in 4.761sec
-done counting 40155 rows in 4.743sec
-average time: 4.970sec
+db_filename opensubtitles.org.dump.9180519.to.9521948.eng.pagesize-512.db
+done sequential reading 1919MB in 16.780sec
+done sequential reading 1919MB in 17.067sec
+done sequential reading 1919MB in 16.753sec
+average time: 17.102sec
+done random reading 1919MB from all rows in 69.379sec
+done random reading 1919MB from all rows in 69.044sec
+done random reading 1919MB from all rows in 67.899sec
+average time: 70.202sec
+done random reading 6MB from 1000 rows in 0.681sec
+done random reading 6MB from 1000 rows in 0.706sec
+done random reading 5MB from 1000 rows in 0.692sec
+average time: 2.162sec
+done counting 82498 rows in 9.533sec
+done counting 82498 rows in 9.484sec
+done counting 82498 rows in 9.602sec
+average time: 9.790sec
 
-db_filename opensubtitles-9180519-9223801-pagesize2048.db
-done sequential reading 921MB in 4.217sec
-done sequential reading 921MB in 4.163sec
-done sequential reading 921MB in 4.130sec
-average time: 4.403sec
-done random reading 921MB in 18.403sec
-done random reading 921MB in 18.638sec
-done random reading 921MB in 18.588sec
-average time: 18.909sec
-done counting 40155 rows in 4.754sec
-done counting 40155 rows in 4.922sec
-done counting 40155 rows in 4.831sec
-average time: 5.081sec
+db_filename opensubtitles.org.dump.9180519.to.9521948.eng.pagesize-1024.db
+done sequential reading 1919MB in 12.281sec
+done sequential reading 1919MB in 11.392sec
+done sequential reading 1919MB in 11.387sec
+average time: 11.917sec
+done random reading 1919MB from all rows in 63.451sec
+done random reading 1919MB from all rows in 61.045sec
+done random reading 1919MB from all rows in 61.193sec
+average time: 63.295sec
+done random reading 6MB from 1000 rows in 0.619sec
+done random reading 5MB from 1000 rows in 0.578sec
+done random reading 6MB from 1000 rows in 0.573sec
+average time: 1.979sec
+done counting 82498 rows in 8.426sec
+done counting 82498 rows in 8.229sec
+done counting 82498 rows in 8.270sec
+average time: 8.543sec
 
-db_filename opensubtitles-9180519-9223801-pagesize4096.db
-done sequential reading 921MB in 4.391sec
-done sequential reading 921MB in 4.379sec
-done sequential reading 921MB in 4.371sec
-average time: 4.605sec
-done random reading 921MB in 19.206sec
-done random reading 921MB in 19.337sec
-done random reading 921MB in 19.436sec
-average time: 19.684sec
-done counting 40155 rows in 4.993sec
-done counting 40155 rows in 4.988sec
-done counting 40155 rows in 5.062sec
-average time: 5.252sec
+db_filename opensubtitles.org.dump.9180519.to.9521948.eng.pagesize-2048.db
+done sequential reading 1919MB in 9.191sec
+done sequential reading 1919MB in 9.252sec
+done sequential reading 1919MB in 9.250sec
+average time: 9.462sec
+done random reading 1919MB from all rows in 57.403sec
+done random reading 1919MB from all rows in 58.354sec
+done random reading 1919MB from all rows in 57.268sec
+average time: 59.094sec
+done random reading 6MB from 1000 rows in 0.555sec
+done random reading 6MB from 1000 rows in 0.548sec
+done random reading 6MB from 1000 rows in 0.530sec
+average time: 1.964sec
+done counting 82498 rows in 8.061sec
+done counting 82498 rows in 8.082sec
+done counting 82498 rows in 7.826sec
+average time: 8.234sec
 
-db_filename opensubtitles-9180519-9223801-pagesize8192.db
-done sequential reading 921MB in 4.157sec
-done sequential reading 921MB in 4.128sec
-done sequential reading 921MB in 4.202sec
-average time: 4.393sec
-done random reading 921MB in 18.508sec
-done random reading 921MB in 18.469sec
-done random reading 921MB in 18.413sec
-average time: 18.817sec
-done counting 40155 rows in 4.835sec
-done counting 40155 rows in 4.854sec
-done counting 40155 rows in 4.789sec
-average time: 5.059sec
+db_filename opensubtitles.org.dump.9180519.to.9521948.eng.pagesize-4096.db
+done sequential reading 1919MB in 7.433sec
+done sequential reading 1919MB in 7.381sec
+done sequential reading 1919MB in 7.537sec
+average time: 7.675sec
+done random reading 1919MB from all rows in 57.401sec
+done random reading 1919MB from all rows in 57.512sec
+done random reading 1919MB from all rows in 57.785sec
+average time: 58.913sec
+done random reading 6MB from 1000 rows in 0.494sec
+done random reading 6MB from 1000 rows in 0.486sec
+done random reading 6MB from 1000 rows in 0.512sec
+average time: 1.901sec
+done counting 82498 rows in 7.932sec
+done counting 82498 rows in 7.768sec
+done counting 82498 rows in 7.657sec
+average time: 8.016sec
 
-db_filename opensubtitles-9180519-9223801-pagesize16384.db
-done sequential reading 921MB in 4.335sec
-done sequential reading 921MB in 4.349sec
-done sequential reading 921MB in 4.351sec
-average time: 4.577sec
-done random reading 921MB in 19.342sec
-done random reading 921MB in 19.308sec
-done random reading 921MB in 19.449sec
-average time: 19.727sec
-done counting 40155 rows in 4.870sec
-done counting 40155 rows in 4.970sec
-done counting 40155 rows in 4.962sec
-average time: 5.175sec
+db_filename opensubtitles.org.dump.9180519.to.9521948.eng.pagesize-8192.db
+done sequential reading 1919MB in 7.128sec
+done sequential reading 1919MB in 7.285sec
+done sequential reading 1919MB in 7.166sec
+average time: 7.420sec
+done random reading 1919MB from all rows in 61.642sec
+done random reading 1919MB from all rows in 61.839sec
+done random reading 1919MB from all rows in 61.901sec
+average time: 63.161sec
+done random reading 6MB from 1000 rows in 0.516sec
+done random reading 5MB from 1000 rows in 0.511sec
+done random reading 6MB from 1000 rows in 0.522sec
+average time: 2.024sec
+done counting 82498 rows in 9.475sec
+done counting 82498 rows in 9.548sec
+done counting 82498 rows in 9.421sec
+average time: 9.714sec
 
-db_filename opensubtitles-9180519-9223801-pagesize32768.db
-done sequential reading 921MB in 4.140sec
-done sequential reading 921MB in 4.174sec
-done sequential reading 921MB in 4.164sec
-average time: 4.389sec
-done random reading 921MB in 18.358sec
-done random reading 921MB in 18.257sec
-done random reading 921MB in 18.218sec
-average time: 18.638sec
-done counting 40155 rows in 4.699sec
-done counting 40155 rows in 4.779sec
-done counting 40155 rows in 4.756sec
-average time: 4.973sec
+db_filename opensubtitles.org.dump.9180519.to.9521948.eng.pagesize-16384.db
+done sequential reading 1919MB in 6.632sec
+done sequential reading 1919MB in 6.621sec
+done sequential reading 1919MB in 6.888sec
+average time: 6.953sec
+done random reading 1919MB from all rows in 63.543sec
+done random reading 1919MB from all rows in 63.940sec
+done random reading 1919MB from all rows in 63.693sec
+average time: 65.141sec
+done random reading 5MB from 1000 rows in 0.511sec
+done random reading 6MB from 1000 rows in 0.526sec
+done random reading 6MB from 1000 rows in 0.519sec
+average time: 1.926sec
+done counting 82498 rows in 7.231sec
+done counting 82498 rows in 7.247sec
+done counting 82498 rows in 7.203sec
+average time: 7.475sec
 
-db_filename opensubtitles-9180519-9223801-pagesize65536.db
-done sequential reading 921MB in 4.531sec
-done sequential reading 921MB in 4.556sec
-done sequential reading 921MB in 4.537sec
-average time: 4.771sec
-done random reading 921MB in 19.078sec
-done random reading 921MB in 19.178sec
-done random reading 921MB in 19.066sec
-average time: 19.467sec
-done counting 40155 rows in 4.806sec
-done counting 40155 rows in 4.777sec
-done counting 40155 rows in 4.691sec
-average time: 4.985sec
+db_filename opensubtitles.org.dump.9180519.to.9521948.eng.pagesize-32768.db
+done sequential reading 1919MB in 8.089sec
+done sequential reading 1919MB in 7.328sec
+done sequential reading 1919MB in 7.186sec
+average time: 7.769sec
+done random reading 1919MB from all rows in 69.545sec
+done random reading 1919MB from all rows in 70.395sec
+done random reading 1919MB from all rows in 70.076sec
+average time: 71.371sec
+done random reading 5MB from 1000 rows in 0.561sec
+done random reading 6MB from 1000 rows in 0.559sec
+done random reading 5MB from 1000 rows in 0.565sec
+average time: 2.001sec
+done counting 82498 rows in 6.284sec
+done counting 82498 rows in 6.232sec
+done counting 82498 rows in 6.215sec
+average time: 6.478sec
+
+db_filename opensubtitles.org.dump.9180519.to.9521948.eng.pagesize-65536.db
+done sequential reading 1919MB in 7.164sec
+done sequential reading 1919MB in 7.080sec
+done sequential reading 1919MB in 7.164sec
+average time: 7.363sec
+done random reading 1919MB from all rows in 74.709sec
+done random reading 1919MB from all rows in 72.531sec
+done random reading 1919MB from all rows in 71.928sec
+average time: 74.411sec
+done random reading 5MB from 1000 rows in 0.727sec
+done random reading 5MB from 1000 rows in 0.769sec
+done random reading 6MB from 1000 rows in 0.724sec
+average time: 2.068sec
+done counting 82498 rows in 6.442sec
+done counting 82498 rows in 6.478sec
+done counting 82498 rows in 6.515sec
+average time: 6.723sec

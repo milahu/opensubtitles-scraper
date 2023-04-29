@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-# sudo ./new-subs-archive-benchmark.py
+# sudo python -u new-subs-archive-benchmark.py | tee new-subs-archive-benchmark.txt
 
 import subprocess
 import glob
@@ -30,10 +30,11 @@ $ du -b opensubtitles-9180519-9223801-pagesize* | sort -n
 953827328       opensubtitles-9180519-9223801-pagesize8192.db
 """
 
-sqlite_files = glob.glob("opensubtitles-9180519-9223801-pagesize*.db")
+sqlite_files_regex = r"^opensubtitles.org.dump.(\d+).to.(\d+).eng.pagesize-(\d+).db$"
+sqlite_files = glob.glob("*.db")
 sqlite_files = natsort.natsorted(sqlite_files)
 sqlite_files = list(filter(
-    lambda f: re.match(r"^opensubtitles-(\d+)-(\d+)-pagesize(\d+).db$", f),
+    lambda f: re.match(sqlite_files_regex, f),
     sqlite_files
 ))
 if False:
@@ -56,9 +57,11 @@ iso_files = [
 
 test_files = (
     sqlite_files +
+    # todo:
     tar_files +
     iso_files
 )
+test_files = sqlite_files
 
 
 # this is only needed with subprocess.run(args, shell=True)
@@ -95,7 +98,7 @@ def benchmark_sqlite(db_path):
     print()
     print("db_filename", db_filename)
     m = re.match(
-        r"^opensubtitles-(\d+)-(\d+)-pagesize(\d+).db$",
+        sqlite_files_regex,
         db_filename
     )
     #if not m:
@@ -104,6 +107,7 @@ def benchmark_sqlite(db_path):
     benchmark_names = [
         "read_sequential_all", # no difference
         "read_random_all", # no diff
+        "read_random_some", # todo
         "count", # sequential access of interior pages
     ]
     for benchmark_name in benchmark_names:
