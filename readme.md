@@ -53,3 +53,13 @@ useful for subtitle-fetchers like
 - [bazarr](https://github.com/morpheus65535/bazarr)
 - [subliminal](https://github.com/Diaoul/subliminal)
 - [subdl](https://github.com/alexanderwink/subdl)
+
+## scraping
+
+opensubtitles.org is protected by cloudflare, so im using a scraping proxy ([zenrows.com](https://www.zenrows.com/)).
+with `max_concurrency = 10` in fetch-subs.py, one request takes about 0.2 seconds.
+
+videos:
+
+- https://asciinema.org/a/6fG6TXEkF3UOOL0qu8tivViXF
+- [docs/fetch-subs.py.cast](docs/fetch-subs.py.cast)
