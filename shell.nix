@@ -13,7 +13,7 @@ let
     #playwright-stealth = pkgs.python3.pkgs.callPackage ./nix/playwright-stealth.nix {};
     #undetected-playwright = pkgs.python3.pkgs.callPackage ./nix/undetected-playwright.nix {};
     #pygnuutils = pkgs.python3.pkgs.callPackage ./nix/pygnuutils.nix {};
-    pycdlib = pkgs.python3.pkgs.callPackage ./nix/pycdlib.nix {};
+    #pycdlib = pkgs.python3.pkgs.callPackage ./nix/pycdlib.nix {};
   };
 
   sqlite-bench = pkgs.callPackage ./nix/sqlite-bench.nix {};
@@ -88,7 +88,7 @@ buildInputs = (with pkgs; [
   #extraPythonPackages.pygnuutils
   #extraPythonPackages.pyppeteer-stealth
   #extraPythonPackages.undetected-playwright
-  extraPythonPackages.pycdlib
+  #extraPythonPackages.pycdlib
   sqlite-bench
 ];
 
