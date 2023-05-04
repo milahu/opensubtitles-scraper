@@ -8,14 +8,19 @@
 
 
 # folders with zip files
-input_dir_short_filenames = "new-subs-num"
 input_dir_long_filenames = "new-subs"
+
+# folders with zip files
+# short name format
+# for output_format = "iso"
+input_dir_short_filenames = "new-subs-num"
 
 # use short filenames in archive
 # short: 1.zip
 # long : 1.alien.3.(1992).eng.2cd.zip
 # short filenames are better for lookup by sub_number
 # about 10x faster than glob (readdir + regex)
+# for output_format = "iso"
 use_short_filenames = True
 
 # create filenames.txt with the full filenames
@@ -38,6 +43,10 @@ repeat_count = 2
 
 # sqlite is reproducible by default. nice!
 output_format = "sqlite"
+# big releases (monthly)
+sqlite_group_by_language = True
+# small releases (daily)
+#sqlite_group_by_language = False
 
 
 if output_format == "sqlite":
@@ -60,7 +69,7 @@ sqlite_page_size = 2**14 # 16384 = 16K
 sqlite_page_size = 2**15 # 32768 = 32K
 sqlite_page_size = 2**16 # 65536 = 64K = max
 """
-sqlite_page_size = 2**12 # 4K = default
+sqlite_page_size = 2**12 # 4096 = 4K = default
 
 # benchmark
 sqlite_compare_page_sizes = False
@@ -85,12 +94,9 @@ sqlite_page_sizes = [
 # opensubs.db: 1 - 9180517
 # 9180518: not found
 continue_from = 9180519
-# opensubtitles-9180519-9225080.tar # tar, long names
-# opensubtitles-9225081-9271106.tar # tar, long names
-# opensubtitles-9271107-9331439.tar # tar, long names
-#continue_from = 9331439 + 1
-# opensubtitles-9331440-9379715.iso # iso, short names + filenames.txt
-#continue_from = 9379715 + 1
+# opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26
+continue_from = 9521948 + 1
+# opensubtitles.org.dump.9521949.to.xxxxxxx.by.lang.2023.05.xx
 
 
 # reproducible filesystem images
@@ -431,52 +437,50 @@ def pack_files_inner(sum_files, sum_size):
     first_num = int(os.path.basename(first_file).split(".")[0])
     last_num = int(os.path.basename(last_file).split(".")[0])
     sum_files = sorted(sum_files)
-    def get_archive_path(first_num, last_num, extension, suffix_before_duplicate=None):
-        archive_path = f"opensubtitles-{first_num}-{last_num}.{extension}"
+    def get_archive_path(first_num, last_num, file_extension, suffix_before_duplicate=None):
+        archive_path = f"opensubtitles-{first_num}-{last_num}.{file_extension}"
         if suffix_before_duplicate:
-            archive_path = f"opensubtitles-{first_num}-{last_num}-{suffix_before_duplicate}.{extension}"
+            archive_path = f"opensubtitles-{first_num}-{last_num}-{suffix_before_duplicate}.{file_extension}"
         duplicate = 1
         while os.path.exists(archive_path):
             duplicate += 1
-            archive_path = f"opensubtitles-{first_num}-{last_num}.{duplicate}.{extension}"
+            archive_path = f"opensubtitles-{first_num}-{last_num}.{duplicate}.{file_extension}"
             if suffix_before_duplicate:
-                archive_path = f"opensubtitles-{first_num}-{last_num}-{suffix_before_duplicate}.{duplicate}.{extension}"
+                archive_path = f"opensubtitles-{first_num}-{last_num}-{suffix_before_duplicate}.{duplicate}.{file_extension}"
         return archive_path
     if output_format == "tar":
-        archive_path = get_archive_path(first_num, last_num, "tar")
+        # note: uncompressed tar, because content is compressed (zip files)
+        file_extension = "tar"
+        archive_path = get_archive_path(first_num, last_num, file_extension)
         pack_files_tar(archive_path, sum_files)
         return archive_path
     if output_format == "iso":
-        archive_path = get_archive_path(first_num, last_num, "iso")
+        file_extension = "iso"
+        archive_path = get_archive_path(first_num, last_num, file_extension)
         volid = f"OPENSUBTITLES_{first_num}_{last_num}"
         pack_files_iso(archive_path, sum_files, volid)
         return archive_path
     if output_format == "udf":
         # mkudffs creates pure UDF, so we use extension "udf"
-        archive_path = get_archive_path(first_num, last_num, "udf")
+        file_extension = "udf"
+        archive_path = get_archive_path(first_num, last_num, file_extension)
         label = f"opensubtitles-{first_num}-{last_num}"
         #group_label = f"opensubtitles"
         pack_files_udf(archive_path, sum_files, label, sum_size)
         return archive_path
     if output_format == "udf-pycdlib":
         # pycdlib creates impure UDF, so we use extension "iso"
-        archive_path = get_archive_path(first_num, last_num, "iso")
+        file_extension = "iso"
+        archive_path = get_archive_path(first_num, last_num, file_extension)
         label = f"opensubtitles-{first_num}-{last_num}"
         #group_label = f"opensubtitles"
         pack_files_udf_pycdlib(archive_path, sum_files, label, sum_size)
         return archive_path
     if output_format == "sqlite":
         table_name = "zipfiles"
-        #if sqlite_compare_page_sizes:
-        #    archive_path = None
-        #    for page_size in sqlite_page_sizes:
-        #        extra_suffix = f"pagesize{page_size}"
-        #        archive_path = get_archive_path(first_num, last_num, "db", extra_suffix)
-        #        pack_files_sqlite(archive_path, sum_files, table_name, page_size)
-        #    raise Exception("done sqlite benchmark files")
-        #    return archive_path
-        group_by_language = True
-        if group_by_language:
+        file_extension = "db" # short, ambiguous
+        #file_extension = "sqlite" # explicit, also used by archive.org for metadata
+        if sqlite_group_by_language:
             files_by_lang = dict()
             for filepath in sum_files:
                 # parse lang from filename
@@ -488,13 +492,13 @@ def pack_files_inner(sum_files, sum_size):
                 files_by_lang[lang].append(filepath)
             archive_paths = []
             for lang in files_by_lang:
-                archive_path = get_archive_path(first_num, last_num, "db", lang)
+                archive_path = get_archive_path(first_num, last_num, file_extension, lang)
                 lang_files = files_by_lang[lang]
                 pack_files_sqlite(archive_path, lang_files, table_name)
                 archive_paths.append(archive_path)
             return archive_paths
         else:
-            archive_path = get_archive_path(first_num, last_num, "db")
+            archive_path = get_archive_path(first_num, last_num, file_extension)
             pack_files_sqlite(archive_path, sum_files, table_name)
             return archive_path
     #elif output_format == "fat32":
