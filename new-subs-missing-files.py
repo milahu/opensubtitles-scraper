@@ -17,8 +17,8 @@ nums = sorted(nums)
 for idx in range(0, len(nums) - 1):
     if nums[idx] + 1 == nums[idx + 1]:
         continue
-    if nums[idx + 1] == 9511453: # outlier
-        break
+    #if nums[idx + 1] == 9511453: # outlier
+    #    break
     #missing_len = nums[idx + 1] - nums[idx] + 1
     #print(f"# range from {nums[idx] + 1} to {nums[idx + 1] - 1} = {missing_len} nums")
     for num in range(nums[idx] + 1, nums[idx + 1]):
