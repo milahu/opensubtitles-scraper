@@ -7,6 +7,10 @@
 # it was only 300K requests, and it was done in about 1.5 days
 # not bad, zenrows.com! :)
 
+# TODO fe-fetch recent downloads
+# give opensubtitles.org some time for moderation
+# some time = some days = 3 days?
+
 import sys
 import os
 import re
@@ -108,12 +112,23 @@ new_subs_dir = "new-subs"
 
 # https://www.opensubtitles.org/en/search/subs
 # https://www.opensubtitles.org/ # New subtitles
-# TODO update
 #last_num_remote = 9520468 # 2023-04-25
 #last_num_remote = 9521948 # 2023-04-26
-last_num_remote = 9523112 # 2023-04-27
-# last found 9521948
-# done 9528240
+#last_num_remote = 9523112 # 2023-04-27
+#last_num_remote = 9530994 # 2023-05-01
+#last_num_remote = 9531985 # 2023-05-01
+#last_num_remote = 9533109 # 2023-05-02
+
+# get last_num_remote
+# dont use proxy
+response = requests.get("https://www.opensubtitles.org/en/search/subs")
+status_code = response.status_code
+assert status_code == 200, f"unexpected status_code {status_code}"
+content_type = response.headers.get("Content-Type")
+assert content_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
+remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', response.text)
+print("remote_nums", remote_nums)
+last_num_remote = max(map(int, remote_nums))
 print("last_num_remote", last_num_remote)
 
 
@@ -309,6 +324,21 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
         filename_notfound = f"{new_subs_dir}/{num}.not-found"
 
         filename = filename_zip
+
+        # https://dl.opensubtitles.org/en/download/sub/{IDSubtitle}
+        # these urls return zip files, which can contain multiple subtitle files
+        # either because of multipart (2cd, 3cd, 4cd, ...)
+        # or for additional hearing-impaired subtitles.
+        # individual files can be downloaded from
+        # https://dl.opensubtitles.org/en/download/file/{IDSubtitleFile}
+
+        # there is no export for the relation
+        # between IDSubtitle and IDSubtitleFile.
+        # also the nfo files do not contain IDSubtitleFile.
+        # for each IDSubtitle, we can parse the info page
+        # https://www.opensubtitles.org/en/subtitles/{IDSubtitle}
+        # grep for "/download/file/" or "subtitlefileids"
+
         #url = f"https://www.opensubtitles.org/en/subtitleserve/sub/{num}"
         # redirect location:
         #url = f"https://dl.opensubtitles.org/en/download/sub/{num}"
@@ -622,7 +652,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             logger.info(f"{num} {status_code} Internal Server Error -> retry")
             return num
 
-        if status_code in {422, 429, 403}:
+        if status_code in {422, 429, 403, 503}:
             response_json = (await response_content.read()).decode("utf8")
             response_data = json.loads(response_json)
             if response_data["code"] == "RESP001":
@@ -645,13 +675,16 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 # Your IP address has been blocked for exceeding the maximum error rate ...
                 logger.info(f"{num} retry. error: IP address was blocked @ {response_json}")
                 return {"retry_num": num, "pause": True, "change_ipaddr": True} # pause scraper, change IP address, retry
+            if response_data["code"] == "CTX0002":
+                # Operation timeout exceeded (CTX0002)
+                return {"retry_num": num, "pause": True} # pause scraper, retry
             logger.info(f"{num} retry. headers: {response_headers}. content: {await response_content.read()}")
             return num # retry
 
         # requests
         #assert status_code == 200, f"{num} unexpected status_code {status_code}. headers: {response_headers}. content: {response_content[0:100]}..."
         # aiohttp
-        assert status_code == 200, f"{num} unexpected status_code {status_code}. headers: {response_headers}. content: {await response_content.read(100)}..."
+        assert status_code == 200, f"{num} unexpected status_code {status_code}. headers: {response_headers}. content: {await response_content.read()}"
 
         content_type = content_type or response_headers.get("Content-Type")
 
@@ -670,8 +703,8 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 # blocked shows after about 30 requests
                 # can also be alert:
                 # alert: Turn off adblocker, otherwise site will not work properly. You can use different browser or browser in incognito/private mode
-                if headers.get("Zr-Final-Url") == "https://www.opensubtitles.org/en/login/vrf-on":
-                    logger.info(f"""{num} FIXME Zr-Final-Url: {headers.get("Zr-Final-Url")}""")
+                if response_headers.get("Zr-Final-Url") == "https://www.opensubtitles.org/en/login/vrf-on":
+                    logger.info(f"""{num} FIXME Zr-Final-Url: {response_headers.get("Zr-Final-Url")}""")
                 else:
                     logger.info(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}")
                 filename = f"{new_subs_dir}/{num}.html"
@@ -955,7 +988,8 @@ async def main():
             retry_counter += 1
             if retry_counter > 1000:
                 if len(num_stack) == 0:
-                    raise Exception(f"done all nums until {last_num_remote}")
+                    logger.info(f"done all nums until {last_num_remote}")
+                    raise SystemExit
                 else:
                     break
             #print("num_stack", num_stack)
