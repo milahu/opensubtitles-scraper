@@ -1,5 +1,7 @@
 #!/usr/bin/env -S python3 -u
 
+# FIXME dont create master branch
+
 import sys
 import os
 import re
@@ -97,13 +99,25 @@ done_nums_set = set(done_nums)
 
 
 
-# debug
-print("git log")
+# debug: git log
 args = [
     "git",
     "-C", new_subs_dir,
     "log",
     "--oneline",
+]
+print(shlex.join(args))
+proc = subprocess.run(
+    args,
+    check=True,
+    timeout=10,
+)
+
+# debug: git branch
+args = [
+    "git",
+    "-C", new_subs_dir,
+    "branch",
 ]
 print(shlex.join(args))
 proc = subprocess.run(
@@ -308,13 +322,56 @@ for filename in os.listdir(new_subs_dir):
 
 
 
-# debug
-print("git log")
+# debug: git log
 args = [
     "git",
     "-C", new_subs_dir,
     "log",
     "--oneline",
+]
+print(shlex.join(args))
+proc = subprocess.run(
+    args,
+    check=True,
+    timeout=10,
+)
+
+# debug: git log master
+args = [
+    "git",
+    "-C", new_subs_dir,
+    "log",
+    "--oneline",
+    "master",
+]
+print(shlex.join(args))
+proc = subprocess.run(
+    args,
+    check=True,
+    timeout=10,
+)
+
+# debug: git branch
+args = [
+    "git",
+    "-C", new_subs_dir,
+    "branch",
+]
+print(shlex.join(args))
+proc = subprocess.run(
+    args,
+    check=True,
+    timeout=10,
+)
+
+# FIXME dont create master branch
+# workaround: delete master branch
+args = [
+    "git",
+    "-C", new_subs_dir,
+    "branch",
+    "-D",
+    "master",
 ]
 print(shlex.join(args))
 proc = subprocess.run(
@@ -331,6 +388,7 @@ args = [
     "-C", new_subs_dir,
     "push",
     "--all", # push all branches
+    "--force", # overwrite existing remote branches
     remote_url,
 ]
 #print(shlex.join(args))
