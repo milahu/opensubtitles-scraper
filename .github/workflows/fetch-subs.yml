@@ -20,6 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/setup-python@v4
+      with:
+        python-version: '3'
+        #python-version: '3.9'
+        # cache pip dependencies
+        cache: 'pip'
+    - run: pip install -r requirements.txt
     - uses: actions/checkout@v3
       with:
         fetch-depth: '0'
