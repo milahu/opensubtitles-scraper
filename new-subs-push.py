@@ -112,6 +112,7 @@ args = [
     "git",
     "-C", new_subs_dir,
     "checkout",
+    "--quiet",
     #"--force", # untracked working tree files will be overwritten by checkout
     "main",
 ]
@@ -185,7 +186,7 @@ for filename in os.listdir(new_subs_dir):
 
     # add file to f"nums/{num}" branch
     # "-C", worktree_path,
-    print("git add", filename)
+    print("adding file", filename)
 
     # https://stackoverflow.com/questions/53005845/checking-out-orphan-branch-in-new-work-tree
     # d=subdir; n=some-branch; git worktree add --detach --no-checkout $d; git -C $d checkout --orphan $n; git reset; git clean -fdq; echo hello >$d/test.txt; git -C $d add test.txt; git -C $d commit -m init
@@ -214,6 +215,7 @@ for filename in os.listdir(new_subs_dir):
         "-C", new_subs_dir,
         "worktree",
         "add",
+        "--quiet",
         "--detach",
         "--no-checkout",
         f"nums/{num}", # worktree path
@@ -230,6 +232,7 @@ for filename in os.listdir(new_subs_dir):
         "git",
         "-C", worktree_path,
         "checkout",
+        "--quiet",
         "--orphan",
         f"nums/{num}", # branch name
     ]

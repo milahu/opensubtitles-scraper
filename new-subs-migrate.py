@@ -62,7 +62,8 @@ args = [
     "git",
     "-C", new_subs_dir,
     "checkout",
-    "--force", # untracked working tree files will be overwritten by checkout
+    "--quiet",
+    #"--force", # untracked working tree files will be overwritten by checkout
     "main",
 ]
 print(shlex.join(args))
@@ -136,6 +137,7 @@ for filename in os.listdir(new_subs_dir):
             "-C", new_subs_dir,
             "worktree",
             "add",
+            "--quiet",
             "--detach",
             "--no-checkout",
             f"nums/{num}", # worktree path
@@ -152,6 +154,7 @@ for filename in os.listdir(new_subs_dir):
             "git",
             "-C", worktree_path,
             "checkout",
+            "--quiet",
             "--orphan",
             f"nums/{num}", # branch name
         ]
