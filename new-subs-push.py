@@ -267,14 +267,17 @@ args = [
     remote_url,
 ]
 #print(shlex.join(args))
-proc = subprocess.run(
-    args,
-    #check=True,
-    timeout=10,
-    #capture_output=True,
-    #encoding="utf8",
-)
-proc.wait()
-if proc.returncode != 0:
+try:
+    proc = subprocess.run(
+        args,
+        check=True,
+        timeout=10,
+        #capture_output=True,
+        #encoding="utf8",
+    )
+# TODO more specific
+# subprocess.XXXError
+except Exception as error:
+    print(error)
     print("failed to git-push. maybe another git-push was faster. retry in next run")
     sys.exit(1)
