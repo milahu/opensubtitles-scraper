@@ -1127,7 +1127,7 @@ async def main():
                 num_stack_first = num_stack_last + 1
                 num_stack_last = num_stack_first + options.sample_size
                 #logger_print("num_stack_first", num_stack_first)
-                logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
+                #logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
                 def filter_num(num):
                     return (
                         num not in nums_done_set and
@@ -1158,6 +1158,7 @@ async def main():
                 logger.info(f"done: {num_downloads_done}. remain: {num_remain}")
                 num_stack = num_stack[0:num_remain]
 
+            logger.info(f"stack range: ({num_stack_first}, {num_stack_last})")
             logger.info(f"batch size: {len(num_stack)}")
             #logger.info(f"batch: {num_stack}")
 
