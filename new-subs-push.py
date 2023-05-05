@@ -203,6 +203,24 @@ for filename in os.listdir(new_subs_dir):
         timeout=10,
     )
 
+    # disable compression for zip files
+    gitattributes_path = f"{new_subs_dir}/nums/{num}/.gitattributes"
+    # https://stackoverflow.com/questions/7102053/git-pull-without-remotely-compressing-objects
+    with open(gitattributes_path, "w") as f:
+        f.write("*.zip -delta\n")
+    args = [
+        "git",
+        "-C", worktree_path,
+        "add",
+        os.path.basename(gitattributes_path),
+    ]
+    print(shlex.join(args))
+    proc = subprocess.run(
+        args,
+        check=True,
+        timeout=10,
+    )
+
     args = [
         "git",
         "-C", worktree_path,
