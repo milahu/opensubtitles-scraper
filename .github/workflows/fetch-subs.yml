@@ -1,7 +1,7 @@
 name: "fetch-subs"
 on:
   workflow_dispatch:
-  schedule:
+  #schedule:
     # 2000 new subs every day
     # 83.3 new subs every hour
     # 30 new subs every 21.6 minutes # rate limit: 30 requests
@@ -9,7 +9,7 @@ on:
     # 14 new subs every 10 minutes
     # 7 new subs every 5 minutes
     # run every 5 minutes:
-    - cron:  '*/5 * * * *'
+    #- cron:  '*/5 * * * *'
     # run every 10 minutes:
     #- cron:  '*/10 * * * *'
     # run every 20 minutes:
