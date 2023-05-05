@@ -36,7 +36,12 @@ jobs:
     - name: debug-before
       run: bash -c "set -x; ls -l"
     - name: 'pull new-subs'
-      run: git clone --depth=1 $NEW_SUBS_REPO_URL new-subs
+      run: |
+        bash -c '
+        set -x
+        git clone --depth=1 $NEW_SUBS_REPO_URL new-subs
+        ls new-subs | wc -l
+        '
       env:
         NEW_SUBS_REPO_URL: '${{ secrets.NEW_SUBS_REPO_URL }}'
     - name: fetch-subs.py
@@ -55,6 +60,10 @@ jobs:
         export GIT_AUTHOR_EMAIL="milahu@gmail.com"
         export GIT_COMMITTER_NAME=$GIT_AUTHOR_NAME
         export GIT_COMMITTER_EMAIL=$GIT_AUTHOR_EMAIL
+
+        set -x
+
+        ls new-subs | wc -l
 
         git -C new-subs add "*"
         git -C new-subs commit -m up
