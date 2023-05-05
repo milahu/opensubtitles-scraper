@@ -204,11 +204,11 @@ options = parser.parse_args()
 missing_numbers = None
 missing_numbers_txt_path = "missing_numbers.txt"
 if os.path.exists(missing_numbers_txt_path):
-    logger.info(f"loading missing_numbers from {missing_numbers_txt_path}")
+    logger_print(f"loading missing_numbers from {missing_numbers_txt_path}")
     with open(missing_numbers_txt_path, "r") as f:
         missing_numbers = list(map(int, f.read().strip().split("\n")))
 if missing_numbers:
-    logger.info(f"fetching {len(missing_numbers)} missing numbers:", missing_numbers)
+    logger_print(f"fetching {len(missing_numbers)} missing numbers:", missing_numbers)
 
     # postprocess: create empty dcma files
     # TODO detect these files while scraping
@@ -250,6 +250,9 @@ logging.basicConfig(
 logger = logging.getLogger("fetch-subs")
 
 
+def logger_print(*args):
+    logging.info(" ".join(map(str, args)))
+
 
 def change_ipaddr():
     #dev = "wan"
@@ -272,9 +275,9 @@ def change_ipaddr():
             encoding="utf8",
         )
         # inet addr:79.253.14.204  P-t-P:62.155.242.79  Mask:255.255.255.255
-        #logger.info("proc.stdout", repr(proc.stdout))
+        #logger_print("proc.stdout", repr(proc.stdout))
         match = re.search(r"inet addr:(\d+\.\d+\.\d+\.\d+) ", proc.stdout)
-        #logger.info("match", repr(match))
+        #logger_print("match", repr(match))
         ipaddr = match.group(1)
         return ipaddr
 
@@ -318,7 +321,7 @@ def change_ipaddr():
 
 
 if False:
-    logger.info("changing IP address")
+    logger_print("changing IP address")
     change_ipaddr()
 
 
@@ -454,7 +457,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 # requests.exceptions.ProxyError: HTTPSConnectionPool(host='dl.opensubtitles.org', port=443): Max retries exceeded with url: /en/download/sub/9188285 (Caused by ProxyError('Cannot connect to proxy.', NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x7fa473cadcf0>: Failed to establish a new connection: [Errno -3] Temporary failure in name resolution')))
                 logger.info(f"{num} retry. error: {err}")
                 return num # retry
-            #logger.info("response", dir(response))
+            #logger_print("response", dir(response))
             #status_code = response.status_code # requests
             status_code = response.status # aiohttp
             content_type = response.headers.get("Zr-Content-Type")
@@ -635,7 +638,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 #continue
                 return
             else:
-                logger.info(f"error: found multiple downloaded files for num={num}:", downloaded_files)
+                logger_print(f"error: found multiple downloaded files for num={num}:", downloaded_files)
                 raise NotImplementedError
 
         elif options.proxy_provider == "pyppeteer":
@@ -663,9 +666,9 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             try:
                 status_code = int(response_headers["Ant-Page-Status-Code"])
             except KeyError as err:
-                logger.info(f"{num} status_code={status_code} KeyError: no Ant-Page-Status-Code. headers: {response_headers}. content: {response_content[0:100]}...")
+                logger_print(f"{num} status_code={status_code} KeyError: no Ant-Page-Status-Code. headers: {response_headers}. content: {response_content[0:100]}...")
 
-        #logger.info(f"{num} status_code={status_code} headers:", response_headers)
+        #logger_print(f"{num} status_code={status_code} headers:", response_headers)
 
         if status_code == 404:
             open(filename_notfound, 'a').close() # create empty file
@@ -700,7 +703,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # blocking is done by cloudflare?
             #logger.info(f"{num} {status_code} Too Many Requests -> waiting {sleep_blocked} seconds")
             #time.sleep(sleep_blocked)
-            logger.info(f"{num} response_headers", response_headers)
+            logger_print(f"{num} response_headers", response_headers)
             raise NotImplementedError(f"{num} {status_code} Too Many Requests -> TODO change VPN server")
 
             user_agent = random.choice(user_agents)
@@ -765,7 +768,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         if content_type != "application/zip":
             # blocked
             # TODO retry download
-            #logger.info(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
+            #logger_print(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
             if content_type in {"text/html", "text/html; charset=UTF-8", "text/html; charset=utf-8"}:
                 # can be "not found" or "blocked":
                 # not found: [CRITICAL ERROR] Subtitle id {num} was not found in database
@@ -788,14 +791,14 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                     filename = f"{new_subs_dir}/{num}.{i}.html"
             else:
                 filename=f"{new_subs_dir}/{num}.unknown"
-                logger.info(f"{num} saving response_content to file: {filename}")
+                logger_print(f"{num} saving response_content to file: {filename}")
                 with open(filename, "wb") as dst:
                     dst.write(response_content)
-                #logger.info(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
+                #logger_print(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
                 raise NotImplementedError(f"{num}: unknown Content-Type: {content_type}")
 
-        #logger.info(f"{num} response", dir(response))
-        #logger.info(f"{num} response_headers", response_headers)
+        #logger_print(f"{num} response", dir(response))
+        #logger_print(f"{num} response_headers", response_headers)
         # 'Zr-Content-Disposition': 'attachment; filename="nana.s01.e14.family.restaurant.of.shambles.(2006).ita.1cd.(9181475).zip"'
         content_disposition = content_disposition or response_headers.get("Content-Disposition")
 
@@ -816,7 +819,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             filename = filename[0:(-1 * len(suffix))] + ".zip"
         else:
             # file basename is f"{num}.zip"
-            #logger.info(f"{num} FIXME missing filename? response_headers", response_headers)
+            #logger_print(f"{num} FIXME missing filename? response_headers", response_headers)
             pass
 
         # all filenames should be ascii
@@ -919,13 +922,13 @@ async def main():
         # https://github.com/MeiK2333/pyppeteer_stealth
         sys.path.append("pyppeteer_stealth") # local version
         import pyppeteer_stealth
-        logger.info("pyppeteer_stealth", pyppeteer_stealth)
+        logger_print("pyppeteer_stealth", pyppeteer_stealth)
         # TODO test sites:
         # https://abrahamjuliot.github.io/creepjs/
         # http://f.vision/
         # via https://github.com/QIN2DIM/undetected-playwright/issues/2
 
-        logger.info("pyppeteer.launch")
+        logger_print("pyppeteer.launch")
         pyppeteer_browser = await pyppeteer.launch(
             # https://pptr.dev/api/puppeteer.puppeteerlaunchoptions
             headless=pyppeteer_headless,
@@ -936,11 +939,11 @@ async def main():
             ],
         )
 
-        logger.info("pyppeteer_browser.newPage")
+        logger_print("pyppeteer_browser.newPage")
         pyppeteer_page = await pyppeteer_browser.newPage()
 
         # TODO why is this not working?
-        logger.info("pyppeteer_stealth.stealth")
+        logger_print("pyppeteer_stealth.stealth")
         await pyppeteer_stealth.stealth(pyppeteer_page)
 
         for url, path in [
@@ -958,7 +961,7 @@ async def main():
                 #    await pyppeteer_page.screenshot(path=path + f".{(i + 1) * 10}.png", fullPage=True)
                 await asyncio.sleep(10)
             await pyppeteer_page.screenshot(path=path, fullPage=True)
-            logger.info(f"done: {path}")
+            logger_print(f"done: {path}")
 
         #await pyppeteer_browser.close()
 
@@ -983,8 +986,8 @@ async def main():
 
     nums_done = sorted(nums_done)
 
-    #logger.info("nums_done", nums_done[0:10], "...", nums_done[-10:])
-    logger.info("nums_done", nums_done)
+    #logger_print("nums_done", nums_done[0:10], "...", nums_done[-10:])
+    logger_print("nums_done", nums_done)
 
     first_num_file = None
     last_num_file = 0
@@ -993,8 +996,8 @@ async def main():
         first_num_file = nums_done[0]
         last_num_file = nums_done[-1]
 
-    logger.info("first_num_file", first_num_file)
-    logger.info("last_num_file", last_num_file)
+    logger_print("first_num_file", first_num_file)
+    logger_print("last_num_file", last_num_file)
 
     #requests_session = new_requests_session()
 
@@ -1011,14 +1014,14 @@ async def main():
         #num_stack_last = first_num_file
         num_stack_last = last_num_file
 
-    logger.info("num_stack_last", num_stack_last)
+    logger_print("num_stack_last", num_stack_last)
 
     if options.first_num:
         num_stack_first = options.first_num
     else:
         num_stack_first = num_stack_last
 
-    logger.info("num_stack_first", num_stack_first)
+    logger_print("num_stack_first", num_stack_first)
 
     downloads_since_change_ipaddr = 0
 
@@ -1074,9 +1077,9 @@ async def main():
                 content_type = response.headers.get("Content-Type")
                 assert content_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
                 remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', await response.text())
-                logger.info("remote_nums", remote_nums)
+                logger_print("remote_nums", remote_nums)
                 options.last_num = max(map(int, remote_nums))
-                logger.info("options.last_num", options.last_num)
+                logger_print("options.last_num", options.last_num)
 
             #while not num_stack: # while stack is empty
             retry_counter = 0
@@ -1118,7 +1121,7 @@ async def main():
                         raise SystemExit
                     else:
                         break
-                #logger.info("num_stack", num_stack)
+                #logger_print("num_stack", num_stack)
 
             random.shuffle(num_stack)
 
@@ -1140,7 +1143,7 @@ async def main():
                 tasks.append(task)
             return_values = await asyncio.gather(*tasks)
             # TODO show progress
-            #logger.info("return_values", return_values)
+            #logger_print("return_values", return_values)
             pause_scraper = False
             do_change_ipaddr = False
             for return_value in return_values:
