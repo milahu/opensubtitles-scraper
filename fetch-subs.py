@@ -25,6 +25,7 @@ import collections
 import zipfile
 import base64
 import asyncio
+import argparse
 
 import aiohttp
 import requests
@@ -46,29 +47,29 @@ max_concurrency = 10
 # start sequential at around 80% (better too early)
 # so 80% would be
 # first_num = 9180519
-# last_num_remote = 9520468
+# options.last_num = 9520468
 # 9180519 + 0.8 * 1E6 = 9980519
 # 9520468 - 0.2 * 1E6 = 9320468 # pick
 #sequential_fetching_after_num = 9320468
 
 
-#num_stack_size_min = 10000 # randomize the last 4 digits
-num_stack_size_min = 1000 # randomize the last 3 digits
-#num_stack_size_min = 100 # randomize the last 2 digits
-#num_stack_size_min = 10 # randomize the last 1 digit
+#options.sample_size = 10000 # randomize the last 4 digits
+#options.sample_size = 1000 # randomize the last 3 digits
+#options.sample_size = 100 # randomize the last 2 digits
+#options.sample_size = 10 # randomize the last 1 digit
 
 
-if False:
+#if False:
 #if True:
     # debug
     #max_concurrency = 1
-    num_stack_size_min = 10
+    #options.sample_size = 10
 
 
 # captcha after 30 requests
-#proxy_provider = "chromium"
+#options.proxy_provider = "chromium"
 
-#proxy_provider = "pyppeteer"
+#options.proxy_provider = "pyppeteer"
 
 
 #fetcher_lib = "requests"
@@ -80,18 +81,18 @@ pyppeteer_headless = False # debug
 
 # note: these API keys are all expired
 
-#proxy_provider = "scrapfly.io"
+#options.proxy_provider = "scrapfly.io"
 proxy_scrapfly_io_api_key = "scp-live-65607ed58a5449f791ba56baa5488098"
 
-#proxy_provider = "scrapingdog.com"
+#options.proxy_provider = "scrapingdog.com"
 api_key_scrapingdog_com = "643f9f3b575aa419c1d7218a"
 
-#proxy_provider = "webscraping.ai"
+#options.proxy_provider = "webscraping.ai"
 api_key_webscraping_ai = "b948b414-dd1d-4d98-8688-67f154a74fe8"
 webscraping_ai_option_proxy = "datacenter"
 #webscraping_ai_option_proxy = "residential"
 
-proxy_provider = "zenrows.com"
+#options.proxy_provider = "zenrows.com"
 fetcher_lib = "aiohttp"
 #api_key_zenrows_com = "88d22df90b3a4c252b480dc8847872dac59db0e0" # expired
 from secrets import api_key_zenrows_com
@@ -101,10 +102,10 @@ class Config:
     zenrows_com_js = False
 config = Config()
 
-#proxy_provider = "scraperbox.com"
+#options.proxy_provider = "scraperbox.com"
 proxy_scraperbox_com_api_key = "56B1354FD63EB435CA1A9096B706BD55"
 
-#proxy_provider = "scrapingant.com"
+#options.proxy_provider = "scrapingant.com"
 api_key_scrapingant_com = "6ae0de59fad34337b2ee86814857278a"
 
 
@@ -112,26 +113,92 @@ new_subs_dir = "new-subs"
 
 # https://www.opensubtitles.org/en/search/subs
 # https://www.opensubtitles.org/ # New subtitles
-#last_num_remote = 9520468 # 2023-04-25
-#last_num_remote = 9521948 # 2023-04-26
-#last_num_remote = 9523112 # 2023-04-27
-#last_num_remote = 9530994 # 2023-05-01
-#last_num_remote = 9531985 # 2023-05-01
-#last_num_remote = 9533109 # 2023-05-02
-
-# get last_num_remote
-# dont use proxy
-response = requests.get("https://www.opensubtitles.org/en/search/subs")
-status_code = response.status_code
-assert status_code == 200, f"unexpected status_code {status_code}"
-content_type = response.headers.get("Content-Type")
-assert content_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
-remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', response.text)
-print("remote_nums", remote_nums)
-last_num_remote = max(map(int, remote_nums))
-print("last_num_remote", last_num_remote)
+#options.last_num = 9520468 # 2023-04-25
+#options.last_num = 9521948 # 2023-04-26
+#options.last_num = 9523112 # 2023-04-27
+#options.last_num = 9530994 # 2023-05-01
+#options.last_num = 9531985 # 2023-05-01
+#options.last_num = 9533109 # 2023-05-02
 
 
+parser = argparse.ArgumentParser(
+    prog='fetch-subs',
+    description='Fetch subtitles',
+    #epilog='Text at the bottom of help',
+)
+
+default_jobs = 1
+default_num_downloads = 25
+default_sample_size = 1000
+proxy_provider_values = ["requests", "zenrows.com"]
+default_proxy_provider = "requests"
+
+#parser.add_argument('filename')
+parser.add_argument(
+    '--proxy-provider',
+    default=default_proxy_provider,
+    choices=proxy_provider_values,
+    metavar="S",
+    help=(
+        f"proxy provider. "
+        f"default: {default_proxy_provider}. "
+        f"values: {', '.join(proxy_provider_values)}"
+    ),
+)
+parser.add_argument(
+    '--jobs',
+    default=default_jobs,
+    metavar="N",
+    help=f"how many jobs to run in parallel. default: {default_jobs}",
+)
+parser.add_argument(
+    '--num-downloads',
+    dest="num_downloads",
+    default=default_num_downloads,
+    metavar="N",
+    help=f"limit the number of downloads. default: {default_num_downloads}",
+)
+parser.add_argument(
+    '--sample-size',
+    dest="sample_size",
+    default=default_sample_size,
+    metavar="N",
+    help=f"size of random sample. default: {default_sample_size}",
+)
+parser.add_argument(
+    '--first-num',
+    dest="first_num",
+    default=None,
+    metavar="N",
+    help="first subtitle number. default: get from store",
+)
+parser.add_argument(
+    '--last-num',
+    dest="last_num",
+    default=None,
+    metavar="N",
+    help="last subtitle number. default: get from remote",
+)
+#parser.add_argument('--verbose', action='store_true')
+#options = parser.parse_args(sys.argv)
+options = parser.parse_args()
+
+
+if options.last_num == None:
+    # get options.last_num
+    # dont use proxy
+    response = requests.get("https://www.opensubtitles.org/en/search/subs")
+    status_code = response.status_code
+    assert status_code == 200, f"unexpected status_code {status_code}"
+    content_type = response.headers.get("Content-Type")
+    assert content_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
+    remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', response.text)
+    print("remote_nums", remote_nums)
+    options.last_num = max(map(int, remote_nums))
+    print("options.last_num", options.last_num)
+
+
+# postprocess: fetch missing subs
 # example: https://www.opensubtitles.org/en/subtitles/9205951
 # this is a bug in opensubtitles.org
 # the server returns infinite cyclic redirect via
@@ -274,17 +341,18 @@ def change_ipsubnet():
             return first_ipaddr, new_ipaddr
 
 
-def new_session():
+def new_requests_session():
+    global user_agents
     requests_session = requests.Session()
-    return requests_session
+    #return requests_session
     # https://httpbin.org/headers
     # chromium headers:
+    user_agent = random.choice(user_agents)
     requests_session.headers = {
-        #'user-agent': user_agent,
+        'user-agent': user_agent,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Encoding": "gzip, deflate, br",
         "Accept-Language": "en-US,en;q=0.9",
-        #"Host": "httpbin.org",
         "Sec-Ch-Ua": "\"Not A(Brand\";v=\"24\", \"Chromium\";v=\"110\"",
         "Sec-Ch-Ua-Mobile": "?0",
         "Sec-Ch-Ua-Platform": "\"Linux\"",
@@ -294,7 +362,6 @@ def new_session():
         "Sec-Fetch-User": "?1",
         "Upgrade-Insecure-Requests": "1",
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
-        #"X-Amzn-Trace-Id": "Root=1-xxx"
     }
     return requests_session
 
@@ -352,7 +419,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
         response_headers = None
         response_content = None
 
-        if proxy_provider == "scrapingant.com":
+        if options.proxy_provider == "scrapingant.com":
             query = urllib.parse.urlencode({
                 "url": url,
                 "x-api-key": api_key_scrapingant_com,
@@ -362,7 +429,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             response = requests.get(url, **requests_get_kwargs)
             status_code = response.status_code
 
-        elif proxy_provider == "zenrows.com":
+        elif options.proxy_provider == "zenrows.com":
             #proxy = f"http://{api_key_zenrows_com}:@proxy.zenrows.com:8001"
             zenrows_com_query_parts = []
             if config.zenrows_com_antibot:
@@ -397,7 +464,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             content_type = response.headers.get("Zr-Content-Type")
             content_disposition = response.headers.get("Zr-Content-Disposition")
 
-        elif proxy_provider == "scrapingdog.com":
+        elif options.proxy_provider == "scrapingdog.com":
             query = urllib.parse.urlencode({
                 "url": url,
                 "api_key": api_key_scrapingdog_com,
@@ -432,7 +499,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 # example: text/html; charset=utf-8
                 # example: text/html; charset=us-ascii
 
-        elif proxy_provider == "webscraping.ai":
+        elif options.proxy_provider == "webscraping.ai":
             # https://docs.webscraping.ai/reference/gethtml
             query = urllib.parse.urlencode({
                 "url": url,
@@ -449,7 +516,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
 
             logger.info(f"{num} headers: {response.headers}")
 
-        elif proxy_provider == "scrapfly.io":
+        elif options.proxy_provider == "scrapfly.io":
             # https://scrapfly.io/dashboard
             # https://scrapfly.io/docs/scrape-api
             query = urllib.parse.urlencode({
@@ -502,7 +569,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             #logger.info(f"{num} cost details: {response_data['context']['cost']['details']}")
             logger.debug(f"{num} cost: {response_data['context']['cost']['total']} = {response_data['context']['cost']['details']}")
 
-        elif proxy_provider == "scraperbox.com":
+        elif options.proxy_provider == "scraperbox.com":
             # https://scraperbox.com/dashboard
             query = urllib.parse.urlencode({
                 "url": url,
@@ -520,7 +587,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
 
             logger.info(f"{num} headers: {response.headers}")
 
-        elif proxy_provider == "chromium":
+        elif options.proxy_provider == "chromium":
             args = ["chromium", url]
             subprocess.run(
                 args,
@@ -571,11 +638,11 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 print(f"error: found multiple downloaded files for num={num}:", downloaded_files)
                 raise NotImplementedError
 
-        elif proxy_provider == "pyppeteer":
+        elif options.proxy_provider == "pyppeteer":
             await pyppeteer_page.goto(url)
             raise NotImplementedError
 
-        else:
+        elif options.proxy_provider == "requests":
             # no proxy
             response = requests.get(url, **requests_get_kwargs)
             status_code = response.status_code
@@ -586,7 +653,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
         # https://scrapingant.com/free-proxies/
         #proxy = "socks5://54.254.52.187:8118"
 
-        if proxy_provider == "scrapingant.com":
+        if options.proxy_provider == "scrapingant.com":
             try:
                 status_code = int(response_headers["Ant-Page-Status-Code"])
             except KeyError as err:
@@ -643,7 +710,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 change_ipaddr()
             downloads_since_change_ipaddr = 0
             # fix: http.client.RemoteDisconnected: Remote end closed connection without response
-            requests_session = new_session()
+            requests_session = new_requests_session()
             time.sleep(sleep_change_ipaddr)
             #continue
             return
@@ -825,13 +892,18 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
         #num += 1
 
 
+user_agents = None
+
+
 async def main():
 
-    if proxy_provider == "zenrows.com":
+    global user_agents
+
+    if options.proxy_provider == "zenrows.com":
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-    elif proxy_provider == "pyppeteer":
+    elif options.proxy_provider == "pyppeteer":
         # puppeteer is old, chrome only, but stealth plugin works?
         import pyppeteer
         # https://github.com/towry/n/issues/148
@@ -884,7 +956,7 @@ async def main():
 
         raise NotImplementedError
 
-    #elif proxy_provider == "playwright":
+    #elif options.proxy_provider == "playwright":
 
     #first_num_file = last_num_db
     #last_num_file = 1
@@ -912,7 +984,7 @@ async def main():
     print("first_num_file", first_num_file)
     print("last_num_file", last_num_file)
 
-    requests_session = new_session()
+    requests_session = new_requests_session()
 
     num_stack_last = None
 
@@ -954,7 +1026,7 @@ async def main():
 
         #while not num_stack: # while stack is empty
         retry_counter = 0
-        while len(num_stack) < num_stack_size_min: # while stack is empty
+        while len(num_stack) < options.sample_size: # while stack is empty
             if missing_numbers:
                 num_stack = missing_numbers
                 # slow but rare
@@ -972,23 +1044,23 @@ async def main():
                 break
             # add numbers to the stack
             num_stack_first = num_stack_last + 1
-            num_stack_last = num_stack_first + num_stack_size_min
+            num_stack_last = num_stack_first + options.sample_size
             #logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
             def filter_num(num):
                 return (
                     num not in nums_done_set and
-                    num <= last_num_remote
+                    num <= options.last_num
                 )
             num_stack += list(
                 filter(filter_num,
                     range(num_stack_first, num_stack_last + 1),
-                    #random.sample(range(num_stack_first, last_num_remote + 1), num_stack_size_min)
+                    #random.sample(range(num_stack_first, options.last_num + 1), options.sample_size)
                 )
             )
             retry_counter += 1
             if retry_counter > 1000:
                 if len(num_stack) == 0:
-                    logger.info(f"done all nums until {last_num_remote}")
+                    logger.info(f"done all nums until {options.last_num}")
                     raise SystemExit
                 else:
                     break
