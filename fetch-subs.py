@@ -1154,7 +1154,7 @@ async def main():
                 )
                 if len(num_stack_expand) == 0:
                     logger.info(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
-                    raise SystemExit
+                    break
                 num_stack += num_stack_expand
                 retry_counter += 1
                 if retry_counter > 20:
@@ -1164,7 +1164,7 @@ async def main():
                     else:
                         break
 
-            logger.debug(f"num_stack: {num_stack}")
+            logger.info(f"num_stack: {num_stack}")
             random.shuffle(num_stack)
 
             if options.num_downloads:
