@@ -1,7 +1,5 @@
 #!/usr/bin/env -S python3 -u
 
-# FIXME dont create master branch
-
 # TODO alternative?
 # https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
 
@@ -204,7 +202,7 @@ for filename in os.listdir(new_subs_dir):
             #"--force",
             f"nums/{num}", # worktree path
         ]
-        print(shlex.join(args))
+        #print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -235,7 +233,7 @@ for filename in os.listdir(new_subs_dir):
         "--orphan",
         f"nums/{num}", # branch name
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -247,7 +245,7 @@ for filename in os.listdir(new_subs_dir):
         "-C", worktree_path,
         "reset",
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -260,7 +258,7 @@ for filename in os.listdir(new_subs_dir):
         "clean",
         "-fdq",
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -279,7 +277,7 @@ for filename in os.listdir(new_subs_dir):
         "add",
         filename
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -297,7 +295,7 @@ for filename in os.listdir(new_subs_dir):
         "add",
         os.path.basename(gitattributes_path),
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -344,7 +342,7 @@ for filename in os.listdir(new_subs_dir):
         # note: actually: relative path to new_subs_dir
         os.path.basename(files_txt_path),
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -379,52 +377,6 @@ proc = subprocess.run(
     check=True,
     timeout=10,
 )
-
-"""
-# debug: git log master
-args = [
-    "git",
-    "-C", new_subs_dir,
-    "log",
-    "--oneline",
-    "master",
-]
-print(shlex.join(args))
-proc = subprocess.run(
-    args,
-    check=True,
-    timeout=10,
-)
-
-# debug: git branch
-args = [
-    "git",
-    "-C", new_subs_dir,
-    "branch",
-]
-print(shlex.join(args))
-proc = subprocess.run(
-    args,
-    check=True,
-    timeout=10,
-)
-
-# FIXME dont create master branch
-# workaround: delete master branch
-args = [
-    "git",
-    "-C", new_subs_dir,
-    "branch",
-    "-D",
-    "master",
-]
-print(shlex.join(args))
-proc = subprocess.run(
-    args,
-    check=True,
-    timeout=10,
-)
-"""
 
 
 
