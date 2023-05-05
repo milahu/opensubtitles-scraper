@@ -34,9 +34,17 @@ jobs:
       run: ./new-subs-pull.py
       env:
         NEW_SUBS_REPO_URL: '${{ secrets.NEW_SUBS_REPO_URL }}'
+        GIT_AUTHOR_NAME: "Milan Hauth"
+        GIT_AUTHOR_EMAIL: "milahu@gmail.com"
+        GIT_COMMITTER_NAME: "Milan Hauth"
+        GIT_COMMITTER_EMAIL: "milahu@gmail.com"
     - name: fetch-subs.py
       run: ./fetch-subs.py --num-downloads 20 --first-num 9539186
     - name: new-subs-push.py
       run: ./new-subs-push.py
       env:
         NEW_SUBS_REPO_URL: '${{ secrets.NEW_SUBS_REPO_URL }}'
+        GIT_AUTHOR_NAME: "Milan Hauth"
+        GIT_AUTHOR_EMAIL: "milahu@gmail.com"
+        GIT_COMMITTER_NAME: "Milan Hauth"
+        GIT_COMMITTER_EMAIL: "milahu@gmail.com"
