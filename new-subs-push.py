@@ -202,7 +202,7 @@ for filename in os.listdir(new_subs_dir):
             #"--force",
             f"nums/{num}", # worktree path
         ]
-        #print(shlex.join(args))
+        print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -218,7 +218,7 @@ for filename in os.listdir(new_subs_dir):
         "--no-checkout",
         f"nums/{num}", # worktree path
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -233,7 +233,7 @@ for filename in os.listdir(new_subs_dir):
         "--orphan",
         f"nums/{num}", # branch name
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -245,7 +245,7 @@ for filename in os.listdir(new_subs_dir):
         "-C", worktree_path,
         "reset",
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -258,7 +258,7 @@ for filename in os.listdir(new_subs_dir):
         "clean",
         "-fdq",
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -295,7 +295,7 @@ for filename in os.listdir(new_subs_dir):
         "add",
         os.path.basename(gitattributes_path),
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -309,7 +309,7 @@ for filename in os.listdir(new_subs_dir):
         "--quiet",
         "-m", f"add {num}",
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -323,7 +323,7 @@ for filename in os.listdir(new_subs_dir):
         "remove",
         f"nums/{num}", # worktree path
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -343,7 +343,7 @@ for filename in os.listdir(new_subs_dir):
         # note: actually: relative path to new_subs_dir
         os.path.basename(files_txt_path),
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -357,7 +357,7 @@ for filename in os.listdir(new_subs_dir):
         "--quiet",
         "-m", f"files.txt: add {num}",
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
