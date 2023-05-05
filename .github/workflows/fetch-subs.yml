@@ -48,6 +48,12 @@ jobs:
     - name: 'push new-subs'
       run: |
         bash -c '
+
+        export GIT_AUTHOR_NAME="Milan Hauth"
+        export GIT_AUTHOR_EMAIL="milahu@gmail.com"
+        export GIT_COMMITTER_NAME=$GIT_AUTHOR_NAME
+        export GIT_COMMITTER_EMAIL=$GIT_AUTHOR_EMAIL
+
         git -C new-subs add "*"
         git -C new-subs commit -m up
         git -C new-subs push $NEW_SUBS_REPO_URL
