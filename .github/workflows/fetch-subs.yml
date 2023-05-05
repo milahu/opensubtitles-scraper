@@ -24,8 +24,9 @@ jobs:
         fetch-depth: '0'
     - uses: actions/setup-python@v4
       with:
-        #python-version: '3.10'
-        python-version-file: '.python-version'
+        # latest stable version of python 3
+        python-version: '3.x'
+        #python-version-file: '.python-version'
         # cache pip dependencies
         cache: 'pip'
     - run: pip install -r requirements.txt
