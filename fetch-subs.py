@@ -130,14 +130,16 @@ parser = argparse.ArgumentParser(
 default_jobs = 1
 default_num_downloads = 25
 default_sample_size = 1000
-proxy_provider_values = ["requests", "zenrows.com"]
-default_proxy_provider = "requests"
+proxy_provider_values = ["zenrows.com"]
+default_proxy_provider = None
 
 #parser.add_argument('filename')
 parser.add_argument(
     '--proxy-provider',
+    dest="proxy_provider",
     default=default_proxy_provider,
-    choices=proxy_provider_values,
+    #choices=proxy_provider_values,
+    type=str,
     metavar="S",
     help=(
         f"proxy provider. "
@@ -148,6 +150,7 @@ parser.add_argument(
 parser.add_argument(
     '--jobs',
     default=default_jobs,
+    type=int,
     metavar="N",
     help=f"how many jobs to run in parallel. default: {default_jobs}",
 )
@@ -155,6 +158,7 @@ parser.add_argument(
     '--num-downloads',
     dest="num_downloads",
     default=default_num_downloads,
+    type=int,
     metavar="N",
     help=f"limit the number of downloads. default: {default_num_downloads}",
 )
@@ -162,6 +166,7 @@ parser.add_argument(
     '--sample-size',
     dest="sample_size",
     default=default_sample_size,
+    type=int,
     metavar="N",
     help=f"size of random sample. default: {default_sample_size}",
 )
@@ -169,6 +174,7 @@ parser.add_argument(
     '--first-num',
     dest="first_num",
     default=None,
+    type=int,
     metavar="N",
     help="first subtitle number. default: get from store",
 )
@@ -176,26 +182,13 @@ parser.add_argument(
     '--last-num',
     dest="last_num",
     default=None,
+    type=int,
     metavar="N",
     help="last subtitle number. default: get from remote",
 )
 #parser.add_argument('--verbose', action='store_true')
 #options = parser.parse_args(sys.argv)
 options = parser.parse_args()
-
-
-if options.last_num == None:
-    # get options.last_num
-    # dont use proxy
-    response = requests.get("https://www.opensubtitles.org/en/search/subs")
-    status_code = response.status_code
-    assert status_code == 200, f"unexpected status_code {status_code}"
-    content_type = response.headers.get("Content-Type")
-    assert content_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
-    remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', response.text)
-    print("remote_nums", remote_nums)
-    options.last_num = max(map(int, remote_nums))
-    print("options.last_num", options.last_num)
 
 
 # postprocess: fetch missing subs
@@ -349,7 +342,6 @@ def new_requests_session():
     # chromium headers:
     user_agent = random.choice(user_agents)
     requests_session.headers = {
-        'user-agent': user_agent,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Encoding": "gzip, deflate, br",
         "Accept-Language": "en-US,en;q=0.9",
@@ -361,12 +353,12 @@ def new_requests_session():
         "Sec-Fetch-Site": "none",
         "Sec-Fetch-User": "?1",
         "Upgrade-Insecure-Requests": "1",
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+        "User-Agent": user_agent,
     }
     return requests_session
 
 
-async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list, html_errors, config):
+async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_download_list, html_errors, config):
 
     async with semaphore: # limit parallel downloads
 
@@ -426,6 +418,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 "browser": "false",
             })
             url = f"https://api.scrapingant.com/v2/general?{query}"
+            # TODO aiohttp
             response = requests.get(url, **requests_get_kwargs)
             status_code = response.status_code
 
@@ -450,9 +443,9 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             #requests_get_kwargs["verify"] = False # requests
             try:
                 #response = requests.get(url, **requests_get_kwargs)
-                response = await session.get(url, **requests_get_kwargs)
+                response = await aiohttp_session.get(url, **requests_get_kwargs)
             except (
-                requests.exceptions.ProxyError,
+                #requests.exceptions.ProxyError,
                 asyncio.exceptions.TimeoutError,
             ) as err:
                 # requests.exceptions.ProxyError: HTTPSConnectionPool(host='dl.opensubtitles.org', port=443): Max retries exceeded with url: /en/download/sub/9188285 (Caused by ProxyError('Cannot connect to proxy.', NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x7fa473cadcf0>: Failed to establish a new connection: [Errno -3] Temporary failure in name resolution')))
@@ -472,6 +465,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             })
             url = f"https://api.scrapingdog.com/scrape?{query}"
 
+            # TODO aiohttp
             response = requests.get(url, **requests_get_kwargs)
 
             status_code = response.status_code
@@ -509,6 +503,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             })
             url = f"https://api.webscraping.ai/html?{query}"
 
+            # TODO aiohttp
             response = requests.get(url, **requests_get_kwargs)
 
             status_code = response.status_code
@@ -531,6 +526,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             })
             url = f"https://api.scrapfly.io/scrape?{query}"
 
+            # TODO aiohttp
             response = requests.get(url, **requests_get_kwargs)
 
             response_data = json.loads(response.content)
@@ -580,6 +576,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             })
             url = f"https://scraperbox.com/api/scrape?{query}"
 
+            # TODO aiohttp
             response = requests.get(url, **requests_get_kwargs)
 
             status_code = response.status_code
@@ -642,10 +639,16 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             await pyppeteer_page.goto(url)
             raise NotImplementedError
 
-        elif options.proxy_provider == "requests":
+        else:
             # no proxy
-            response = requests.get(url, **requests_get_kwargs)
-            status_code = response.status_code
+            # requests
+            #response = requests.get(url, **requests_get_kwargs)
+            #status_code = response.status_code
+            # aiohttp
+            response = await aiohttp_session.get(url, **requests_get_kwargs)
+            status_code = response.status
+            logger.info(f"{num} status_code: {status_code}")
+            logger.info(f"{num} headers: {response.headers}")
 
         response_content = response_content or response.content
         response_headers = response_headers or response.headers
@@ -685,7 +688,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
             #    logger.info(f"499: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
             #num += 1
             #continue
-            return
+            return # success
 
         if False and status_code == 429:
             # rate limiting
@@ -710,14 +713,15 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 change_ipaddr()
             downloads_since_change_ipaddr = 0
             # fix: http.client.RemoteDisconnected: Remote end closed connection without response
+            # TODO aiohttp
             requests_session = new_requests_session()
             time.sleep(sleep_change_ipaddr)
             #continue
-            return
+            return # success
 
         if status_code == 500:
             logger.info(f"{num} {status_code} Internal Server Error -> retry")
-            return num
+            return num # retry
 
         if status_code in {422, 429, 403, 503}:
             response_json = (await response_content.read()).decode("utf8")
@@ -731,7 +735,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
                 # create empty file
                 filename_dcma = f"{new_subs_dir}/{num}.dcma"
                 open(filename_dcma, 'a').close() # create empty file
-                return
+                return # success
                 #return num # retry
                 #return {"retry_num": num, "pause": True} # pause scraper, retry
             if response_data["code"] == "AUTH006":
@@ -833,10 +837,10 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
         if fetcher_lib == "aiohttp":
             with open(filename_tmp, file_open_mode) as f:
                 f.write(await response_content.read())
-        else:
-            # requests
-            with open(filename_tmp, file_open_mode) as f:
-                f.write(response_content)
+        #else:
+        #    # requests
+        #    with open(filename_tmp, file_open_mode) as f:
+        #        f.write(response_content)
         os.rename(filename_tmp, filename)
 
         if filename.endswith(".html"):
@@ -890,6 +894,7 @@ async def fetch_num(num, session, semaphore, dt_download_list, t2_download_list,
         #time.sleep(sleep_each)
         #break
         #num += 1
+        return # success
 
 
 user_agents = None
@@ -978,13 +983,17 @@ async def main():
     #print("nums_done", nums_done[0:10], "...", nums_done[-10:])
     #print("nums_done", nums_done)
 
-    first_num_file = nums_done[0]
-    last_num_file = nums_done[-1]
+    first_num_file = None
+    last_num_file = 0
+
+    if nums_done:
+        first_num_file = nums_done[0]
+        last_num_file = nums_done[-1]
 
     print("first_num_file", first_num_file)
     print("last_num_file", last_num_file)
 
-    requests_session = new_requests_session()
+    #requests_session = new_requests_session()
 
     num_stack_last = None
 
@@ -999,9 +1008,12 @@ async def main():
         #num_stack_last = first_num_file
         num_stack_last = last_num_file
 
-    print("num_stack_last", num)
+    print("num_stack_last", num_stack_last)
 
-    num_stack_first = num_stack_last
+    if options.first_num:
+        num_stack_first = options.first_num
+    else:
+        num_stack_first = num_stack_last
 
     downloads_since_change_ipaddr = 0
 
@@ -1022,62 +1034,104 @@ async def main():
 
     # loop subtitle numbers
 
+    num_downloads_done = 0
+
     while True:
 
-        #while not num_stack: # while stack is empty
-        retry_counter = 0
-        while len(num_stack) < options.sample_size: # while stack is empty
-            if missing_numbers:
-                num_stack = missing_numbers
-                # slow but rare
-                for filename in os.listdir(new_subs_dir):
-                    for num in missing_numbers:
-                        if (
-                            filename == f"{num}.not-found" or (
-                                filename.startswith(f"{num}.") and
-                                filename.endswith(".zip")
-                            )
-                        ):
-                            missing_numbers.remove(num)
-                if len(missing_numbers) == 0:
-                    raise Exception("done all missing_numbers")
-                break
-            # add numbers to the stack
-            num_stack_first = num_stack_last + 1
-            num_stack_last = num_stack_first + options.sample_size
-            #logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
-            def filter_num(num):
-                return (
-                    num not in nums_done_set and
-                    num <= options.last_num
-                )
-            num_stack += list(
-                filter(filter_num,
-                    range(num_stack_first, num_stack_last + 1),
-                    #random.sample(range(num_stack_first, options.last_num + 1), options.sample_size)
-                )
-            )
-            retry_counter += 1
-            if retry_counter > 1000:
-                if len(num_stack) == 0:
-                    logger.info(f"done all nums until {options.last_num}")
-                    raise SystemExit
-                else:
-                    break
-            #print("num_stack", num_stack)
-
-        random.shuffle(num_stack)
-
-        logger.info(f"batch size: {len(num_stack)}")
-        #logger.info(f"batch: {num_stack}")
         semaphore = asyncio.Semaphore(max_concurrency)
+        aiohttp_kwargs = dict()
         # fix: aiohttp.client_exceptions.ClientConnectorCertificateError: Cannot connect to host dl.opensubtitles.org:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:997)')]
-        #async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
-        async with aiohttp.ClientSession() as session:
+        #aiohttp_kwargs["verify_ssl"] = False
+        aiohttp_kwargs["headers"] = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "en-US,en;q=0.9",
+            #"Sec-Ch-Ua": "\"Not A(Brand\";v=\"24\", \"Chromium\";v=\"110\"",
+            #"Sec-Ch-Ua-Mobile": "?0",
+            #"Sec-Ch-Ua-Platform": "\"Linux\"",
+            #"Sec-Fetch-Dest": "document",
+            #"Sec-Fetch-Mode": "navigate",
+            #"Sec-Fetch-Site": "none",
+            #"Sec-Fetch-User": "?1",
+            #"Upgrade-Insecure-Requests": "1",
+            "User-Agent": user_agent,
+        }
+
+        async with aiohttp.ClientSession(**aiohttp_kwargs) as aiohttp_session:
+
+            if options.last_num == None:
+                logger.info(f"getting options.last_num from remote")
+                url = "https://www.opensubtitles.org/en/search/subs"
+                # TODO use proxy
+                response = await aiohttp_session.get(url)
+                status_code = response.status
+                assert status_code == 200, f"unexpected status_code {status_code}"
+                content_type = response.headers.get("Content-Type")
+                assert content_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
+                remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', await response.text())
+                print("remote_nums", remote_nums)
+                options.last_num = max(map(int, remote_nums))
+                print("options.last_num", options.last_num)
+
+            #while not num_stack: # while stack is empty
+            retry_counter = 0
+            while len(num_stack) < options.sample_size: # while stack is empty
+                if missing_numbers:
+                    num_stack = missing_numbers
+                    # slow but rare
+                    for filename in os.listdir(new_subs_dir):
+                        for num in missing_numbers:
+                            if (
+                                filename == f"{num}.not-found" or (
+                                    filename.startswith(f"{num}.") and
+                                    filename.endswith(".zip")
+                                )
+                            ):
+                                missing_numbers.remove(num)
+                    if len(missing_numbers) == 0:
+                        raise Exception("done all missing_numbers")
+                    break
+                # add numbers to the stack
+                num_stack_first = num_stack_last + 1
+                num_stack_last = num_stack_first + options.sample_size
+                #logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
+                def filter_num(num):
+                    return (
+                        num not in nums_done_set and
+                        num <= options.last_num
+                    )
+                num_stack += list(
+                    filter(filter_num,
+                        range(num_stack_first, num_stack_last + 1),
+                        #random.sample(range(num_stack_first, options.last_num + 1), options.sample_size)
+                    )
+                )
+                retry_counter += 1
+                if retry_counter > 1000:
+                    if len(num_stack) == 0:
+                        logger.info(f"done all nums until {options.last_num}")
+                        raise SystemExit
+                    else:
+                        break
+                #print("num_stack", num_stack)
+
+            random.shuffle(num_stack)
+
+            if options.num_downloads:
+                num_remain = options.num_downloads - num_downloads_done
+                if num_remain <= 0:
+                    logger.info(f"done {options.num_downloads} nums")
+                    raise SystemExit
+                logger.info(f"done: {num_downloads_done}. remain: {num_remain}")
+                num_stack = num_stack[0:num_remain]
+
+            logger.info(f"batch size: {len(num_stack)}")
+            #logger.info(f"batch: {num_stack}")
+
             tasks = []
             while num_stack:
                 num = num_stack.pop()
-                task = asyncio.create_task(fetch_num(num, session, semaphore, dt_download_list, t2_download_list, html_errors, config))
+                task = asyncio.create_task(fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_download_list, html_errors, config))
                 tasks.append(task)
             return_values = await asyncio.gather(*tasks)
             # TODO show progress
@@ -1087,11 +1141,15 @@ async def main():
             for return_value in return_values:
                 if return_value == None:
                     # success
+                    num_downloads_done += 1
                     continue
                 if type(return_value) == int:
                     # retry
                     num_stack.append(return_value)
                 elif type(return_value) == dict:
+                    if "done_num" in return_value:
+                        # success
+                        num_downloads_done += 1
                     if "retry_num" in return_value:
                         # retry
                         num_stack.append(return_value["retry_num"])
