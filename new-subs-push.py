@@ -218,7 +218,7 @@ for filename in os.listdir(new_subs_dir):
         "--no-checkout",
         f"nums/{num}", # worktree path
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -277,7 +277,7 @@ for filename in os.listdir(new_subs_dir):
         "add",
         filename
     ]
-    #print(shlex.join(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -306,9 +306,10 @@ for filename in os.listdir(new_subs_dir):
         "git",
         "-C", worktree_path,
         "commit",
+        "--quiet",
         "-m", f"add {num}",
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -322,7 +323,7 @@ for filename in os.listdir(new_subs_dir):
         "remove",
         f"nums/{num}", # worktree path
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -353,9 +354,10 @@ for filename in os.listdir(new_subs_dir):
         "git",
         "-C", new_subs_dir,
         "commit",
+        "--quiet",
         "-m", f"files.txt: add {num}",
     ]
-    print(shlex.join(args))
+    #print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -389,7 +391,7 @@ args = [
     "--force", # overwrite existing remote branches
     remote_url,
 ]
-#print(shlex.join(args))
+print(shlex.join(args))
 try:
     proc = subprocess.run(
         args,
