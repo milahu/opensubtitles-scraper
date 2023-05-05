@@ -48,7 +48,7 @@ args = [
     "git",
     "-C", new_subs_dir,
     "pull",
-    "--force", # untracked working tree files will be overwritten by checkout
+    #"--force", # untracked working tree files will be overwritten by checkout
     "--depth=1",
     "origin",
     "main",
@@ -64,7 +64,7 @@ args = [
     "git",
     "-C", new_subs_dir,
     "checkout",
-    "--force", # untracked working tree files will be overwritten by checkout
+    #"--force", # untracked working tree files will be overwritten by checkout
     "main",
 ]
 proc = subprocess.run(
@@ -92,6 +92,23 @@ done_nums_set = set(done_nums)
 
 
 
+# debug
+print("git log")
+args = [
+    "git",
+    "-C", new_subs_dir,
+    "log",
+    "--oneline",
+]
+print(shlex.join(args))
+proc = subprocess.run(
+    args,
+    check=True,
+    timeout=10,
+)
+
+
+
 print(f"processing files in {new_subs_dir} ...")
 
 for filename in os.listdir(new_subs_dir):
@@ -105,6 +122,8 @@ for filename in os.listdir(new_subs_dir):
     if num in done_nums_set:
         continue
 
+    # add file to f"nums/{num}" branch
+    # "-C", worktree_path,
     print("git add", filename)
 
     # https://stackoverflow.com/questions/53005845/checking-out-orphan-branch-in-new-work-tree
@@ -119,7 +138,7 @@ for filename in os.listdir(new_subs_dir):
             "-C", new_subs_dir,
             "worktree",
             "remove",
-            "--force",
+            #"--force",
             f"nums/{num}", # worktree path
         ]
         print(shlex.join(args))
@@ -249,7 +268,8 @@ for filename in os.listdir(new_subs_dir):
         timeout=10,
     )
 
-    # add to files.txt in main branch
+    # add file to files.txt in main branch
+    # "-C", new_subs_dir,
 
     with open(files_txt_path, "a") as f:
         f.write(f"{filename}\n")
@@ -280,6 +300,23 @@ for filename in os.listdir(new_subs_dir):
         check=True,
         timeout=10,
     )
+
+
+
+# debug
+print("git log")
+args = [
+    "git",
+    "-C", new_subs_dir,
+    "log",
+    "--oneline",
+]
+print(shlex.join(args))
+proc = subprocess.run(
+    args,
+    check=True,
+    timeout=10,
+)
 
 
 
