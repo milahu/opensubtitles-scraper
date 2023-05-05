@@ -27,51 +27,16 @@ jobs:
         fetch-depth: '0'
     - uses: actions/setup-python@v4
       with:
-        # latest stable version of python 3
         python-version: '3.x'
-        #python-version-file: '.python-version'
-        # cache pip dependencies
         cache: 'pip'
     - run: pip install -r requirements.txt
-    - name: debug-before
-      run: bash -c "set -x; ls -l"
-    - name: 'pull new-subs'
-      run: |
-        bash -c '
-        set -x
-        git clone --depth=1 $NEW_SUBS_REPO_URL new-subs
-        ls new-subs | wc -l
-        '
+    - name: new-subs-pull.py
+      run: ./new-subs-pull.py
       env:
         NEW_SUBS_REPO_URL: '${{ secrets.NEW_SUBS_REPO_URL }}'
     - name: fetch-subs.py
       run: ./fetch-subs.py --num-downloads 20 --first-num 9539186
-      # https://github.com/your_name/your_repo/settings/secrets/actions
-      #env:
-      #  API_TOKEN_GITHUB: '${{ secrets.API_TOKEN_GITHUB }}'
-      #  API_USER_GITHUB: '${{ secrets.API_USER_GITHUB }}'
-    - name: debug-after
-      run: bash -c "set -x; ls -l; ls -l new-subs/"
-    - name: 'push new-subs'
-      run: |
-        bash -c '
-
-        export GIT_AUTHOR_NAME="Milan Hauth"
-        export GIT_AUTHOR_EMAIL="milahu@gmail.com"
-        export GIT_COMMITTER_NAME=$GIT_AUTHOR_NAME
-        export GIT_COMMITTER_EMAIL=$GIT_AUTHOR_EMAIL
-
-        set -x
-
-        ls new-subs | wc -l
-
-        git -C new-subs add "*"
-        git -C new-subs commit -m up
-        git -C new-subs push $NEW_SUBS_REPO_URL
-        '
+    - name: new-subs-push.py
+      run: ./new-subs-push.py
       env:
         NEW_SUBS_REPO_URL: '${{ secrets.NEW_SUBS_REPO_URL }}'
-        #API_TOKEN_GITHUB: '${{ secrets.API_TOKEN_GITHUB }}'
-        #API_USER_GITHUB: '${{ secrets.API_USER_GITHUB }}'
-    #- name: store-subs.py
-    #  run: ./store-subs.py
