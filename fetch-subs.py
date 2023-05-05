@@ -189,7 +189,14 @@ parser.add_argument(
     metavar="N",
     help="last subtitle number. default: get from remote",
 )
-#parser.add_argument('--verbose', action='store_true')
+parser.add_argument(
+    "--show-ip-address",
+    dest="show_ip_address",
+    default=False,
+    action="store_true",
+    help="show IP address. default: false",
+)
+#parser.add_argument('--verbose', )
 #options = parser.parse_args(sys.argv)
 options = parser.parse_args()
 
@@ -1079,6 +1086,23 @@ async def main():
                 logger_print("remote_nums", remote_nums)
                 options.last_num = max(map(int, remote_nums))
                 logger_print("options.last_num", options.last_num)
+
+            if options.show_ip_address:
+                url = "https://httpbin.org/ip"
+                # TODO use proxy
+                response = None
+                status_code = None
+                for retry_step in range(10):
+                    response = await aiohttp_session.get(url)
+                    status_code = response.status
+                    if status_code == 200:
+                        break
+                    # status_code example: 504
+                    logger_print(f"unexpected status_code {status_code} -> retry")
+                    time.sleep(5)
+                content_type = response.headers.get("Content-Type")
+                assert content_type == "application/json", f"unexpected content_type {repr(content_type)}"
+                logger_print(f"IP address: {await response.text()}")
 
             #while not num_stack: # while stack is empty
             retry_counter = 0
