@@ -1174,6 +1174,7 @@ async def main():
                     raise SystemExit
                 logger.info(f"done: {num_downloads_done}. remain: {num_remain}")
                 num_stack = num_stack[0:num_remain]
+                logger.info(f"num_stack: {num_stack}")
 
             logger.info(f"batch size: {len(num_stack)}")
             #logger.info(f"batch: {num_stack}")
