@@ -28,6 +28,20 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
         check=True,
         timeout=10,
     )
+
+    # debug: git branch
+    args = [
+        "git",
+        "-C", new_subs_dir,
+        "branch",
+    ]
+    print(shlex.join(args))
+    proc = subprocess.run(
+        args,
+        check=True,
+        timeout=10,
+    )
+
     print("git remote add")
     args = [
         "git",
@@ -36,6 +50,19 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
         "add",
         "origin",
         remote_url,
+    ]
+    print(shlex.join(args))
+    proc = subprocess.run(
+        args,
+        check=True,
+        timeout=10,
+    )
+
+    # debug: git branch
+    args = [
+        "git",
+        "-C", new_subs_dir,
+        "branch",
     ]
     print(shlex.join(args))
     proc = subprocess.run(
@@ -57,6 +84,19 @@ args = [
     "--depth=1",
     "origin",
     "main",
+]
+print(shlex.join(args))
+proc = subprocess.run(
+    args,
+    check=True,
+    timeout=10,
+)
+
+# debug: git branch
+args = [
+    "git",
+    "-C", new_subs_dir,
+    "branch",
 ]
 print(shlex.join(args))
 proc = subprocess.run(
