@@ -1102,7 +1102,8 @@ async def main():
                     time.sleep(5)
                 content_type = response.headers.get("Content-Type")
                 assert content_type == "application/json", f"unexpected content_type {repr(content_type)}"
-                logger_print(f"IP address: {await response.text()}")
+                response_data = json.loads(await response.text())
+                logger_print(f"IP address: {response_data.get('origin')}")
 
             #while not num_stack: # while stack is empty
             retry_counter = 0
