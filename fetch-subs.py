@@ -1083,7 +1083,7 @@ async def main():
                 content_type = response.headers.get("Content-Type")
                 assert content_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
                 remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', await response.text())
-                logger_print("remote_nums", remote_nums)
+                logger.debug(f"remote_nums {repr(remote_nums)}")
                 options.last_num = max(map(int, remote_nums))
                 logger_print("options.last_num", options.last_num)
 
@@ -1126,8 +1126,9 @@ async def main():
                 # add numbers to the stack
                 num_stack_first = num_stack_last + 1
                 num_stack_last = num_stack_first + options.sample_size
-                #logger_print("num_stack_first", num_stack_first)
-                #logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
+                if options.last_num and num_stack_last > options.last_num:
+                    num_stack_last = options.last_num
+                #logger.debug(f"stack range: ({num_stack_first}, {num_stack_last})")
                 def filter_num(num):
                     return (
                         num not in nums_done_set and
@@ -1146,7 +1147,7 @@ async def main():
                         raise SystemExit
                     else:
                         break
-                #logger_print("num_stack", num_stack)
+                logger.info(f"num_stack: {num_stack}")
 
             random.shuffle(num_stack)
 
@@ -1158,7 +1159,6 @@ async def main():
                 logger.info(f"done: {num_downloads_done}. remain: {num_remain}")
                 num_stack = num_stack[0:num_remain]
 
-            logger.info(f"stack range: ({num_stack_first}, {num_stack_last})")
             logger.info(f"batch size: {len(num_stack)}")
             #logger.info(f"batch: {num_stack}")
 
