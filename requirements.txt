@@ -1,0 +1,5 @@
+aiohttp
+magic
+
+# TODO remove
+requests
