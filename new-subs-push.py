@@ -269,6 +269,7 @@ args = [
     "git",
     "-C", new_subs_dir,
     "push",
+    "--all", # push all branches
     remote_url,
 ]
 #print(shlex.join(args))
