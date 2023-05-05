@@ -229,7 +229,7 @@ if options.num_downloads:
         options.num_downloads = int(options.num_downloads)
     elif re.match(r"^(\d+)-(\d+)$", options.num_downloads):
         m = re.match(r"^(\d+)-(\d+)$", options.num_downloads)
-        options.num_downloads = random.randint(int(m.group(0)), int(m.group(1)))
+        options.num_downloads = random.randint(int(m.group(1)), int(m.group(2)))
         logging.info(f"options.num_downloads: {options.num_downloads}")
 
 
