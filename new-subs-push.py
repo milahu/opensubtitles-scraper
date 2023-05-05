@@ -305,4 +305,7 @@ try:
 except Exception as error:
     print(error)
     print("failed to git-push. maybe another git-push was faster. retry in next run")
+    # wait for output of git
+    # TODO better
+    time.sleep(5)
     sys.exit(1)
