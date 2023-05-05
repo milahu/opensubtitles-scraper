@@ -46,9 +46,9 @@ args = [
     "git",
     "-C", new_subs_dir,
     "pull",
-    "--force", # untracked working tree files will be overwritten by checkout
+    #"--force", # untracked working tree files will be overwritten by checkout
     "origin",
-    "main",
+    "main:main",
 ]
 print(shlex.join(args))
 proc = subprocess.run(

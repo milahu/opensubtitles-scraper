@@ -47,7 +47,7 @@ args = [
     "-C", new_subs_dir,
     "pull",
     "origin",
-    "main",
+    "main:main",
     "--depth=1",
 ]
 proc = subprocess.run(

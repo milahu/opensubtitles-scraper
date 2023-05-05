@@ -2,6 +2,9 @@
 
 # FIXME dont create master branch
 
+# TODO alternative?
+# https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
+
 import sys
 import os
 import re
@@ -83,7 +86,7 @@ args = [
     #"--force", # untracked working tree files will be overwritten by checkout
     "--depth=1",
     "origin",
-    "main",
+    "main:main",
 ]
 print(shlex.join(args))
 proc = subprocess.run(
@@ -376,6 +379,7 @@ proc = subprocess.run(
     timeout=10,
 )
 
+"""
 # debug: git log master
 args = [
     "git",
@@ -419,6 +423,7 @@ proc = subprocess.run(
     check=True,
     timeout=10,
 )
+"""
 
 
 
