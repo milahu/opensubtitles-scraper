@@ -196,9 +196,28 @@ parser.add_argument(
     action="store_true",
     help="show IP address. default: false. note: this is slow",
 )
-#parser.add_argument('--verbose', )
+parser.add_argument(
+    "--debug",
+    default=False,
+    action="store_true",
+    help="show debug messages",
+)
 #options = parser.parse_args(sys.argv)
 options = parser.parse_args()
+
+logging_level = "INFO"
+if options.debug:
+    logging_level = "DEBUG"
+
+logging.basicConfig(
+    format='%(asctime)s %(levelname)s %(message)s',
+    level=logging_level,
+)
+
+logger = logging.getLogger("fetch-subs")
+
+def logger_print(*args):
+    logging.info(" ".join(map(str, args)))
 
 
 # postprocess: fetch missing subs
@@ -247,18 +266,6 @@ is_greedy = True
 if is_greedy:
     sleep_each_min, sleep_each_max = 0, 0
     sleep_change_ipaddr = 0
-
-logging.basicConfig(
-    format='%(asctime)s %(levelname)s %(message)s',
-    #level="DEBUG",
-    level="INFO",
-)
-
-logger = logging.getLogger("fetch-subs")
-
-
-def logger_print(*args):
-    logging.info(" ".join(map(str, args)))
 
 
 def change_ipaddr():
@@ -660,8 +667,8 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # aiohttp
             response = await aiohttp_session.get(url, **requests_get_kwargs)
             status_code = response.status
-            logger.info(f"{num} status_code: {status_code}")
-            logger.info(f"{num} headers: {response.headers}")
+            logger.debug(f"{num} status_code: {status_code}")
+            logger.debug(f"{num} headers: {response.headers}")
 
         response_content = response_content or response.content
         response_headers = response_headers or response.headers
