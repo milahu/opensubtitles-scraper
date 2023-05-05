@@ -94,8 +94,11 @@ webscraping_ai_option_proxy = "datacenter"
 
 #options.proxy_provider = "zenrows.com"
 fetcher_lib = "aiohttp"
-#api_key_zenrows_com = "88d22df90b3a4c252b480dc8847872dac59db0e0" # expired
-from secrets import api_key_zenrows_com
+try:
+    from secrets import api_key_zenrows_com
+except ImportError:
+    api_key_zenrows_com = "88d22df90b3a4c252b480dc8847872dac59db0e0" # expired
+
 
 class Config:
     zenrows_com_antibot = False
