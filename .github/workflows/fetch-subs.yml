@@ -8,12 +8,13 @@ on:
     # 20.8 new subs every 15 minutes
     # 13.9 new subs every 10 minutes
     # run every 10 minutes:
-    #- cron:  '*/10 * * * *'
+    - cron:  '*/10 * * * *'
     # run every 20 minutes:
-    - cron:  '*/20 * * * *'
-  #push:
-  #  branches:
-  #    - master
+    #- cron:  '*/20 * * * *'
+  push:
+    branches:
+      - main
+      - test
 jobs:
   fetch_subs:
     runs-on: ubuntu-latest
