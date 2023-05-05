@@ -5,8 +5,9 @@ on:
     # 2000 new subs every day
     # 83.3 new subs every hour
     # 30 new subs every 21.6 minutes # rate limit: 30 requests
-    # 20.8 new subs every 15 minutes
-    # 13.9 new subs every 10 minutes
+    # 21 new subs every 15 minutes
+    # 14 new subs every 10 minutes
+    # 7 new subs every 5 minutes
     # run every 10 minutes:
     #- cron:  '*/10 * * * *'
     # run every 20 minutes:
