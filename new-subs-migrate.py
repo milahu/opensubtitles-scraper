@@ -287,31 +287,34 @@ for filename in os.listdir(new_subs_dir):
     )
 
     # cleanup: rm file from main branch
-    args = [
-        "git",
-        "-C", new_subs_dir,
-        "rm",
-        filename,
-    ]
-    print(shlex.join(args))
-    proc = subprocess.run(
-        args,
-        check=True,
-        timeout=10,
-    )
-
-    args = [
-        "git",
-        "-C", new_subs_dir,
-        "commit",
-        "-m", f"rm {num}",
-    ]
-    print(shlex.join(args))
-    proc = subprocess.run(
-        args,
-        check=True,
-        timeout=10,
-    )
+    try:
+        args = [
+            "git",
+            "-C", new_subs_dir,
+            "rm",
+            filename,
+        ]
+        print(shlex.join(args))
+        proc = subprocess.run(
+            args,
+            check=True,
+            timeout=10,
+        )
+        args = [
+            "git",
+            "-C", new_subs_dir,
+            "commit",
+            "-m", f"rm {num}",
+        ]
+        print(shlex.join(args))
+        proc = subprocess.run(
+            args,
+            check=True,
+            timeout=10,
+        )
+    except subprocess.CalledProcessError as error:
+        print(f"rm {new_subs_dir}/{filename}")
+        os.unlink(f"{new_subs_dir}/{filename}")
 
 
 
