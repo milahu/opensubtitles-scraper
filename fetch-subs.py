@@ -161,9 +161,13 @@ parser.add_argument(
     '--num-downloads',
     dest="num_downloads",
     default=default_num_downloads,
-    type=int,
+    #type=int,
     metavar="N",
-    help=f"limit the number of downloads. default: {default_num_downloads}",
+    help=(
+        f"limit the number of downloads. "
+        f"default: {default_num_downloads}. "
+        f"can be a range like 10-20, then value is random."
+    ),
 )
 parser.add_argument(
     '--sample-size',
@@ -218,6 +222,15 @@ logger = logging.getLogger("fetch-subs")
 
 def logger_print(*args):
     logging.info(" ".join(map(str, args)))
+
+
+if options.num_downloads:
+    if re.match(r"^\d+$", options.num_downloads):
+        options.num_downloads = int(options.num_downloads)
+    elif re.match(r"^(\d+)-(\d+)$", options.num_downloads):
+        m = re.match(r"^(\d+)-(\d+)$", options.num_downloads)
+        options.num_downloads = random.randint(int(m.group(0)), int(m.group(1)))
+        logging.info(f"options.num_downloads: {options.num_downloads}")
 
 
 # postprocess: fetch missing subs
