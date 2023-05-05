@@ -10,6 +10,7 @@ import shutil
 
 new_subs_dir = "new-subs"
 remote_url = os.environ.get("NEW_SUBS_REPO_URL")
+assert remote_url
 
 if not os.path.exists(f"{new_subs_dir}/.git"):
     print("git init")
