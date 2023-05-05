@@ -1,0 +1,36 @@
+name: "fetch-subs"
+on:
+  workflow_dispatch:
+  schedule:
+    # 2000 new subs every day
+    # 83.3 new subs every hour
+    # 30 new subs every 21.6 minutes # rate limit: 30 requests
+    # 20.8 new subs every 15 minutes
+    # 13.9 new subs every 10 minutes
+    # run every 10 minutes:
+    #- cron:  '*/10 * * * *'
+    # run every 20 minutes:
+    - cron:  '*/20 * * * *'
+  #push:
+  #  branches:
+  #    - master
+jobs:
+  fetch_subs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/setup-python@v4
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: '0'
+    - name: debug-before
+      run: bash -c "set -x; ls -l; ls -l new-subs/"
+    - name: fetch-subs.py
+      run: ./fetch-subs.py --num-downloads 3 --first-num 9539186
+      env:
+        # https://github.com/your_name/your_repo/settings/secrets/actions
+        #API_TOKEN_GITHUB: '${{ secrets.API_TOKEN_GITHUB }}'
+        #API_USER_GITHUB: '${{ secrets.API_USER_GITHUB }}'
+    - name: debug-after
+      run: bash -c "set -x; ls -l; ls -l new-subs/"
+    #- name: store-subs.py
+    #  run: ./store-subs.py
