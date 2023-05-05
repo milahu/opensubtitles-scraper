@@ -176,7 +176,7 @@ for filename in os.listdir(new_subs_dir):
         "git",
         "-C", worktree_path,
         "clean",
-        "fdq",
+        "-fdq",
     ]
     print(shlex.join(args))
     proc = subprocess.run(
