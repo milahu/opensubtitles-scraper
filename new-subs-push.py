@@ -22,6 +22,7 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
     print("git init")
     args = [
         "git",
+        "-c", "init.defaultBranch=main",
         "-C", new_subs_dir,
         "init",
     ]
@@ -86,7 +87,7 @@ args = [
     #"--force", # untracked working tree files will be overwritten by checkout
     "--depth=1",
     "origin",
-    "main:main",
+    "main",
 ]
 print(shlex.join(args))
 proc = subprocess.run(

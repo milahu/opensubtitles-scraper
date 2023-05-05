@@ -14,6 +14,7 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
     os.makedirs(new_subs_dir, exist_ok=True)
     args = [
         "git",
+        "-c", "init.defaultBranch=main",
         "-C", new_subs_dir,
         "init",
     ]
@@ -47,7 +48,7 @@ args = [
     "-C", new_subs_dir,
     "pull",
     "origin",
-    "main:main",
+    "main",
     "--depth=1",
 ]
 proc = subprocess.run(
