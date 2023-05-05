@@ -108,7 +108,7 @@ for filename in os.listdir(new_subs_dir):
     print("git add", filename)
 
     # https://stackoverflow.com/questions/53005845/checking-out-orphan-branch-in-new-work-tree
-    # d=subdir; n=some-branch; git worktree add --detach --no-checkout $d; git -C $d checkout --orphan $n; echo hello >$d/test.txt; git -C $d add test.txt; git -C $d commit -m init
+    # d=subdir; n=some-branch; git worktree add --detach --no-checkout $d; git -C $d checkout --orphan $n; git reset; git clean -fdq; echo hello >$d/test.txt; git -C $d add test.txt; git -C $d commit -m init
 
     worktree_path = f"{new_subs_dir}/nums/{num}"
 
@@ -152,6 +152,31 @@ for filename in os.listdir(new_subs_dir):
         "checkout",
         "--orphan",
         f"nums/{num}", # branch name
+    ]
+    print(shlex.join(args))
+    proc = subprocess.run(
+        args,
+        check=True,
+        timeout=10,
+    )
+
+    args = [
+        "git",
+        "-C", worktree_path,
+        "reset",
+    ]
+    print(shlex.join(args))
+    proc = subprocess.run(
+        args,
+        check=True,
+        timeout=10,
+    )
+
+    args = [
+        "git",
+        "-C", worktree_path,
+        "clean",
+        "fdq",
     ]
     print(shlex.join(args))
     proc = subprocess.run(
