@@ -136,6 +136,8 @@ if os.path.exists(files_txt_path):
             filename = line.strip()
             if filename.startswith(".git"):
                 continue
+            if filename in {"files.txt", "nums"}:
+                continue
             try:
                 num = int(filename.split(".", 1)[0])
             except ValueError:
@@ -180,6 +182,8 @@ print(f"processing files in {new_subs_dir} ...")
 
 for filename in os.listdir(new_subs_dir):
     if filename.startswith(".git"):
+        continue
+    if filename in {"files.txt", "nums"}:
         continue
     try:
         num = int(filename.split(".", 1)[0])
