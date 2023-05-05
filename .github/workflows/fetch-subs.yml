@@ -33,7 +33,7 @@ jobs:
     - name: debug-before
       run: bash -c "set -x; ls -l"
     - name: fetch-subs.py
-      run: ./fetch-subs.py --num-downloads 3 --first-num 9539186
+      run: ./fetch-subs.py --num-downloads 3 --first-num 9539186 --show-ip-address
       # https://github.com/your_name/your_repo/settings/secrets/actions
       #env:
       #  API_TOKEN_GITHUB: '${{ secrets.API_TOKEN_GITHUB }}'
