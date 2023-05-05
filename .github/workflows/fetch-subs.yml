@@ -33,6 +33,10 @@ jobs:
     - run: pip install -r requirements.txt
     - name: debug-before
       run: bash -c "set -x; ls -l"
+    - name: 'pull new-subs'
+      run: git clone --depth=1 $NEW_SUBS_REPO_URL new-subs
+      env:
+        NEW_SUBS_REPO_URL: '${{ secrets.NEW_SUBS_REPO_URL }}'
     - name: fetch-subs.py
       run: ./fetch-subs.py --num-downloads 3 --first-num 9539186
       # https://github.com/your_name/your_repo/settings/secrets/actions
@@ -41,5 +45,16 @@ jobs:
       #  API_USER_GITHUB: '${{ secrets.API_USER_GITHUB }}'
     - name: debug-after
       run: bash -c "set -x; ls -l; ls -l new-subs/"
+    - name: 'push new-subs'
+      run: |
+        bash -c '
+        git -C new-subs add "*"
+        git -C new-subs commit -m up
+        git -C new-subs push $NEW_SUBS_REPO_URL
+        '
+      env:
+        NEW_SUBS_REPO_URL: '${{ secrets.NEW_SUBS_REPO_URL }}'
+        #API_TOKEN_GITHUB: '${{ secrets.API_TOKEN_GITHUB }}'
+        #API_USER_GITHUB: '${{ secrets.API_USER_GITHUB }}'
     #- name: store-subs.py
     #  run: ./store-subs.py
