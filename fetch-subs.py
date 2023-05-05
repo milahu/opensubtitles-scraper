@@ -1014,14 +1014,13 @@ async def main():
         #num_stack_last = first_num_file
         num_stack_last = last_num_file
 
-    logger_print("num_stack_last", num_stack_last)
 
     if options.first_num:
-        num_stack_first = options.first_num
-    else:
-        num_stack_first = num_stack_last
-
-    logger_print("num_stack_first", num_stack_first)
+        #num_stack_first = options.first_num
+        num_stack_last = options.first_num - 1
+    #else:
+    #    num_stack_first = num_stack_last
+    #logger_print("num_stack_first", num_stack_first)
 
     downloads_since_change_ipaddr = 0
 
@@ -1102,7 +1101,8 @@ async def main():
                 # add numbers to the stack
                 num_stack_first = num_stack_last + 1
                 num_stack_last = num_stack_first + options.sample_size
-                #logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
+                #logger_print("num_stack_first", num_stack_first)
+                logger.info(f"stack range ({num_stack_first}, {num_stack_last})")
                 def filter_num(num):
                     return (
                         num not in nums_done_set and
