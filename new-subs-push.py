@@ -6,6 +6,7 @@ import re
 import subprocess
 import shlex
 import shutil
+import time
 
 
 new_subs_dir = "new-subs"
@@ -19,6 +20,7 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
         "-C", new_subs_dir,
         "init",
     ]
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -33,6 +35,7 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
         "origin",
         remote_url,
     ]
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -53,6 +56,7 @@ args = [
     "origin",
     "main",
 ]
+print(shlex.join(args))
 proc = subprocess.run(
     args,
     check=True,
@@ -67,6 +71,7 @@ args = [
     #"--force", # untracked working tree files will be overwritten by checkout
     "main",
 ]
+print(shlex.join(args))
 proc = subprocess.run(
     args,
     check=True,
