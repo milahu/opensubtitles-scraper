@@ -1006,8 +1006,7 @@ async def main():
 
     nums_done = sorted(nums_done)
 
-    #logger_print("nums_done", nums_done[0:10], "...", nums_done[-10:])
-    logger_print("nums_done", nums_done)
+    logger.debug(f"nums_done {nums_done}")
 
     first_num_file = None
     last_num_file = 0
