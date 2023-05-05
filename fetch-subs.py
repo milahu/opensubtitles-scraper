@@ -194,7 +194,7 @@ parser.add_argument(
     dest="show_ip_address",
     default=False,
     action="store_true",
-    help="show IP address. default: false",
+    help="show IP address. default: false. note: this is slow",
 )
 #parser.add_argument('--verbose', )
 #options = parser.parse_args(sys.argv)
@@ -1092,7 +1092,7 @@ async def main():
                 # TODO use proxy
                 response = None
                 status_code = None
-                for retry_step in range(10):
+                for retry_step in range(20):
                     response = await aiohttp_session.get(url)
                     status_code = response.status
                     if status_code == 200:
