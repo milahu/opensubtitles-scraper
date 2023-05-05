@@ -1154,10 +1154,10 @@ async def main():
                 )
                 if len(num_stack_expand) == 0:
                     logger.info(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
-                    break
+                    raise SystemExit
                 num_stack += num_stack_expand
                 retry_counter += 1
-                if retry_counter > 1000:
+                if retry_counter > 20:
                     if len(num_stack) == 0:
                         logger.info(f"done all nums until {options.last_num}")
                         raise SystemExit
