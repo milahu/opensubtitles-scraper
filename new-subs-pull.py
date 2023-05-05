@@ -11,6 +11,7 @@ new_subs_dir = "new-subs"
 remote_url = os.environ.get("NEW_SUBS_REPO_URL")
 
 if not os.path.exists(f"{new_subs_dir}/.git"):
+    os.makedirs(new_subs_dir, exist_ok=True)
     args = [
         "git",
         "-C", new_subs_dir,
