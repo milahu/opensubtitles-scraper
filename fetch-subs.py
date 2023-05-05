@@ -1159,7 +1159,7 @@ async def main():
                     else:
                         break
 
-            logger.info(f"num_stack: {num_stack}")
+            logger.debug(f"num_stack: {num_stack}")
             random.shuffle(num_stack)
 
             if options.num_downloads:
