@@ -1,5 +1,5 @@
 aiohttp
-magic
+python-magic
 
 # TODO remove
 requests
