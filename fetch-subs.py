@@ -1158,11 +1158,11 @@ async def main():
                 num_stack += num_stack_expand
                 retry_counter += 1
                 if retry_counter > 20:
-                    if len(num_stack) == 0:
-                        logger.info(f"done all nums until {options.last_num}")
-                        raise SystemExit
-                    else:
-                        break
+                    break
+
+            if len(num_stack) == 0:
+                logger.info(f"done all nums until {options.last_num}")
+                raise SystemExit
 
             logger.info(f"num_stack: {num_stack}")
             random.shuffle(num_stack)
