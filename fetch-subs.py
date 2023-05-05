@@ -1134,12 +1134,16 @@ async def main():
                         num not in nums_done_set and
                         num <= options.last_num
                     )
-                num_stack += list(
+                num_stack_expand = list(
                     filter(filter_num,
                         range(num_stack_first, num_stack_last + 1),
                         #random.sample(range(num_stack_first, options.last_num + 1), options.sample_size)
                     )
                 )
+                if len(num_stack_expand) == 0:
+                    logger.info(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
+                    break
+                num_stack += num_stack_expand
                 retry_counter += 1
                 if retry_counter > 1000:
                     if len(num_stack) == 0:
@@ -1147,8 +1151,8 @@ async def main():
                         raise SystemExit
                     else:
                         break
-                logger.info(f"num_stack: {num_stack}")
 
+            logger.info(f"num_stack: {num_stack}")
             random.shuffle(num_stack)
 
             if options.num_downloads:
