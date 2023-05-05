@@ -132,6 +132,7 @@ for filename in os.listdir(new_subs_dir):
             "worktree",
             "add",
             "--detach",
+            "--no-checkout",
             f"nums/{num}", # worktree path
         ]
         print(shlex.join(args))
@@ -148,31 +149,6 @@ for filename in os.listdir(new_subs_dir):
             "checkout",
             "--orphan",
             f"nums/{num}", # branch name
-        ]
-        print(shlex.join(args))
-        proc = subprocess.run(
-            args,
-            check=True,
-            timeout=10,
-        )
-
-        args = [
-            "git",
-            "-C", worktree_path,
-            "reset",
-        ]
-        print(shlex.join(args))
-        proc = subprocess.run(
-            args,
-            check=True,
-            timeout=10,
-        )
-
-        args = [
-            "git",
-            "-C", worktree_path,
-            "clean",
-            "-fdq",
         ]
         print(shlex.join(args))
         proc = subprocess.run(
