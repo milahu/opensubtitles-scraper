@@ -989,7 +989,13 @@ async def main():
     os.makedirs(new_subs_dir, exist_ok=True)
     nums_done = []
 
-    for filename in os.listdir(new_subs_dir):
+    filenames = os.listdir(new_subs_dir)
+    if os.path.exists(f"{new_subs_dir}/files.txt"):
+        with open(f"{new_subs_dir}/files.txt") as f:
+            for line in f:
+                filenames.append(line.strip())
+
+    for filename in filenames:
         #match = re.fullmatch(r"([0-9]+)\.(.+\.)?zip", filename)
         # retry .html files
         match = re.fullmatch(r"([0-9]+)\.(zip|not-found|.*\.zip)", filename)
