@@ -16,7 +16,7 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
         "-C", new_subs_dir,
         "init",
     ]
-    print(shlex.quote(args))
+    print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,

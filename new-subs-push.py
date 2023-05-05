@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import shlex
+import shutil
 
 
 new_subs_dir = "new-subs"
