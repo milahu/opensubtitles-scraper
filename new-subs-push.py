@@ -275,8 +275,12 @@ args = [
 #print(shlex.join(args))
 proc = subprocess.run(
     args,
-    check=True,
+    #check=True,
     timeout=10,
     #capture_output=True,
     #encoding="utf8",
 )
+proc.wait()
+if proc.returncode != 0:
+    print("failed to git-push. maybe another git-push was faster. retry in next run")
+    sys.exit(1)
