@@ -689,8 +689,8 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # aiohttp
             response = await aiohttp_session.get(url, **requests_get_kwargs)
             status_code = response.status
-            logger.debug(f"{num} status_code: {status_code}")
-            logger.debug(f"{num} headers: {response.headers}")
+            logger.info(f"{num} status_code: {status_code}")
+            logger.info(f"{num} headers: {response.headers}")
 
         response_content = response_content or response.content
         response_headers = response_headers or response.headers
