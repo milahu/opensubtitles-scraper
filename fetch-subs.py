@@ -233,7 +233,7 @@ def logger_print(*args):
 
 
 if type(options.num_downloads) == str:
-    print("options.num_downloads", repr(options.num_downloads))
+    logger_print("options.num_downloads", repr(options.num_downloads))
     if re.match(r"^\d+$", options.num_downloads):
         options.num_downloads = int(options.num_downloads)
     elif re.match(r"^(\d+)-(\d+)$", options.num_downloads):
