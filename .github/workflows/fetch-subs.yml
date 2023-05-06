@@ -38,10 +38,10 @@ on:
     #- cron:  '*/20 * * * *'
     # run every 30 minutes:
     #- cron:  '*/30 * * * *'
-  #push:
-  #  branches:
-  #    - main
-  #    - test
+  push:
+    branches:
+      - main
+      - test
 jobs:
   fetch_subs:
     runs-on: ubuntu-latest
