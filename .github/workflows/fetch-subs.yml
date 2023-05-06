@@ -63,7 +63,7 @@ jobs:
         GIT_COMMITTER_NAME: "Milan Hauth"
         GIT_COMMITTER_EMAIL: "milahu@gmail.com"
     - name: fetch-subs.py
-      run: ./fetch-subs.py --num-downloads 28-40 --first-num 9539186
+      run: ./fetch-subs.py --num-downloads 15-45 --first-num 9539186
     - name: new-subs-push.py
       run: ./new-subs-push.py
       env:
