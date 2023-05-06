@@ -1208,12 +1208,12 @@ async def main():
                         #random.sample(range(num_stack_first, options.last_num + 1), options.sample_size)
                     )
                 )
-                if len(num_stack_expand) == 0:
-                    logger.info(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
-                    break
+                #if len(num_stack_expand) == 0:
+                #    logger.info(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
+                #    break
                 num_stack += num_stack_expand
                 retry_counter += 1
-                if retry_counter > 20:
+                if retry_counter > 1000:
                     break
 
             if len(num_stack) == 0:
