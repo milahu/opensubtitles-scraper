@@ -1,3 +1,23 @@
+# https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions#included-storage-and-minutes
+# Product | Storage | Minutes (per month)
+# 500 MB | 2,000
+
+# https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions#per-minute-rates
+# Per-minute rates
+# Operating system | Cores | Per-minute rate (USD)
+# Linux | 2 | $0.008
+
+# https://github.com/pricing/calculator?feature=actions
+
+# action runs for 30 seconds, so 1 minute is billed
+# action runs every 10 minutes, so 24*6 = 144 runs per day
+# 144 minutes per day = 4320 minutes per month
+
+# 2000 minutes per 31 days = 64.5 minutes per day
+# = 2.688 minutes per hour
+# = 1 minute every 22.32 minutes
+# 1 minute every 23 minutes = 1940.86 minutes / 31 days
+
 name: "fetch-subs"
 on:
   workflow_dispatch:
@@ -11,9 +31,11 @@ on:
     # run every 5 minutes:
     #- cron:  '*/5 * * * *'
     # run every 10 minutes:
-    - cron:  '*/10 * * * *'
+    #- cron:  '*/10 * * * *'
     # run every 20 minutes:
     #- cron:  '*/20 * * * *'
+    # run every 30 minutes:
+    - cron:  '*/30 * * * *'
   push:
     branches:
       - main
@@ -39,7 +61,7 @@ jobs:
         GIT_COMMITTER_NAME: "Milan Hauth"
         GIT_COMMITTER_EMAIL: "milahu@gmail.com"
     - name: fetch-subs.py
-      run: ./fetch-subs.py --num-downloads 20-30 --first-num 9539186
+      run: ./fetch-subs.py --num-downloads 28-32 --first-num 9539186
     - name: new-subs-push.py
       run: ./new-subs-push.py
       env:
