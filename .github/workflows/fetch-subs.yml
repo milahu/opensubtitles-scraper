@@ -1,3 +1,5 @@
+# TODO these limits apply only to private repos?
+
 # https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions#included-storage-and-minutes
 # Product | Storage | Minutes (per month)
 # 500 MB | 2,000
@@ -31,11 +33,11 @@ on:
     # run every 5 minutes:
     #- cron:  '*/5 * * * *'
     # run every 10 minutes:
-    #- cron:  '*/10 * * * *'
+    - cron:  '*/10 * * * *'
     # run every 20 minutes:
     #- cron:  '*/20 * * * *'
     # run every 30 minutes:
-    - cron:  '*/30 * * * *'
+    #- cron:  '*/30 * * * *'
   #push:
   #  branches:
   #    - main
