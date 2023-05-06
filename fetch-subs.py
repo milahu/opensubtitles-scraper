@@ -113,6 +113,7 @@ api_key_scrapingant_com = "6ae0de59fad34337b2ee86814857278a"
 
 
 new_subs_dir = "new-subs"
+#new_subs_dir = "new-subs-temp-debug"
 
 # https://www.opensubtitles.org/en/search/subs
 # https://www.opensubtitles.org/ # New subtitles
@@ -205,6 +206,13 @@ parser.add_argument(
     default=False,
     action="store_true",
     help="show debug messages",
+)
+parser.add_argument(
+    "--force-download",
+    dest="force_download",
+    default=False,
+    action="store_true",
+    help="also download when files exist",
 )
 #options = parser.parse_args(sys.argv)
 options = parser.parse_args()
@@ -700,6 +708,16 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
 
         if status_code == 404:
             open(filename_notfound, 'a').close() # create empty file
+            debug_404_pages = False
+            if debug_404_pages:
+                response_text = (await response_content.read()).decode("utf8")
+                with open(f"{filename_notfound}.html", 'w') as f:
+                    f.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">\n')
+                    f.write("<!-- response headers:\n")
+                    for key in response_headers:
+                        f.write(f"{key}: {response_headers[key]}\n")
+                    f.write("-->\n")
+                    f.write(response_text)
             t2_download = time.time()
             dt_download = t2_download - t1_download
             dt_download_list.append(dt_download)
@@ -757,9 +775,29 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             logger.info(f"{num} {status_code} Internal Server Error -> retry")
             return num # retry
 
-        if status_code in {422, 429, 403, 503}:
-            response_json = (await response_content.read()).decode("utf8")
-            response_data = json.loads(response_json)
+        if status_code == 429:
+            if False and content_type == "text/html; charset=UTF-8":
+                # captcha page
+                # bug in proxy provider
+                logger.info(f"{num} {status_code} captcha -> retry")
+                return num # retry
+            response_text = (await response_content.read()).decode("utf8")
+            content_type = content_type or response_headers.get("Content-Type")
+            error_filename = f"http-429-at-num-{num}.html"
+            logger_print(f"{num} {status_code} response_headers", response_headers)
+            logger.info(f"{num} {status_code} content_type={repr(content_type)} + response_text in {error_filename} -> retry")
+            with open(error_filename, "w") as f:
+                f.write(response_text)
+            return num # retry
+
+        if status_code in {422, 403, 503}:
+            response_text = (await response_content.read()).decode("utf8")
+            logger.info(f"{num} {status_code} response_text: {repr(response_text)}")
+            if response_text == "":
+                # json.loads -> json.decoder.JSONDecodeError Expecting value
+                logger.info(f"{num} {status_code} got empty response_text -> retry")
+                return num
+            response_data = json.loads(response_text)
             if response_data["code"] == "RESP001":
                 # Could not get content. try enabling javascript rendering for a higher success rate (RESP001)
                 #config.zenrows_com_js = True
@@ -774,16 +812,16 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 #return {"retry_num": num, "pause": True} # pause scraper, retry
             if response_data["code"] == "AUTH006":
                 # The concurrency limit was reached. Please upgrade to a higher plan or ...
-                logger.info(f"{num} retry. error: concurrency limit was reached @ {response_json}")
+                logger.info(f"{num} {status_code} retry. error: concurrency limit was reached @ {response_text}")
                 return {"retry_num": num, "pause": True} # pause scraper, retry
             if response_data["code"] == "BLK0001":
                 # Your IP address has been blocked for exceeding the maximum error rate ...
-                logger.info(f"{num} retry. error: IP address was blocked @ {response_json}")
+                logger.info(f"{num} {status_code} retry. error: IP address was blocked @ {response_text}")
                 return {"retry_num": num, "pause": True, "change_ipaddr": True} # pause scraper, change IP address, retry
             if response_data["code"] == "CTX0002":
                 # Operation timeout exceeded (CTX0002)
                 return {"retry_num": num, "pause": True} # pause scraper, retry
-            logger.info(f"{num} retry. headers: {response_headers}. content: {await response_content.read()}")
+            logger.info(f"{num} {status_code} retry. headers: {response_headers}. content: {await response_content.read()}")
             return num # retry
 
         # requests
@@ -1019,6 +1057,10 @@ async def main():
         nums_done.append(num)
 
     nums_done = sorted(nums_done)
+
+    if options.force_download:
+        # quickfix
+        nums_done = []
 
     logger.debug(f"nums_done {nums_done}")
 
