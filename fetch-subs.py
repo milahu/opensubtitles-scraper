@@ -689,8 +689,11 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # aiohttp
             response = await aiohttp_session.get(url, **requests_get_kwargs)
             status_code = response.status
-            logger.info(f"{num} status_code: {status_code}")
-            logger.info(f"{num} headers: {response.headers}")
+            logger.debug(f"{num} status_code: {status_code}")
+            logger.debug(f"{num} headers: {response.headers}")
+            # debug rate-limiting
+            for key in ["Content-Type", "Download-Quota", "X-RateLimit-Remaining"]:
+                logger.info(f"{num} header: {key}: {response.headers.get(key)}")
 
         response_content = response_content or response.content
         response_headers = response_headers or response.headers
