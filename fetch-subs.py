@@ -752,15 +752,16 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             #continue
             return # success
 
-        if False and status_code == 429:
+        if options.proxy_provider == None and status_code == 429:
             # rate limiting
             # this happens after 30 sequential requests
             # only successful requests are counted (http 404 is not counted)
             # blocking is done by cloudflare?
             #logger.info(f"{num} {status_code} Too Many Requests -> waiting {sleep_blocked} seconds")
             #time.sleep(sleep_blocked)
-            logger_print(f"{num} response_headers", response_headers)
-            raise NotImplementedError(f"{num} {status_code} Too Many Requests -> TODO change VPN server")
+            logger_print(f"{num} {status_code} response_headers", response_headers)
+            logger_print(f"{num} {status_code} Too Many Requests -> stoppping scraper")
+            raise SystemExit
 
             user_agent = random.choice(user_agents)
 
