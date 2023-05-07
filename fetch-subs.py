@@ -1230,11 +1230,12 @@ async def main():
                 num_stack_last = num_stack_first + options.sample_size
                 if options.last_num and num_stack_last > options.last_num:
                     num_stack_last = options.last_num
-                #logger.debug(f"stack range: ({num_stack_first}, {num_stack_last})")
+                logger.info(f"stack range: ({num_stack_first}, {num_stack_last})")
                 def filter_num(num):
                     return (
-                        num not in nums_done_set and
-                        num <= options.last_num
+                        num not in nums_done_set
+                        # already handled by num_stack_last
+                        #and num <= options.last_num
                     )
                 num_stack_expand = list(
                     filter(filter_num,
@@ -1242,6 +1243,7 @@ async def main():
                         #random.sample(range(num_stack_first, options.last_num + 1), options.sample_size)
                     )
                 )
+                logger.info(f"num_stack_expand: {repr(num_stack_expand)}")
                 #if len(num_stack_expand) == 0:
                 #    logger.info(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
                 #    break
