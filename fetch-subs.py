@@ -761,6 +761,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             #time.sleep(sleep_blocked)
             logger_print(f"{num} {status_code} response_headers", response_headers)
             logger_print(f"{num} {status_code} Too Many Requests -> stopping scraper")
+            # stop scraper. retry would cause infinite loop
             raise SystemExit
 
             user_agent = random.choice(user_agents)
