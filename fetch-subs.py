@@ -1171,6 +1171,7 @@ async def main():
                 url = "https://www.opensubtitles.org/en/search/subs"
                 # TODO use proxy
                 response = await aiohttp_session.get(url)
+                # status_code can be 429 Too Many Requests -> fatal error
                 status_code = response.status
                 assert status_code == 200, f"unexpected status_code {status_code}"
                 content_type = response.headers.get("Content-Type")
