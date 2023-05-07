@@ -1082,25 +1082,25 @@ async def main():
     #num_stack_last = None
     num_stack_first = None
 
-    # find first missing file
-    for idx in range(0, len(nums_done) - 1):
-        if nums_done[idx] + 1 != nums_done[idx + 1]:
-            #num_stack_last = nums_done[idx]
-            num_stack_first = nums_done[idx] + 1
-            logger_print("num_stack_first 2", num_stack_first)
-            #logger_print("num_stack_last 2", num_stack_last)
-            #logger_print("first_missing_num 2", num_stack_last + 1)
-            break
+    if options.first_num:
+        len_before = len(nums_done)
+        nums_done = list(filter(lambda num: num >= options.first_num, nums_done))
+        logger_print(f"using options.first_num {options.first_num} as lower limit for nums_done. len(nums_done): {len_before} -> {len(nums_done)}")
 
-    if num_stack_first == None:
-        # no missing files, continue from last file
-        #num_stack_last = first_num_file
-        #num_stack_last = last_num_file
-        #num_stack_first = last_num_file + 1
-        if nums_done:
-            num_stack_first = nums_done[-1] + 1
-        else:
-            num_stack_first = 1
+    nums_done_set = set(nums_done)
+
+    # find first missing num
+    # use options.first_num as lower limit to find num_stack_first
+    first_num = options.first_num or 1
+    num = first_num
+    while True:
+        if num not in nums_done_set:
+            # first missing num
+            num_stack_first = num
+            break
+        num += 1
+
+    logger_print("num_stack_first", num_stack_first)
 
     # options.first_num allows to skip not-yet downloaded nums
     # options.first_num not allows to re-download already downloaded nums
@@ -1124,7 +1124,6 @@ async def main():
 
     user_agent = random.choice(user_agents)
 
-    nums_done_set = set(nums_done)
     num_stack = []
     dt_download_list = collections.deque(maxlen=100) # last 100 dt
     t2_download_list = collections.deque(maxlen=100) # last 100 t2
@@ -1243,9 +1242,9 @@ async def main():
                 # next iteration
                 num_stack_first = num_stack_last + 1
 
-                # TODO break earlier
+                # TODO better
                 retry_counter += 1
-                if retry_counter > 5:
+                if retry_counter > 1000:
                     break
 
             if len(num_stack) == 0:
