@@ -1087,8 +1087,9 @@ async def main():
         if nums_done[idx] + 1 != nums_done[idx + 1]:
             #num_stack_last = nums_done[idx]
             num_stack_first = nums_done[idx] + 1
-            logger_print("num_stack_last 2", num_stack_last)
-            logger_print("first_missing_num 2", num_stack_last + 1)
+            logger_print("num_stack_first 2", num_stack_first)
+            #logger_print("num_stack_last 2", num_stack_last)
+            #logger_print("first_missing_num 2", num_stack_last + 1)
             break
 
     if num_stack_first == None:
@@ -1242,8 +1243,9 @@ async def main():
                 # next iteration
                 num_stack_first = num_stack_last + 1
 
+                # TODO break earlier
                 retry_counter += 1
-                if retry_counter > 1000:
+                if retry_counter > 5:
                     break
 
             if len(num_stack) == 0:
