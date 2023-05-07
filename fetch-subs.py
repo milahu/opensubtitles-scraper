@@ -691,9 +691,6 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             status_code = response.status
             logger.debug(f"{num} status_code: {status_code}")
             logger.debug(f"{num} headers: {response.headers}")
-            # debug rate-limiting
-            for key in ["Content-Type", "Download-Quota", "X-RateLimit-Remaining"]:
-                logger.info(f"{num} header: {key}: {response.headers.get(key)}")
 
         response_content = response_content or response.content
         response_headers = response_headers or response.headers
@@ -738,7 +735,17 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             else:
                 dt_download_avg_parallel = 0
 
-            logger.info(f"{num} {status_code} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}")
+            # debug rate-limiting
+            # X-RateLimit-Remaining is constant at 40
+            # Download-Quota is between 200 and 0
+            debug_headers = dict()
+            for key in ["Content-Type", "Download-Quota", "X-RateLimit-Remaining"]:
+                if not key in response.headers:
+                    continue
+                debug_headers[key] = response.headers.get(key)
+                #logger.info(f"{num} header: {key}: {response.headers.get(key)}")
+
+            logger.info(f"{num} {status_code} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} debug_headers={repr(debug_headers)}")
             #if dt_download_avg_parallel > 1:
             #    logger.info(f"499: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
             #num += 1
