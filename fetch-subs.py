@@ -1079,50 +1079,35 @@ async def main():
 
     logger.debug(f"nums_done {nums_done}")
 
-    first_num_file = None
-    last_num_file = 0
+    #num_stack_last = None
+    num_stack_first = None
 
-    if nums_done:
-        first_num_file = nums_done[0]
-        # this can be wrong. nums can be missing before nums_done[-1]
-        last_num_file = nums_done[-1]
-        # find first missing num
-        for idx in range(0, len(nums_done) - 1):
-            num0 = nums_done[idx + 0]
-            num1 = nums_done[idx + 1]
-            if num0 + 1 != num1:
-                # found missing num: num0 + 1
-                #logger_print("first missing num", num0 + 1)
-                logger_print("num_stack_last 1", num0)
-                logger_print("first_missing_num 1", num0 + 1)
-                last_num_file = num0
-                break
-
-    #logger_print("first_num_file", first_num_file)
-    logger_print("last_num_file", last_num_file)
-
-    #requests_session = new_requests_session()
-
-    num_stack_last = None
-
-    # FIXME this is redundant, see "first missing num"
     # find first missing file
     for idx in range(0, len(nums_done) - 1):
         if nums_done[idx] + 1 != nums_done[idx + 1]:
-            num_stack_last = nums_done[idx]
+            #num_stack_last = nums_done[idx]
+            num_stack_first = nums_done[idx] + 1
             logger_print("num_stack_last 2", num_stack_last)
             logger_print("first_missing_num 2", num_stack_last + 1)
             break
 
-    if num_stack_last == None:
-        # no missing files, continue with last file
+    if num_stack_first == None:
+        # no missing files, continue from last file
         #num_stack_last = first_num_file
-        num_stack_last = last_num_file
+        #num_stack_last = last_num_file
+        #num_stack_first = last_num_file + 1
+        if nums_done:
+            num_stack_first = nums_done[-1] + 1
+        else:
+            num_stack_first = 1
 
-
-    if options.first_num and num_stack_last < (options.first_num - 1):
-        #num_stack_first = options.first_num
-        num_stack_last = options.first_num - 1
+    # options.first_num allows to skip not-yet downloaded nums
+    # options.first_num not allows to re-download already downloaded nums
+    #if options.first_num and num_stack_last < (options.first_num - 1):
+    #    num_stack_last = options.first_num - 1
+    if options.first_num and num_stack_first < options.first_num:
+        logger.info(f"raising num_stack_first {num_stack_first} to options.first_num {options.first_num}")
+        num_stack_first = options.first_num
     #else:
     #    num_stack_first = num_stack_last
     #logger_print("num_stack_first", num_stack_first)
@@ -1225,10 +1210,15 @@ async def main():
                     if len(missing_numbers) == 0:
                         raise Exception("done all missing_numbers")
                     break
+
                 # add numbers to the stack
-                num_stack_first = num_stack_last + 1
+                #num_stack_first = num_stack_last + 1
                 num_stack_last = num_stack_first + options.sample_size
+                # next iteration
+                #num_stack_first = num_stack_last + 1
+
                 if options.last_num and num_stack_last > options.last_num:
+                    logger.info(f"lowering num_stack_last {num_stack_last} to options.last_num {options.last_num}")
                     num_stack_last = options.last_num
                 logger.info(f"stack range: ({num_stack_first}, {num_stack_last})")
                 def filter_num(num):
@@ -1248,6 +1238,10 @@ async def main():
                 #    logger.info(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
                 #    break
                 num_stack += num_stack_expand
+
+                # next iteration
+                num_stack_first = num_stack_last + 1
+
                 retry_counter += 1
                 if retry_counter > 1000:
                     break
