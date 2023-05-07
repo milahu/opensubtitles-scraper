@@ -1221,6 +1221,9 @@ async def main():
                     logger.info(f"lowering num_stack_last {num_stack_last} to options.last_num {options.last_num}")
                     num_stack_last = options.last_num
                 logger.info(f"stack range: ({num_stack_first}, {num_stack_last})")
+                if num_stack_last < num_stack_first:
+                    logger.info(f"stack range is empty")
+                    break
                 def filter_num(num):
                     return (
                         num not in nums_done_set
