@@ -706,6 +706,16 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
 
         #logger_print(f"{num} status_code={status_code} headers:", response_headers)
 
+        # debug rate-limiting
+        # X-RateLimit-Remaining is constant at 40
+        # Download-Quota is between 200 and 0
+        debug_headers = dict()
+        for key in ["Content-Type", "Download-Quota", "X-RateLimit-Remaining"]:
+            if not key in response.headers:
+                continue
+            debug_headers[key] = response.headers.get(key)
+            #logger.info(f"{num} header: {key}: {response.headers.get(key)}")
+
         if status_code == 404:
             open(filename_notfound, 'a').close() # create empty file
             debug_404_pages = False
@@ -734,16 +744,6 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 dt_download_avg_parallel = sum(dt_download_list_parallel) / len(dt_download_list_parallel)
             else:
                 dt_download_avg_parallel = 0
-
-            # debug rate-limiting
-            # X-RateLimit-Remaining is constant at 40
-            # Download-Quota is between 200 and 0
-            debug_headers = dict()
-            for key in ["Content-Type", "Download-Quota", "X-RateLimit-Remaining"]:
-                if not key in response.headers:
-                    continue
-                debug_headers[key] = response.headers.get(key)
-                #logger.info(f"{num} header: {key}: {response.headers.get(key)}")
 
             logger.info(f"{num} {status_code} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} debug_headers={repr(debug_headers)}")
             #if dt_download_avg_parallel > 1:
@@ -970,9 +970,9 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         #logger.debug("headers: " + repr(dict(headers)))
         sleep_each = random.randint(sleep_each_min, sleep_each_max)
         if sleep_each > 0:
-            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} -> waiting {sleep_each} seconds")
+            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} debug_headers={repr(debug_headers)} -> waiting {sleep_each} seconds")
         else:
-            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}")
+            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} debug_headers={repr(debug_headers)}")
         #if dt_download_avg_parallel > 1:
         #    logger.info(f"635: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
         #time.sleep(sleep_each)
