@@ -1115,7 +1115,7 @@ async def main():
         num_stack_last = last_num_file
 
 
-    if options.first_num:
+    if options.first_num and num_stack_last < (options.first_num - 1):
         #num_stack_first = options.first_num
         num_stack_last = options.first_num - 1
     #else:
