@@ -1172,6 +1172,9 @@ async def main():
                 # TODO use proxy
                 response = await aiohttp_session.get(url)
                 # status_code can be 429 Too Many Requests -> fatal error
+                if options.proxy_provider == None and status_code == 429:
+                    logger.info(f"/en/search/subs 429 Too Many Requests -> fatal error")
+                    sys.exit(1)
                 status_code = response.status
                 assert status_code == 200, f"unexpected status_code {status_code}"
                 content_type = response.headers.get("Content-Type")
