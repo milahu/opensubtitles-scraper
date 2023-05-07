@@ -647,6 +647,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 dt_download_list.append(dt_download)
                 t2_download_list.append(t2_download)
                 dt_download_avg = sum(dt_download_list) / len(dt_download_list)
+                # FIXME use options.jobs to get dt_download_avg_parallel
                 dt_download_list_parallel = []
                 t2_download_list_sorted = sorted(t2_download_list)
                 for i in range(0, len(t2_download_list_sorted) - 1):
@@ -659,15 +660,19 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 else:
                     dt_download_avg_parallel = 0
 
+                dt_par_str = ""
+                if options.jobs > 1:
+                    dt_par_str = f" dt_par={dt_download_avg_parallel:.3f}"
+
                 logger.info("t2_download_list", t2_download_list)
                 logger.info("dt_download_list_parallel", dt_download_list_parallel)
 
                 #logger.debug("headers: " + repr(dict(headers)))
                 sleep_each = random.randint(sleep_each_min, sleep_each_max)
                 if sleep_each > 0:
-                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f} -> waiting {sleep_each} seconds")
+                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str} -> waiting {sleep_each} seconds")
                 else:
-                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}")
+                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}")
                 #if dt_download_avg_parallel > 1:
                 #    logger.info(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
                 time.sleep(sleep_each)
@@ -731,6 +736,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             t2_download_list.append(t2_download)
             t2_download_list_sorted = sorted(t2_download_list)
             dt_download_avg = sum(dt_download_list) / len(dt_download_list)
+            # FIXME use options.jobs to get dt_download_avg_parallel
             dt_download_list_parallel = []
             for i in range(0, len(t2_download_list_sorted) - 1):
                 t2 = t2_download_list_sorted[i]
@@ -742,7 +748,11 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             else:
                 dt_download_avg_parallel = 0
 
-            logger.info(f"{num} {status_code} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}{debug_headers_str}")
+            dt_par_str = ""
+            if options.jobs > 1:
+                dt_par_str = f" dt_par={dt_download_avg_parallel:.3f}"
+
+            logger.info(f"{num} {status_code} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}{debug_headers_str}")
             #if dt_download_avg_parallel > 1:
             #    logger.info(f"499: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
             #num += 1
@@ -953,6 +963,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         t2_download_list.append(t2_download)
         t2_download_list_sorted = sorted(t2_download_list)
         dt_download_avg = sum(dt_download_list) / len(dt_download_list)
+        # FIXME use options.jobs to get dt_download_avg_parallel
         dt_download_list_parallel = []
         for i in range(0, len(t2_download_list_sorted) - 1):
             t2 = t2_download_list_sorted[i]
@@ -964,15 +975,19 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         else:
             dt_download_avg_parallel = 0
 
+        dt_par_str = ""
+        if options.jobs > 1:
+            dt_par_str = f" dt_par={dt_download_avg_parallel:.3f}"
+
         #logger.info("t2_download_list", t2_download_list)
         #logger.info("dt_download_list_parallel", dt_download_list_parallel)
 
         #logger.debug("headers: " + repr(dict(headers)))
         sleep_each = random.randint(sleep_each_min, sleep_each_max)
         if sleep_each > 0:
-            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}{debug_headers_str} -> waiting {sleep_each} seconds")
+            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}{debug_headers_str} -> waiting {sleep_each} seconds")
         else:
-            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f} dt_par={dt_download_avg_parallel:.3f}{debug_headers_str}")
+            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}{debug_headers_str}")
         #if dt_download_avg_parallel > 1:
         #    logger.info(f"635: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
         #time.sleep(sleep_each)
