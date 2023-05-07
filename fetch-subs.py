@@ -752,6 +752,9 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             #continue
             return # success
 
+        # debug
+        logger.info(f"options.proxy_provider: {repr(options.proxy_provider)}")
+
         if options.proxy_provider == None and status_code == 429:
             # rate limiting
             # this happens after 30 sequential requests
