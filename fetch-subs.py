@@ -1092,21 +1092,26 @@ async def main():
             num1 = nums_done[idx + 1]
             if num0 + 1 != num1:
                 # found missing num: num0 + 1
-                logger_print("first missing num", num0 + 1)
+                #logger_print("first missing num", num0 + 1)
+                logger_print("num_stack_last 1", num0)
+                logger_print("first_missing_num 1", num0 + 1)
                 last_num_file = num0
                 break
 
-    logger_print("first_num_file", first_num_file)
+    #logger_print("first_num_file", first_num_file)
     logger_print("last_num_file", last_num_file)
 
     #requests_session = new_requests_session()
 
     num_stack_last = None
 
+    # FIXME this is redundant, see "first missing num"
     # find first missing file
     for idx in range(0, len(nums_done) - 1):
         if nums_done[idx] + 1 != nums_done[idx + 1]:
             num_stack_last = nums_done[idx]
+            logger_print("num_stack_last 2", num_stack_last)
+            logger_print("first_missing_num 2", num_stack_last + 1)
             break
 
     if num_stack_last == None:
