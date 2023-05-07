@@ -3,6 +3,12 @@
 # TODO alternative?
 # https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
 
+# TODO monthly/weekly releases
+# repo size should be less than 1GB (hard limit: 5GB)
+# https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github#repository-size-limits
+# 1 month = 1 GB
+# 1 week = 0.25 GB
+
 import sys
 import os
 import re
@@ -136,6 +142,9 @@ if os.path.exists(files_txt_path):
             filename = line.strip()
             if filename.startswith(".git"):
                 continue
+            if filename.endswith(".html"):
+                # debug output file
+                continue
             if filename in {"files.txt", "nums"}:
                 continue
             try:
@@ -182,6 +191,9 @@ print(f"processing files in {new_subs_dir} ...")
 
 for filename in os.listdir(new_subs_dir):
     if filename.startswith(".git"):
+        continue
+    if filename.endswith(".html"):
+        # debug output file
         continue
     if filename in {"files.txt", "nums"}:
         continue
@@ -237,6 +249,9 @@ for filename in os.listdir(new_subs_dir):
     )
 
     # FIXME fatal: a branch named 'nums/9539188' already exists
+    # FIXME fatal: a branch named 'nums/9541599' already exists
+    # adding file 9541599.html
+    # adding file 9541599.not-found
     args = [
         "git",
         "-C", worktree_path,
@@ -408,7 +423,7 @@ try:
     proc = subprocess.run(
         args,
         check=True,
-        timeout=10,
+        timeout=9999,
         #capture_output=True,
         #encoding="utf8",
     )
