@@ -1262,7 +1262,7 @@ async def main():
                 logger.debug(f"num_stack: {num_stack}")
 
             logger.info(f"batch size: {len(num_stack)}")
-            #logger.info(f"batch: {num_stack}")
+            logger.info(f"batch: {num_stack}")
 
             tasks = []
             while num_stack:
