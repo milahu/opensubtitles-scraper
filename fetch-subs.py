@@ -1072,7 +1072,17 @@ async def main():
 
     if nums_done:
         first_num_file = nums_done[0]
+        # this can be wrong. nums can be missing before nums_done[-1]
         last_num_file = nums_done[-1]
+        # find first missing num
+        for idx in range(0, len(nums_done) - 1):
+            num0 = nums_done[idx + 0]
+            num1 = nums_done[idx + 1]
+            if num0 + 1 != num1:
+                # found missing num: num0 + 1
+                logger_print("first missing num", num0 + 1)
+                last_num_file = num0
+                break
 
     logger_print("first_num_file", first_num_file)
     logger_print("last_num_file", last_num_file)
