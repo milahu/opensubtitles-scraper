@@ -1178,6 +1178,9 @@ async def main():
                 if options.proxy_provider == None and status_code == 429:
                     logger.info(f"/en/search/subs 429 Too Many Requests -> fatal error")
                     sys.exit(1)
+                if options.proxy_provider == None and status_code == 503:
+                    logger.info(f"/en/search/subs 503 Service Unavailable -> fatal error")
+                    sys.exit(1)
                 assert status_code == 200, f"unexpected status_code {status_code}"
                 content_type = response.headers.get("Content-Type")
                 assert content_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
