@@ -1,9 +1,23 @@
 #!/usr/bin/env python3
 
 
+import sys
+
+"""
 src_db_path = "opensubtitles.org.Actually.Open.Edition.2022.07.25/opensubs.db"
 dst_db_dir = "opensubs-langs"
 lang = "eng"
+"""
+
+if len(sys.argv) != 4:
+  print("usage:")
+  print("  python3 opensubs-db-split-by-lang.py opensubs.db opensubs-by-lang eng")
+  print("  (this takes about 1 hour)")
+  sys.exit(1)
+
+src_db_path = sys.argv[1]
+dst_db_dir = sys.argv[2]
+lang = sys.argv[3]
 
 dst_db_path = f"{dst_db_dir}/{lang}.db"
 
