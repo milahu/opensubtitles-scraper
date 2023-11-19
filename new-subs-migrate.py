@@ -1,5 +1,9 @@
 #!/usr/bin/env -S python3 -u
 
+# migrate: move files away from main branch
+
+# TODO atomic adding of files
+
 import sys
 import os
 import re
@@ -8,7 +12,17 @@ import shlex
 import shutil
 
 
-new_subs_dir = "new-subs"
+# verbose
+debug_print = print
+# quiet
+debug_print = lambda _: None
+
+
+src_dir = "new-subs"
+src_dir = "new-subs-repo"
+
+new_subs_dir = "new-subs-repo"
+
 remote_url = os.environ.get("NEW_SUBS_REPO_URL")
 assert remote_url
 
@@ -20,7 +34,7 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
         "-C", new_subs_dir,
         "init",
     ]
-    print(shlex.join(args))
+    debug_print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -35,7 +49,7 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
         "origin",
         remote_url,
     ]
-    print(shlex.join(args))
+    debug_print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -52,11 +66,11 @@ args = [
     "origin",
     "main",
 ]
-print(shlex.join(args))
+debug_print(shlex.join(args))
 proc = subprocess.run(
     args,
     check=True,
-    timeout=10,
+    timeout=9999,
 )
 print("git checkout main")
 args = [
@@ -67,7 +81,7 @@ args = [
     #"--force", # untracked working tree files will be overwritten by checkout
     "main",
 ]
-print(shlex.join(args))
+debug_print(shlex.join(args))
 proc = subprocess.run(
     args,
     check=True,
@@ -81,6 +95,8 @@ if os.path.exists(files_txt_path):
             filename = line.strip()
             if filename.startswith(".git"):
                 continue
+            if filename in {"files.txt", "nums"}:
+                continue
             try:
                 num = int(filename.split(".", 1)[0])
             except ValueError:
@@ -91,11 +107,17 @@ print(f"found {len(done_nums)} done nums")
 done_nums_set = set(done_nums)
 
 
+nums_todo = None
+if len(sys.argv) > 2 and sys.argv[1] == "--nums":
+    print(f"processing nums from argv:", sys.argv[2:])
+    nums_todo = set(map(int, sys.argv[2:]))
+else:
+    print(f"processing files in {src_dir} ...")
 
-print(f"processing files in {new_subs_dir} ...")
-
-for filename in os.listdir(new_subs_dir):
+for filename in os.listdir(src_dir):
     if filename.startswith(".git"):
+        continue
+    if filename in {"files.txt", "nums"}:
         continue
     try:
         num = int(filename.split(".", 1)[0])
@@ -104,12 +126,14 @@ for filename in os.listdir(new_subs_dir):
         continue
     if num in done_nums_set:
         continue
+    if nums_todo and not num in nums_todo:
+        continue
 
     if filename.endswith(".zip"):
 
         # add to branch f"nums/{num}"
 
-        print("git add", filename)
+        print("adding file", filename)
 
         # https://stackoverflow.com/questions/53005845/checking-out-orphan-branch-in-new-work-tree
         # d=subdir; n=some-branch; git worktree add --detach --no-checkout $d; git -C $d checkout --orphan $n; git reset; git clean -fdq; echo hello >$d/test.txt; git -C $d add test.txt; git -C $d commit -m init
@@ -126,7 +150,7 @@ for filename in os.listdir(new_subs_dir):
                 "--force",
                 f"nums/{num}", # worktree path
             ]
-            print(shlex.join(args))
+            debug_print(shlex.join(args))
             proc = subprocess.run(
                 args,
                 check=True,
@@ -143,7 +167,7 @@ for filename in os.listdir(new_subs_dir):
             "--no-checkout",
             f"nums/{num}", # worktree path
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -159,7 +183,7 @@ for filename in os.listdir(new_subs_dir):
             "--orphan",
             f"nums/{num}", # branch name
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -171,7 +195,7 @@ for filename in os.listdir(new_subs_dir):
             "-C", worktree_path,
             "reset",
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -184,7 +208,7 @@ for filename in os.listdir(new_subs_dir):
             "clean",
             "-fdq",
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -193,7 +217,7 @@ for filename in os.listdir(new_subs_dir):
 
         # copy file to worktree
         shutil.copyfile(
-            f"{new_subs_dir}/{filename}",
+            f"{src_dir}/{filename}",
             f"{new_subs_dir}/nums/{num}/{filename}",
         )
 
@@ -203,7 +227,7 @@ for filename in os.listdir(new_subs_dir):
             "add",
             filename
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -221,7 +245,7 @@ for filename in os.listdir(new_subs_dir):
             "add",
             os.path.basename(gitattributes_path),
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -232,9 +256,10 @@ for filename in os.listdir(new_subs_dir):
             "git",
             "-C", worktree_path,
             "commit",
+            "--quiet",
             "-m", f"add {num}",
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -248,7 +273,7 @@ for filename in os.listdir(new_subs_dir):
             "remove",
             f"nums/{num}", # worktree path
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
@@ -267,7 +292,7 @@ for filename in os.listdir(new_subs_dir):
         # note: actually: relative path to new_subs_dir
         os.path.basename(files_txt_path),
     ]
-    print(shlex.join(args))
+    debug_print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -278,9 +303,10 @@ for filename in os.listdir(new_subs_dir):
         "git",
         "-C", new_subs_dir,
         "commit",
+        "--quiet",
         "-m", f"files.txt: add {num}",
     ]
-    print(shlex.join(args))
+    debug_print(shlex.join(args))
     proc = subprocess.run(
         args,
         check=True,
@@ -293,29 +319,34 @@ for filename in os.listdir(new_subs_dir):
             "git",
             "-C", new_subs_dir,
             "rm",
+            #"--quiet",
             filename,
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
             timeout=10,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         args = [
             "git",
             "-C", new_subs_dir,
             "commit",
+            "--quiet",
             "-m", f"rm {num}",
         ]
-        print(shlex.join(args))
+        debug_print(shlex.join(args))
         proc = subprocess.run(
             args,
             check=True,
             timeout=10,
         )
     except subprocess.CalledProcessError as error:
-        print(f"rm {new_subs_dir}/{filename}")
-        os.unlink(f"{new_subs_dir}/{filename}")
+        debug_print(f"rm {new_subs_dir}/{filename}")
+        #os.unlink(f"{new_subs_dir}/{filename}")
+        os.unlink(f"{src_dir}/{filename}",)
 
 
 
@@ -330,11 +361,11 @@ args = [
     "--all", # push all branches
     remote_url,
 ]
-print(shlex.join(args))
+debug_print(shlex.join(args))
 proc = subprocess.run(
     args,
     check=True,
-    timeout=10,
+    timeout=9999,
     #capture_output=True,
     #encoding="utf8",
 )
