@@ -3,8 +3,15 @@
 # get subtitles for a video file
 # from local subtitle providers
 
-# FIXME chardet.detect is slow
+# TODO search for episode
+# TODO allow passing name/year/season/episode/imdb-id as extra arguments
+# TODO get subs for multiple files, example: 1 season of a tv show
+# TODO remove ads from subs. usually first and last frames in sub. see ads.txt
+# for ads, reduce frame length to zero, so the ads are still visible in the txt files
+# FIXME use fuzzy search. example: Borat 2 Subsequent Moviefilm -> Borat Subsequent Moviefilm
+# FIXME chardet.detect is slow - TODO try https://pypi.org/project/faust-cchardet/
 # FIXME subtitles_all.db is slow
+# FIXME escape % in title. example: 97% Owned (2012)
 
 
 import sys
@@ -40,16 +47,7 @@ def main():
     video_parsed = guessit.guessit(video_filename)
     str_list = []
     print("video_parsed", video_parsed)
-    if video_parsed.get("type") == "movie":
-        return get_movie_subs(video_path, video_parsed, lang_ISO639, config)
-        # note: if we put year in parens, year is ignored
-        str_list += [f"""{video_parsed.get("title")} {video_parsed.get("year")}"""]
-    raise NotImplementedError
-    #elif video_parsed.get("type") == "episode":
-    #    str_list += [f"""{video_parsed.get("title")} S{video_parsed.get("season"):02d}E{video_parsed.get("episode"):02d}"""]
-    #    str_list += [f"""{video_parsed.get("title")} {video_parsed.get("season")}x{video_parsed.get("episode")}"""]
-    #for s in str_list:
-    #    print(s)
+    return get_movie_subs(video_path, video_parsed, lang_ISO639, config)
 
 
 def print_usage():
@@ -70,10 +68,82 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
     meta_con = sqlite3.connect(f"{data_dir}/subtitles_all.db")
     meta_cur = meta_con.cursor()
     # multiple databases for zipfiles: 24GB for english subs
-    sql_query = "SELECT IDSubtitle FROM metadata WHERE MovieName LIKE ? AND MovieYear = ? AND ISO639 = ? AND SubSumCD = 1"
-    sql_args = (video_parsed.get("title"), video_parsed.get("year"), lang_ISO639)
+    sql_query = None
+    sql_args = None
+    if video_parsed.get("type") == "movie":
+        sql_query = (
+            "SELECT IDSubtitle "
+            "FROM metadata "
+            "WHERE MovieName LIKE ? "
+            "AND MovieYear = ? "
+            "AND ISO639 = ? "
+            "AND SubSumCD = 1 "
+            "AND MovieKind = 'movie' "
+            #"AND ImdbID = 12345"
+        )
+        sql_args = (
+            video_parsed.get("title"),
+            video_parsed.get("year"),
+            lang_ISO639,
+        )
+    elif video_parsed.get("type") == "episode":
+        # TODO lookup via IMDB
+        # solve ambiguity: movie covers? plots?
+        # covers/plots are not in https://www.kaggle.com/datasets/ashirwadsangwan/imdb-dataset
+        # -> online ambiguity soliver? = compare some urls
+        # titleType = 'tvSeries'
+        # sqlite3 imdb/title.basics.db "select * from imdb_title_basics where primaryTitle like 'Euphoria' and titleType = 'tvSeries' AND genres LIKE '%Drama%';" -line
+        # https://www.imdb.com/title/tt23863502/
+        # https://www.imdb.com/title/tt8772296/ # this is it: 8772296
+        # titleType = 'tvEpisode'
+        # sqlite3 imdb/title.episode.db "select * from imdb_title_basics where parentTconst = 8772296 and seasonNumber = 1 and episodeNumber = 1 limit 1;" -line
+        # parentTconst = 8772296
+        # tconst = 8135530
+        # sqlite3 imdb/title.basics.db "select * from imdb_title_basics where tconst = 8135530;" -line
+        # TODO
+        series_imdb_parent = 8772296
+        sql_query = (
+            "SELECT IDSubtitle "
+            "FROM metadata "
+            "WHERE "
+            #"MovieName LIKE ? "
+            "SeriesIMDBParent = ? "
+            "AND "
+            "SeriesSeason = ? "
+            "AND "
+            "SeriesEpisode = ? "
+            "AND "
+            "ISO639 = ? "
+            "AND "
+            "SubSumCD = 1 "
+            "AND "
+            "MovieKind = 'tv' "
+            #"AND SeriesIMDBParent = 12345"
+            #"AND ImdbID = 12345"
+        )
+        sql_args = (
+            #video_parsed.get("title"),
+            series_imdb_parent,
+            #video_parsed.get("episode_title"),
+            video_parsed.get("season"),
+            video_parsed.get("episode"),
+            lang_ISO639,
+        )
+    else:
+        raise Exception(f"""unknown video type: {repr(video_parsed.get("type"))}""")
     nums = []
-    #print(f"""metadata: getting results for query:""", sql_query)
+    def format_query(sql_query, sql_args=None):
+        if not sql_args:
+            return sql_query
+        # replace "?" in query with args
+        parts = sql_query.split(" ? ")
+        result = ""
+        for idx, part in enumerate(parts):
+            result += part
+            if idx < len(sql_args):
+                result += f" {repr(sql_args[idx])} "
+        return result
+    print(f"""metadata: getting results for query:""", format_query(sql_query, sql_args))
     for num, in meta_cur.execute(sql_query, sql_args):
         nums.append(num)
     for provider in config["providers"]:
@@ -181,6 +251,7 @@ def extract_sub(zip_content, video_path_base, num, lang_ISO639):
                 # note: chardet can return wrong encodings
                 # https://github.com/chardet/chardet/issues/279
                 # FIXME chardet.detect is slow
+                # see also: subliminal/subtitle.py
                 # example subs: 4248010 4590955
                 # result: cp1252 == Windows-1252
                 #print(f"extracting sub {num}: chardet.detect ...")
@@ -190,7 +261,8 @@ def extract_sub(zip_content, video_path_base, num, lang_ISO639):
                 if not encoding in {"ascii", "utf-8"}:
                     #print(f"output {repr(sub_path)} encoding {encoding} from chardet")
                     sub_content = recode_content(sub_content, encoding)
-            print(f"output {repr(sub_path)} from {repr(filename)} ({encoding})")
+            sub_filename = os.path.basename(sub_path)
+            print(f"output {repr(sub_filename)} from {repr(filename)} ({encoding})")
             with open(sub_path, "wb") as sub_file:
                 sub_file.write(sub_content)
             break # stop after first file
