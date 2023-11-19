@@ -2,6 +2,60 @@
 
 # watch "ls -lt new-subs/ | head"
 
+# FIXME posprocess: fix wrong dcma entries
+# examples:
+# these files were not processed by new-subs-migrate.py
+# because dcma entries exist in new-subs-repo/files.txt
+# TODO also check files in new-subs-repo/trash/
+"""
+$ ls new-subs-repo/ | cat
+9540221.aint.she.tweet.(1952).eng.1cd.zip
+9540240.book.revue.(1946).eng.1cd.zip
+9540304.forget.me.(1994).dut.1cd.zip
+9540310.premier.voyage.(1980).ell.1cd.zip
+9540353.queen.slim.(2019).fin.1cd.zip
+9540451.jewish.matchmaking.s01.e01.episode.1.1.(2023).spa.1cd.zip
+9540476.jewish.matchmaking.s01.e07.so.the.song.goes.().heb.1cd.zip
+9540515.jewish.matchmaking.s01.e01.episode.1.1.(2023).dut.1cd.zip
+9540545.jewish.matchmaking.s01.e04.year.of.the.cindy.().rus.1cd.zip
+9540550.not-found
+9540572.jewish.matchmaking.s01.e04.year.of.the.cindy.().chi.1cd.zip
+9540630.love.village.s01.e04.episode.1.4.().ita.1cd.zip
+9540653.love.village.s01.e03.episode.1.3.().ara.1cd.zip
+9540664.love.village.s01.e02.episode.1.2.().pob.1cd.zip
+9540667.luke.cage.s01.e03.whos.gonna.take.the.weight.(2016).spl.1cd.zip
+9540722.mama.ist.unmoglich.s01.e03.familientreffen.(1997).ger.1cd.zip
+
+$ cat new-subs-repo/files.txt | grep -e 9540221 -e 9540240 -e 9540304 -e 9540310 -e 9540353 -e 9540451 -e 9540476
+9540304.dcma
+9540451.dcma
+9540221.dcma
+9540240.dcma
+9540353.dcma
+9540310.dcma
+9540476.dcma
+
+
+
+TODO verify status 404
+https://github.com/milahu/opensubtitles-scraper-test/actions/runs/4908766906/jobs/8764739331
+2023-05-07 18:47:38,811 INFO 9540550 404 dt=0.551 dt_avg=0.536 type=text/html; charset=UTF-8 quota=None
+# https://www.opensubtitles.org/en/subtitles/9540550/jewish-matchmaking-sv
+# These subtitles were disabled, you should not use them (pipporan @ 06/05/2023 04:28:54)
+# Subtitles was splitted to - 9540551 - 9540552 - 9540553 - 9540554 - 9540555 - 9540556 - 9540557 - 9540558
+
+TODO store the 404 error message? example: "These subtitles were disabled ..."
+
+"""
+
+# TODO quiet: remove logging output " dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}"
+
+# FIXME missing subs from github action
+# bug in nums_done?
+
+# FIXME deadloop. stop scraper at http 429 = rate-limit exceeded
+# https://github.com/milahu/opensubtitles-scraper-test/actions/runs/4906991416/jobs/8761814969
+
 # expected time: 1E6 * 0.1 / 3600 = 28 hours
 # no. i over-estimated the number of requests
 # it was only 300K requests, and it was done in about 1.5 days
@@ -11,13 +65,20 @@
 # give opensubtitles.org some time for moderation
 # some time = some days = 3 days?
 
+# NOTE zipfiles can change name over time
+# example:
+# a: 9524294.delete.me.new.beginnings.().eng.1cd.zip
+# b: 9524294.delete.me.s02.e06.new.beginnings.().eng.1cd.zip
+
 import sys
 import os
 import re
 import urllib.request
 import logging
 import time
+import datetime
 import random
+import hashlib
 import subprocess
 import json
 import glob
@@ -32,10 +93,11 @@ import requests
 import magic # libmagic
 
 
+
 # https://www.zenrows.com/ # Startup plan
 #max_concurrency = 25 # concurrency limit was reached
 max_concurrency = 10
-# unexpected status_code 403. content: b'{"code":"BLK0001","detail":"Your IP address has been blocked for exceeding the maximum error rate al'...
+# unexpected response_status 403. content: b'{"code":"BLK0001","detail":"Your IP address has been blocked for exceeding the maximum error rate al'...
 # -> change_ipaddr()
 
 
@@ -69,6 +131,7 @@ max_concurrency = 10
 # captcha after 30 requests
 #options.proxy_provider = "chromium"
 
+# not working. blocked by cloudflare
 #options.proxy_provider = "pyppeteer"
 
 
@@ -95,7 +158,7 @@ webscraping_ai_option_proxy = "datacenter"
 #options.proxy_provider = "zenrows.com"
 fetcher_lib = "aiohttp"
 try:
-    from secrets import api_key_zenrows_com
+    from fetch_subs_secrets import api_key_zenrows_com
 except ImportError:
     api_key_zenrows_com = "88d22df90b3a4c252b480dc8847872dac59db0e0" # expired
 
@@ -113,7 +176,12 @@ api_key_scrapingant_com = "6ae0de59fad34337b2ee86814857278a"
 
 
 new_subs_dir = "new-subs"
+#new_subs_dir = "new-subs-repo"
 #new_subs_dir = "new-subs-temp-debug"
+
+# TODO instead of 1000, get actual system user id. bash: id -u
+# use tmpfs in RAM to avoid disk writes
+tempdir = "/run/user/1000"
 
 # https://www.opensubtitles.org/en/search/subs
 # https://www.opensubtitles.org/ # New subtitles
@@ -134,13 +202,18 @@ parser = argparse.ArgumentParser(
 default_jobs = 1
 default_num_downloads = 25
 default_sample_size = 1000
-proxy_provider_values = ["zenrows.com"]
+proxy_provider_values = [
+  #"pyppeteer",
+  "chromium",
+  "zenrows.com",
+]
 default_proxy_provider = None
 
 #parser.add_argument('filename')
+
 parser.add_argument(
     '--proxy-provider',
-    dest="proxy_provider",
+    dest="proxy_provider", # options.proxy_provider
     default=default_proxy_provider,
     #choices=proxy_provider_values,
     type=str,
@@ -348,11 +421,11 @@ def change_ipaddr():
         proc.wait(timeout=2*60)
 
     except subprocess.TimeoutExpired:
-        logger.info(f"killing ssh client")
+        logger_print(f"killing ssh client")
         proc.kill()
 
     new_ipaddr = get_ipaddr()
-    logger.info(f"changed IP address from {old_ipaddr} to {new_ipaddr}")
+    logger_print(f"changed IP address from {old_ipaddr} to {new_ipaddr}")
     return old_ipaddr, new_ipaddr
 
 
@@ -372,7 +445,7 @@ def change_ipsubnet():
         old_subnet = get_subnet(old_ipaddr)
         new_subnet = get_subnet(new_ipaddr)
         if old_subnet != new_subnet:
-            logger.info(f"changed IP subnet from {first_ipaddr} to {new_ipaddr}")
+            logger_print(f"changed IP subnet from {first_ipaddr} to {new_ipaddr}")
             return first_ipaddr, new_ipaddr
 
 
@@ -416,7 +489,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         # check again to make sure:
         existing_output_files = glob.glob(filename_glob)
         if len(existing_output_files) > 0:
-            logger.info(f"{num} output file exists: {existing_output_files}")
+            logger_print(f"{num} output file exists: {existing_output_files}")
             #continue
             return
         """
@@ -448,7 +521,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         proxies = {}
         requests_get_kwargs = {}
         content_type = None
-        status_code = None
+        response_status = None
         content_disposition = None
         response_headers = None
         response_content = None
@@ -462,18 +535,18 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             url = f"https://api.scrapingant.com/v2/general?{query}"
             # TODO aiohttp
             response = requests.get(url, **requests_get_kwargs)
-            status_code = response.status_code
+            response_status = response.response_status
 
         elif options.proxy_provider == "zenrows.com":
             #proxy = f"http://{api_key_zenrows_com}:@proxy.zenrows.com:8001"
             zenrows_com_query_parts = []
             if config.zenrows_com_antibot:
-                logger.info(f"{num} antibot=true")
+                logger_print(f"{num} antibot=true")
                 zenrows_com_query_parts += ["antibot=true"]
                 # reset config for next request
                 config.zenrows_com_antibot = False
             if config.zenrows_com_js:
-                logger.info(f"{num} js_render=true")
+                logger_print(f"{num} js_render=true")
                 zenrows_com_query_parts += ["js_render=true"]
                 # reset config for next request
                 config.zenrows_com_js = False
@@ -491,11 +564,11 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 asyncio.exceptions.TimeoutError,
             ) as err:
                 # requests.exceptions.ProxyError: HTTPSConnectionPool(host='dl.opensubtitles.org', port=443): Max retries exceeded with url: /en/download/sub/9188285 (Caused by ProxyError('Cannot connect to proxy.', NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x7fa473cadcf0>: Failed to establish a new connection: [Errno -3] Temporary failure in name resolution')))
-                logger.info(f"{num} retry. error: {err}")
+                logger_print(f"{num} retry. error: {err}")
                 return num # retry
             #logger_print("response", dir(response))
-            #status_code = response.status_code # requests
-            status_code = response.status # aiohttp
+            #response_status = response.response_status # requests
+            response_status = response.status # aiohttp
             content_type = response.headers.get("Zr-Content-Type")
             content_disposition = response.headers.get("Zr-Content-Disposition")
 
@@ -510,25 +583,25 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # TODO aiohttp
             response = requests.get(url, **requests_get_kwargs)
 
-            status_code = response.status_code
-            logger.info(f"{num} status_code: {status_code}")
+            response_status = response.response_status
+            logger_print(f"{num} response_status: {response_status}")
 
-            logger.info(f"{num} headers: {response.headers}")
+            logger_print(f"{num} headers: {response.headers}")
 
-            if status_code != 200:
+            if response_status != 200:
                 # 404 -> always JSON?
-                logger.info(f"{num} content: {response_content}")
+                logger_print(f"{num} content: {response_content}")
 
             # original headers are missing: Content-Type, Content-Disposition, ...
             magic_result = magic.detect_from_content(response_content)
-            logger.info(f"{num} libmagic result: type: {magic_result.mime_type}, encoding: {magic_result.encoding}, name: {magic_result.name}")
+            logger_print(f"{num} libmagic result: type: {magic_result.mime_type}, encoding: {magic_result.encoding}, name: {magic_result.name}")
             # examples: text/html, application/zip
             content_type = magic_result.mime_type
             if content_type == "application/octet-stream":
                 # response_content is broken?
                 # $ unzip -l 9185494.zip
                 # error [9185494.zip]:  missing 985487216 bytes in zipfile
-                logger.info(f"{num} libmagic failed to detect zip file. fixing content_type")
+                logger_print(f"{num} libmagic failed to detect zip file. fixing content_type")
                 content_type = "application/zip"
             if magic_result.encoding != "binary":
                 content_type += f"; charset={magic_result.encoding}"
@@ -548,10 +621,10 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # TODO aiohttp
             response = requests.get(url, **requests_get_kwargs)
 
-            status_code = response.status_code
-            logger.info(f"{num} status_code: {status_code}")
+            response_status = response.response_status
+            logger_print(f"{num} response_status: {response_status}")
 
-            logger.info(f"{num} headers: {response.headers}")
+            logger_print(f"{num} headers: {response.headers}")
 
         elif options.proxy_provider == "scrapfly.io":
             # https://scrapfly.io/dashboard
@@ -573,18 +646,18 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
 
             response_data = json.loads(response.content)
 
-            #status_code = response.status_code
-            status_code = response_data["result"]["status_code"]
+            #response_status = response.response_status
+            response_status = response_data["result"]["response_status"]
 
             if (
                 response_data["result"]["success"] == False and
-                status_code != 404
+                response_status != 404
             ):
-                logger.info(f"""{num} success: False. reason: {response_data["result"]["reason"]}""")
+                logger_print(f"""{num} success: False. reason: {response_data["result"]["reason"]}""")
 
             if True:
                 response_data_file = f"{new_subs_dir}/{num}.scrapfly.json"
-                logger.info(f"""{num} writing json response to file: {response_data_file}""")
+                logger_print(f"""{num} writing json response to file: {response_data_file}""")
                 with open(response_data_file, "wb") as f:
                     f.write(response.content)
 
@@ -598,13 +671,13 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             else:
                 raise Exception(f"""unknown result format: {response_data["result"]["format"]}""")
 
-            #logger.info(f"{num} status_code: {status_code}")
+            #logger_print(f"{num} response_status: {response_status}")
 
-            #logger.info(f"{num} headers: {response_headers}")
+            #logger_print(f"{num} headers: {response_headers}")
 
-            #logger.info(f"{num} proxy pool: {response_data['context']['proxy']['pool']}")
-            #logger.info(f"{num} cost total: {response_data['context']['cost']['total']}")
-            #logger.info(f"{num} cost details: {response_data['context']['cost']['details']}")
+            #logger_print(f"{num} proxy pool: {response_data['context']['proxy']['pool']}")
+            #logger_print(f"{num} cost total: {response_data['context']['cost']['total']}")
+            #logger_print(f"{num} cost details: {response_data['context']['cost']['details']}")
             logger.debug(f"{num} cost: {response_data['context']['cost']['total']} = {response_data['context']['cost']['details']}")
 
         elif options.proxy_provider == "scraperbox.com":
@@ -621,68 +694,119 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # TODO aiohttp
             response = requests.get(url, **requests_get_kwargs)
 
-            status_code = response.status_code
-            logger.info(f"{num} status_code: {status_code}")
+            response_status = response.response_status
+            logger_print(f"{num} response_status: {response_status}")
 
-            logger.info(f"{num} headers: {response.headers}")
+            logger_print(f"{num} headers: {response.headers}")
 
         elif options.proxy_provider == "chromium":
-            args = ["chromium", url]
-            subprocess.run(
-                args,
-                capture_output=True,
-                check=True,
-            )
-            time.sleep(2)
+
+            # FIXME handle file download. where is the file saved?
+            # the last html page is the cloudflare portal saying "Proceeding..."
+
+            response = await chromium_headful_scraper.get_response(url, return_har_path=True)
+            logger_print(f"TODO debug har file: {response.har_path}")
+            response_status = response.status
+            response_type = response.headers.get("Content-Type")
+            # TODO handle binary response
+            response_text = await response.text()
+
+            logger_print("response_status", response_status)
+            logger_print("response_type", response_type)
+            logger_print("response_text", repr(response_text)[0:100] + " ...")
+
+            await asyncio.sleep(10)
+
+            # TODO get the actual download path of chromium
+            # this can be different than $HOME/Downloads
             downloaded_files = glob.glob(f"/home/user/Downloads/*.({num}).zip")
-            if len(downloaded_files) == 0:
-                status_code = 404
-            elif len(downloaded_files) == 1:
-                filepath = downloaded_files[0]
-                filename = os.path.basename(filepath)
-                os.rename(filepath, f"{new_subs_dir}/{num}.{filename}")
+            logger_print("downloaded_files", downloaded_files)
 
-                t2_download = time.time()
-                dt_download = t2_download - t1_download
-                dt_download_list.append(dt_download)
-                t2_download_list.append(t2_download)
-                dt_download_avg = sum(dt_download_list) / len(dt_download_list)
-                # FIXME use options.jobs to get dt_download_avg_parallel
-                dt_download_list_parallel = []
-                t2_download_list_sorted = sorted(t2_download_list)
-                for i in range(0, len(t2_download_list_sorted) - 1):
-                    t2 = t2_download_list_sorted[i]
-                    t2_next = t2_download_list_sorted[i + 1]
-                    dt = t2_next - t2
-                    dt_download_list_parallel.append(dt)
-                if len(dt_download_list_parallel) > 0:
-                    dt_download_avg_parallel = sum(dt_download_list_parallel) / len(dt_download_list_parallel)
-                else:
-                    dt_download_avg_parallel = 0
+            raise NotImplementedError
 
-                dt_par_str = ""
-                if options.jobs > 1:
-                    dt_par_str = f" dt_par={dt_download_avg_parallel:.3f}"
-
-                logger.info("t2_download_list", t2_download_list)
-                logger.info("dt_download_list_parallel", dt_download_list_parallel)
-
-                #logger.debug("headers: " + repr(dict(headers)))
-                sleep_each = random.randint(sleep_each_min, sleep_each_max)
-                if sleep_each > 0:
-                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str} -> waiting {sleep_each} seconds")
-                else:
-                    logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}")
-                #if dt_download_avg_parallel > 1:
-                #    logger.info(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
-                time.sleep(sleep_each)
-                #continue
-                return
-            else:
+            if len(downloaded_files) != 1:
                 logger_print(f"error: found multiple downloaded files for num={num}:", downloaded_files)
                 raise NotImplementedError
 
+            # len(downloaded_files) == 1
+            filepath = downloaded_files[0]
+            filename = os.path.basename(filepath)
+            output_path = f"{new_subs_dir}/{num}.{filename}"
+            os.rename(filepath, output_path)
+
+            #logger.debug("headers: " + repr(dict(headers)))
+            sleep_each = random.randint(sleep_each_min, sleep_each_max)
+            if sleep_each > 0:
+                logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str} -> waiting {sleep_each} seconds")
+            else:
+                logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}")
+            #if dt_download_avg_parallel > 1:
+            #    logger_print(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+            await asyncio.sleep(sleep_each)
+            #continue
+            return
+
+            if False:
+
+                # old code
+
+                args = ["chromium", url]
+                subprocess.run(
+                    args,
+                    capture_output=True,
+                    check=True,
+                )
+                await asyncio.sleep(2)
+                downloaded_files = glob.glob(f"/home/user/Downloads/*.({num}).zip")
+                if len(downloaded_files) == 0:
+                    response_status = 404
+                elif len(downloaded_files) == 1:
+                    filepath = downloaded_files[0]
+                    filename = os.path.basename(filepath)
+                    os.rename(filepath, f"{new_subs_dir}/{num}.{filename}")
+
+                    t2_download = time.time()
+                    dt_download = t2_download - t1_download
+                    dt_download_list.append(dt_download)
+                    t2_download_list.append(t2_download)
+                    dt_download_avg = sum(dt_download_list) / len(dt_download_list)
+                    # FIXME use options.jobs to get dt_download_avg_parallel
+                    dt_download_list_parallel = []
+                    t2_download_list_sorted = sorted(t2_download_list)
+                    for i in range(0, len(t2_download_list_sorted) - 1):
+                        t2 = t2_download_list_sorted[i]
+                        t2_next = t2_download_list_sorted[i + 1]
+                        dt = t2_next - t2
+                        dt_download_list_parallel.append(dt)
+                    if len(dt_download_list_parallel) > 0:
+                        dt_download_avg_parallel = sum(dt_download_list_parallel) / len(dt_download_list_parallel)
+                    else:
+                        dt_download_avg_parallel = 0
+
+                    dt_par_str = ""
+                    if options.jobs > 1:
+                        dt_par_str = f" dt_par={dt_download_avg_parallel:.3f}"
+
+                    logger_print("t2_download_list", t2_download_list)
+                    logger_print("dt_download_list_parallel", dt_download_list_parallel)
+
+                    #logger.debug("headers: " + repr(dict(headers)))
+                    sleep_each = random.randint(sleep_each_min, sleep_each_max)
+                    if sleep_each > 0:
+                        logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str} -> waiting {sleep_each} seconds")
+                    else:
+                        logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}")
+                    #if dt_download_avg_parallel > 1:
+                    #    logger_print(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+                    await asyncio.sleep(sleep_each)
+                    #continue
+                    return
+                else:
+                    logger_print(f"error: found multiple downloaded files for num={num}:", downloaded_files)
+                    raise NotImplementedError
+
         elif options.proxy_provider == "pyppeteer":
+            logger_print("pyppeteer_page.goto", url)
             await pyppeteer_page.goto(url)
             raise NotImplementedError
 
@@ -690,11 +814,11 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # no proxy
             # requests
             #response = requests.get(url, **requests_get_kwargs)
-            #status_code = response.status_code
+            #response_status = response.response_status
             # aiohttp
             response = await aiohttp_session.get(url, **requests_get_kwargs)
-            status_code = response.status
-            logger.debug(f"{num} status_code: {status_code}")
+            response_status = response.status
+            logger.debug(f"{num} response_status: {response_status}")
             logger.debug(f"{num} headers: {response.headers}")
 
         response_content = response_content or response.content
@@ -705,11 +829,11 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
 
         if options.proxy_provider == "scrapingant.com":
             try:
-                status_code = int(response_headers["Ant-Page-Status-Code"])
+                response_status = int(response_headers["Ant-Page-Status-Code"])
             except KeyError as err:
-                logger_print(f"{num} status_code={status_code} KeyError: no Ant-Page-Status-Code. headers: {response_headers}. content: {response_content[0:100]}...")
+                logger_print(f"{num} response_status={response_status} KeyError: no Ant-Page-Status-Code. headers: {response_headers}. content: {response_content[0:100]}...")
 
-        #logger_print(f"{num} status_code={status_code} headers:", response_headers)
+        #logger_print(f"{num} response_status={response_status} headers:", response_headers)
 
         # debug rate-limiting
         # X-RateLimit-Remaining is constant at 40
@@ -718,7 +842,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         debug_headers_str += f" type={response.headers.get('Content-Type')}"
         debug_headers_str += f" quota={response.headers.get('Download-Quota')}"
 
-        if status_code == 404:
+        if response_status == 404:
             open(filename_notfound, 'a').close() # create empty file
             debug_404_pages = False
             if debug_404_pages:
@@ -752,25 +876,25 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             if options.jobs > 1:
                 dt_par_str = f" dt_par={dt_download_avg_parallel:.3f}"
 
-            logger.info(f"{num} {status_code} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}{debug_headers_str}")
+            logger_print(f"{num} {response_status} dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}{debug_headers_str}")
             #if dt_download_avg_parallel > 1:
-            #    logger.info(f"499: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+            #    logger_print(f"499: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
             #num += 1
             #continue
             return # success
 
         # debug
-        #logger.info(f"options.proxy_provider: {repr(options.proxy_provider)}")
+        #logger_print(f"options.proxy_provider: {repr(options.proxy_provider)}")
 
-        if options.proxy_provider == None and status_code == 429:
+        if options.proxy_provider == None and response_status == 429:
             # rate limiting
             # this happens after 30 sequential requests
             # only successful requests are counted (http 404 is not counted)
             # blocking is done by cloudflare?
-            #logger.info(f"{num} {status_code} Too Many Requests -> waiting {sleep_blocked} seconds")
-            #time.sleep(sleep_blocked)
-            logger_print(f"{num} {status_code} response_headers", response_headers)
-            logger_print(f"{num} {status_code} Too Many Requests -> stopping scraper")
+            #logger_print(f"{num} {response_status} Too Many Requests -> waiting {sleep_blocked} seconds")
+            #await asyncio.sleep(sleep_blocked)
+            logger_print(f"{num} {response_status} response_headers", response_headers)
+            logger_print(f"{num} {response_status} Too Many Requests -> stopping scraper")
             # stop scraper. retry would cause infinite loop
             raise SystemExit
 
@@ -778,54 +902,54 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
 
             if downloads_since_change_ipaddr == 0:
                 # after too many change_ipaddr, they are blocking our subnet
-                logger.info(f"{num} {status_code} Too Many Requests + no downloads -> changing IP subnet")
+                logger_print(f"{num} {response_status} Too Many Requests + no downloads -> changing IP subnet")
                 # no. this takes too long and does not work,
                 # because our user-agent is blocked
                 #change_ipsubnet()
             else:
-                logger.info(f"{num} {status_code} Too Many Requests -> changing IP address")
+                logger_print(f"{num} {response_status} Too Many Requests -> changing IP address")
                 change_ipaddr()
             downloads_since_change_ipaddr = 0
             # fix: http.client.RemoteDisconnected: Remote end closed connection without response
             # TODO aiohttp
             requests_session = new_requests_session()
-            time.sleep(sleep_change_ipaddr)
+            await asyncio.sleep(sleep_change_ipaddr)
             #continue
             return # success
 
-        if status_code == 500:
-            logger.info(f"{num} {status_code} Internal Server Error -> retry")
+        if response_status == 500:
+            logger_print(f"{num} {response_status} Internal Server Error -> retry")
             return num # retry
 
-        if status_code == 429:
+        if response_status == 429:
             if False and content_type == "text/html; charset=UTF-8":
                 # captcha page
                 # bug in proxy provider
-                logger.info(f"{num} {status_code} captcha -> retry")
+                logger_print(f"{num} {response_status} captcha -> retry")
                 return num # retry
             response_text = (await response_content.read()).decode("utf8")
             content_type = content_type or response_headers.get("Content-Type")
             error_filename = f"http-429-at-num-{num}.html"
-            logger_print(f"{num} {status_code} response_headers", response_headers)
-            logger.info(f"{num} {status_code} content_type={repr(content_type)} + response_text in {error_filename} -> retry")
+            logger_print(f"{num} {response_status} response_headers", response_headers)
+            logger_print(f"{num} {response_status} content_type={repr(content_type)} + response_text in {error_filename} -> retry")
             with open(error_filename, "w") as f:
                 f.write(response_text)
             return num # retry
 
-        if status_code in {422, 403, 503}:
+        if response_status in {422, 403, 503}:
             response_text = (await response_content.read()).decode("utf8")
-            logger.info(f"{num} {status_code} response_text: {repr(response_text)}")
+            logger_print(f"{num} {response_status} response_text: {repr(response_text)}")
             if response_text == "":
                 # json.loads -> json.decoder.JSONDecodeError Expecting value
-                logger.info(f"{num} {status_code} got empty response_text -> retry")
+                logger_print(f"{num} {response_status} got empty response_text -> retry")
                 return num
             response_data = json.loads(response_text)
             if response_data["code"] == "RESP001":
                 # Could not get content. try enabling javascript rendering for a higher success rate (RESP001)
                 #config.zenrows_com_js = True
                 #config.zenrows_com_antibot = True
-                #logger.info(f"{num} retry. error: need javascript")
-                logger.info(f"{num} 404 dcma")
+                #logger_print(f"{num} retry. error: need javascript")
+                logger_print(f"{num} 404 dcma")
                 # create empty file
                 filename_dcma = f"{new_subs_dir}/{num}.dcma"
                 open(filename_dcma, 'a').close() # create empty file
@@ -834,29 +958,29 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 #return {"retry_num": num, "pause": True} # pause scraper, retry
             if response_data["code"] == "AUTH006":
                 # The concurrency limit was reached. Please upgrade to a higher plan or ...
-                logger.info(f"{num} {status_code} retry. error: concurrency limit was reached @ {response_text}")
+                logger_print(f"{num} {response_status} retry. error: concurrency limit was reached @ {response_text}")
                 return {"retry_num": num, "pause": True} # pause scraper, retry
             if response_data["code"] == "BLK0001":
                 # Your IP address has been blocked for exceeding the maximum error rate ...
-                logger.info(f"{num} {status_code} retry. error: IP address was blocked @ {response_text}")
+                logger_print(f"{num} {response_status} retry. error: IP address was blocked @ {response_text}")
                 return {"retry_num": num, "pause": True, "change_ipaddr": True} # pause scraper, change IP address, retry
             if response_data["code"] == "CTX0002":
                 # Operation timeout exceeded (CTX0002)
                 return {"retry_num": num, "pause": True} # pause scraper, retry
-            logger.info(f"{num} {status_code} retry. headers: {response_headers}. content: {await response_content.read()}")
+            logger_print(f"{num} {response_status} retry. headers: {response_headers}. content: {await response_content.read()}")
             return num # retry
 
         # requests
-        #assert status_code == 200, f"{num} unexpected status_code {status_code}. headers: {response_headers}. content: {response_content[0:100]}..."
+        #assert response_status == 200, f"{num} unexpected response_status {response_status}. headers: {response_headers}. content: {response_content[0:100]}..."
         # aiohttp
-        assert status_code == 200, f"{num} unexpected status_code {status_code}. headers: {response_headers}. content: {await response_content.read()}"
+        assert response_status == 200, f"{num} unexpected response_status {response_status}. headers: {response_headers}. content: {await response_content.read()}"
 
         content_type = content_type or response_headers.get("Content-Type")
 
         if content_type != "application/zip":
             # blocked
             # TODO retry download
-            #logger_print(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
+            #logger_print(f"{num} response_status={response_status} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
             if content_type in {"text/html", "text/html; charset=UTF-8", "text/html; charset=utf-8"}:
                 # can be "not found" or "blocked":
                 # not found: [CRITICAL ERROR] Subtitle id {num} was not found in database
@@ -869,9 +993,9 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 # can also be alert:
                 # alert: Turn off adblocker, otherwise site will not work properly. You can use different browser or browser in incognito/private mode
                 if response_headers.get("Zr-Final-Url") == "https://www.opensubtitles.org/en/login/vrf-on":
-                    logger.info(f"""{num} FIXME Zr-Final-Url: {response_headers.get("Zr-Final-Url")}""")
+                    logger_print(f"""{num} FIXME Zr-Final-Url: {response_headers.get("Zr-Final-Url")}""")
                 else:
-                    logger.info(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}")
+                    logger_print(f"{num} response_status={response_status} content_type={content_type}. headers: {response_headers}")
                 filename = f"{new_subs_dir}/{num}.html"
                 i = 1
                 while os.path.exists(filename):
@@ -882,7 +1006,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 logger_print(f"{num} saving response_content to file: {filename}")
                 with open(filename, "wb") as dst:
                     dst.write(response_content)
-                #logger_print(f"{num} status_code={status_code} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
+                #logger_print(f"{num} response_status={response_status} content_type={content_type}. headers: {response_headers}. content: {response_content[0:100]}...")
                 raise NotImplementedError(f"{num}: unknown Content-Type: {content_type}")
 
         #logger_print(f"{num} response", dir(response))
@@ -940,7 +1064,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         if filename.endswith(".html"):
             html_errors.append(True)
             html_error_probability = sum(map(lambda _: 1, filter(lambda x: x == True, html_errors))) / len(html_errors)
-            logger.info(f"{num} retry. error: html p={html_error_probability * 100:.2f}%")
+            logger_print(f"{num} retry. error: html p={html_error_probability * 100:.2f}%")
             return num # retry
         else:
            html_errors.append(False)
@@ -954,7 +1078,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                     for name in z.namelist():
                         logger.debug(f"  {name}")
             except zipfile.BadZipFile as err:
-                logger.info(f"{num} broken zipfile: {filename} - moving to {filename}.broken - error: {err}")
+                logger_print(f"{num} broken zipfile: {filename} - moving to {filename}.broken - error: {err}")
                 os.rename(filename, filename + ".broken")
 
         t2_download = time.time()
@@ -979,52 +1103,637 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         if options.jobs > 1:
             dt_par_str = f" dt_par={dt_download_avg_parallel:.3f}"
 
-        #logger.info("t2_download_list", t2_download_list)
-        #logger.info("dt_download_list_parallel", dt_download_list_parallel)
+        #logger_print("t2_download_list", t2_download_list)
+        #logger_print("dt_download_list_parallel", dt_download_list_parallel)
 
         #logger.debug("headers: " + repr(dict(headers)))
         sleep_each = random.randint(sleep_each_min, sleep_each_max)
         if sleep_each > 0:
-            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}{debug_headers_str} -> waiting {sleep_each} seconds")
+            logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}{debug_headers_str} -> waiting {sleep_each} seconds")
         else:
-            logger.info(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}{debug_headers_str}")
+            logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}{debug_headers_str}")
         #if dt_download_avg_parallel > 1:
-        #    logger.info(f"635: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
-        #time.sleep(sleep_each)
+        #    logger_print(f"635: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+        #await asyncio.sleep(sleep_each)
         #break
         #num += 1
         return # success
 
 
+
+# global state, shared between functions
 user_agents = None
+chromium_headful_scraper = None
+
+
+
+def random_hash():
+    return hex(random.getrandbits(128))[2:]
+
+def datetime_str():
+    # https://stackoverflow.com/questions/2150739/iso-time-iso-8601-in-python#28147286
+    return datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%S.%fZ")
+
+def sha1sum(file_path):
+    # https://stackoverflow.com/questions/22058048/hashing-a-file-in-python
+    # BUF_SIZE is totally arbitrary, change for your app!
+    BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+    #md5 = hashlib.md5()
+    sha1 = hashlib.sha1()
+    with open(file_path, 'rb') as f:
+        while data := f.read(BUF_SIZE):
+            #md5.update(data)
+            sha1.update(data)
+    return sha1.digest()
+    #print("SHA1: {0}".format(sha1.hexdigest()))
+
+# gui functions
+
+def xdotool(args):
+    cmd = f"DISPLAY=:0.0 xdotool {args}"
+    logger_print("cmd:", cmd)
+    return subprocess.getoutput(cmd)
+
+def wmctrl(args):
+    cmd = f"DISPLAY=:0.0 wmctrl {args}"
+    logger_print("cmd:", cmd)
+    return subprocess.getoutput(cmd)
+
+def notify_send(args):
+    cmd = f"DISPLAY=:0.0 notify-send {args}"
+    logger_print("cmd:", cmd)
+    return subprocess.getoutput(cmd)
+
+async def clipboard_set_text(text):
+    logger_print("clipboard_set_text:", repr(text))
+    subprocess.run(
+        ["xclip", "-i", "-sel", "c"],
+        input=text,
+        encoding="utf8",
+    )
+    #await asyncio.sleep(1) # TODO remove? or more?
+
+def crop_of_center_pos(center_pos, delta=15):
+    if type(center_pos) == str:
+        center_pos = list(map(int, center_pos.split(" ")))
+    return "%sx%s+%s+%s" % (
+        2 * delta,
+        2 * delta,
+        center_pos[0] - delta,
+        center_pos[1] - delta,
+    )
+
+def get_screenshot(center_pos=None, delta=15):
+    # tiff is 2x faster than png, but 20x larger, so only good in tmpfs
+    # use png for storage. the conversion between png and tiff is lossless:
+    # for tiff in *.tiff; do convert $tiff $tiff.png; done
+    # for tiff in *.tiff; do echo $(convert $tiff png:- | convert png:- tiff:- | sha1sum - | cut -d' ' -f1) $tiff; done
+    screenshot_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.tiff"
+    if center_pos:
+        crop = crop_of_center_pos(center_pos, delta)
+        # import -window root -crop $crop -colorspace Gray $screenshot_path
+        args = ["import", "-window", "root", "-crop", crop, "-colorspace", "Gray", screenshot_path]
+        subprocess.run(
+            args,
+            capture_output=True,
+            check=True,
+        )
+        return screenshot_path
+
+    raise NotImplementedError("get_screenshot: center_pos == None")
+
+def show_image(image_path):
+    args = ["feh", image_path]
+    # start the process but dont wait. let it run in the background
+    proc = subprocess.Popen(
+        args,
+        #capture_output=True,
+        #check=True,
+    )
+    return proc
+
+
+
+class ChromiumHeadfulScraper():
+
+    """
+    a headful chromium web scraper, written in python
+    """
+
+    chromium_window_id = None
+
+    class Response():
+        status = 0
+        content_type = None
+        headers = None
+        _text = None
+        def __init__(self, status, headers, content_type, text, har, har_path):
+            self.status = status
+            self.headers = headers
+            self.content_type = content_type
+            self._text = text
+            self.har = har
+            self.har_path = har_path
+        # await response.text()
+        async def text(self):
+            return self._text
+
+    class Headers():
+        def __init__(self, headers):
+            # headers from the HAR file is list of objects:
+            # [ { "name": "x", "value": "y" } ]
+            # transform it to a list of tuples, to save memory
+            # note: all header names in HAR files are lowercase
+            self.headers = list(map(lambda h: (h["name"], h["value"]), headers))
+        def get(self, key):
+            # return the first matching header
+            # TODO better? how to handle duplicate keys in self.headers
+            try:
+                return next(h for h in self.headers if h[0] == key.lower())[1]
+            except StopIteration: # not found
+                raise KeyError
+
+    def __init__(self):
+
+        """
+        initialize the scraper
+
+        open a new tab, the "scraper tab"
+        open chromium in the scraper tab
+        (todo: get positions of buttons and icons)
+        """
+
+        # TODO add args to __init__?
+
+        # async init is done in async def async_init(self)
+        # to create a class instance, simply do
+        # chromium_headful_scraper = ChromiumHeadfulScraper()
+        pass
+
+    def __await__(self):
+
+        return self.async_init().__await__()
+
+    # TODO use this as a "status bar" widget
+    #def set_address_bar_text(text):
+    #    TODO
+
+    async def async_init(self):
+
+        # async init function. note: this must "return self"
+        # https://stackoverflow.com/questions/33128325/how-to-set-class-attribute-with-await-in-init
+
+        #from XDoToolWrapper import XDoToolWrapper
+        #xdotool = XDoToolWrapper()
+        #xdotool.get_monitors()
+
+        def search_chromium_window_id():
+            window_id_list = []
+            desktop_id_list = []
+            for window_id in xdotool(f"search --classname Chromium").split("\n"):
+                desktop_id = xdotool(f"get_desktop_for_window {window_id}")
+                if desktop_id.endswith("-1"): # invalid window_id
+                    continue
+                logger_print(f"found chromium window {window_id} on desktop {desktop_id}")
+                window_id_list.append(int(window_id))
+                desktop_id_list.append(int(desktop_id))
+            if len(window_id_list) > 0:
+                idx = 0 # use the first window
+                window_id = window_id_list[idx]
+                desktop_id = desktop_id_list[idx]
+                logger_print(f"using chromium window {window_id} on desktop {desktop_id}")
+                return window_id
+            return None # not found
+
+        sleep_seconds = 5
+        notify_message = f"searching for an existing chromium window"
+        logger_print(notify_message)
+        notify_send(f"""notify-send -t {sleep_seconds}000 -u normal -e "fetch-subs.py" "{notify_message}" """)
+
+        self.chromium_window_id = search_chromium_window_id()
+
+        #self.chromium_window_id = None # test
+
+        #if self.chromium_window_id == None:
+        #    logger_print(f"no existing chromium window was found. creating a new chromium window")
+
+        logger_print(f"creating a new chromium tab")
+
+        sleep_seconds = 5
+        notify_message = f"creating a new chromium window"
+        notify_send(f"""notify-send -t {sleep_seconds}000 -u normal -e "fetch-subs.py" "{notify_message}" """)
+
+        self.scraper_tab_html = (
+            "<html>\n"
+            "<head>\n"
+            "<title>scraper tab</title>\n"
+            "<style>\n"
+            # darkreader fails on data urls, so we enable darkmode here
+            "@media (prefers-color-scheme: dark) {\n"
+            "body { background: black; color: white; }\n"
+            "}\n"
+            "</style>\n"
+            "</head>\n"
+            "<body>\n"
+            "<h1>scraper tab</h1>\n"
+            "<p>this is an empty tab for web scraping</p>\n"
+            "<p>please do nothing here while the scraper is running</p>\n"
+            "<p>close this tab when the scraper is done</p>\n"
+            "</body>\n"
+            "</html>\n"
+        )
+
+        # create a new tab
+        # https://developer.mozilla.org/en-US/docs/web/http/basics_of_http/data_urls
+        url = "data:text/html;charset=utf-8," + urllib.parse.quote(self.scraper_tab_html)
+        args = ["chromium", url]
+        subprocess.run(
+            args,
+            capture_output=True,
+            check=True,
+        )
+        await asyncio.sleep(5) # TODO dynamic
+
+        if self.chromium_window_id == None:
+            # search for the created chromium window
+            self.chromium_window_id = search_chromium_window_id()
+
+        if self.chromium_window_id == None:
+            raise Exception("failed to create a new chromium window")
+
+        logger_print("chromium_window_id", self.chromium_window_id)
+
+        logger_print("chromium_window_geometry", repr(xdotool(f"getwindowgeometry {self.chromium_window_id}")))
+        # Window 52428803
+        #   Position: 0,0 (screen: 0)
+        #   Geometry: 1920x1040
+        # -> already maximized
+        chromium_window_size = list(map(int, xdotool(f"getwindowgeometry {self.chromium_window_id}").split("\n")[-1].split(" ")[3].split("x")))
+
+        logger_print("focussing the chromium window")
+        # TODO is "windowfocus" enough?
+        #xdotool(f"windowfocus --sync {self.chromium_window_id}")
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        await asyncio.sleep(3) # TODO dynamic
+
+        maximized_window_size = [1920, 1040]
+
+        if chromium_window_size != maximized_window_size:
+            logger_print("maximizing the chromium window")
+            # https://askubuntu.com/questions/703628/how-to-close-minimize-and-maximize-a-specified-window-from-terminal
+            #xdotool(f"windowsize {self.chromium_window_id} 100% 100%") # not working
+            wmctrl(f"-ir {self.chromium_window_id} -b add,maximized_vert,maximized_horz")
+            await asyncio.sleep(3) # TODO dynamic
+
+        #print("xdotool.get_window_geometry()", xdotool.get_window_geometry())
+        logger_print("chromium_window_geometry", repr(xdotool(f"getwindowgeometry {self.chromium_window_id}")))
+
+        logger_print("opening chromium devtools")
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        xdotool(f"key control+I")
+        await asyncio.sleep(3) # TODO dynamic
+
+        # TODO automatically find the positions from a screenshot
+        self.chromium_devtools_top_y = 930
+
+        # TODO automatically find the positions from a screenshot
+        self.chromium_devtools_network_tab_pos = f"620 {self.chromium_devtools_top_y + 20}"
+
+        logger_print("opening network tab of chromium devtools")
+        xdotool(f"mousemove {self.chromium_devtools_network_tab_pos}")
+        xdotool(f"click 1") # left click
+        await asyncio.sleep(3) # TODO dynamic
+
+        # TODO automatically find the positions from a screenshot
+        self.chromium_devtools_toolbar_y = self.chromium_devtools_top_y + 60
+
+        # TODO automatically find the positions from a screenshot
+        self.chromium_devtools_network_tab_start_stop_log_pos = f"25 {self.chromium_devtools_toolbar_y}" # the "start/stop network log" button
+
+        # network logging is enabled by default
+        logger_print("stopping network logging")
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        xdotool(f"mousemove {self.chromium_devtools_network_tab_start_stop_log_pos}")
+        xdotool(f"click 1") # left click
+        await asyncio.sleep(1)
+
+        # TODO automatically find the positions from a screenshot
+        # manually find position:
+        # while true; do xdotool getmouselocation; sleep 0.5; done
+        self.chromium_address_bar_pos = "800 80"
+        self.chromium_reload_page_pos = "130 80"
+        self.chromium_devtools_network_tab_export_har_pos = f"780 {self.chromium_devtools_toolbar_y}" # the "export HAR" button
+        self.chromium_devtools_network_tab_clear_log_pos = f"65 {self.chromium_devtools_toolbar_y}" # the "clear network log" button
+        self.chromium_saving_har_file_pos = f"1850 {self.chromium_devtools_toolbar_y}" # the "saving HAR file" status icon
+
+        # TODO more + dynamic learning of screenshot hashes
+        self.screenshot_hashes = {
+            # "X" = loading, click to stop loading
+            "loading": set([
+                bytes.fromhex("d77321bb9a8d0b6725b83f04fc1e0ff8bf99b2be"),
+            ]),
+            # "O" = done loading, click to reload
+            "done_loading": set([
+                bytes.fromhex("6dbac9c6970f81aa78cd983214bf20488cbfb9c1"),
+            ]),
+            "done_saving_har_file": set([
+                # this is just black (background in darkmode)
+                # when the har file is being saved
+                # then there is a red square "stop" symbol, next to a progress bar
+                # this is only visible for large har files
+                bytes.fromhex("8ea5cf7fbe847958705fc069903e8889806adbf2"),
+            ])
+        }
+
+        return self
+
+    async def get_response(
+            self,
+            url,
+            return_har=False,
+            return_har_path=False,
+            keep_page_open=False,
+        ):
+
+        """
+        send request and get response
+
+        focus the chromium window
+        (todo: stop loading the previous request)
+        clear the network log
+        load the url
+        take screenshots of the reload/stop icon
+        wait until the page is loaded
+        export the network traffic as HAR file
+        parse the HAR file to extract response_status and response_text
+
+        TODO handle file downloads saved to ~/Downloads/
+        also parse the HAR file? seems a waste of memory, at least on success
+        on error, we also want response_status and response_headers
+        """
+
+        # global: get_screenshot
+        # global: sha1sum
+        # global: datetime_str
+        # global: random_hash
+        # global: tempdir
+        # global: logger
+        # global: xdotool
+        # global: logger_print
+
+        # TODO implement POST requests. probably via the javascript console
+
+        # TODO make this return a "response" object?
+        # similar to other http client libraries: requests, aiohttp, ...
+
+        logger_print(f"focussing the chromium window")
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        sleep_seconds = 10
+        notify_message = f"opening url: {url}"
+        logger_print(notify_message)
+        notify_send(f"""notify-send -t {sleep_seconds}000 -u normal -e "fetch-subs.py" "{notify_message}" """)
+
+        # TODO stop previous request if it is still loading. check screenshot of self.chromium_reload_page_pos
+
+        logger_print("clearing the network log")
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        xdotool(f"mousemove {self.chromium_devtools_network_tab_clear_log_pos}")
+        xdotool(f"click 1") # left click
+        await asyncio.sleep(1)
+
+        logger_print("starting network logging")
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        xdotool(f"mousemove {self.chromium_devtools_network_tab_start_stop_log_pos}")
+        xdotool(f"click 1") # left click
+
+        # open the url
+        if False:
+            # no. this creates a new tab
+            # but we want to re-use one tab with chromium devtools
+            args = ["chromium", url]
+            subprocess.run(
+                args,
+                capture_output=True,
+                check=True,
+            )
+
+        await clipboard_set_text(url)
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        xdotool(f"mousemove {self.chromium_address_bar_pos}")
+        xdotool(f"click 1") # left click
+        # paste the url with control+v
+        xdotool(f"key control+l control+v return")
+        # TODO copy-paste via clipboard?
+        # TODO escape url or better: use subprocess.run(["xdotool", "type", "..."])
+        #await asyncio.sleep(sleep_seconds) # TODO dynamic
+
+        # wait for page load
+        logger_print("waiting for page load ...")
+        # TODO handle timeout
+        # debug
+        logger_print("expected screenshot hashes:")
+        for screenshot_hash in self.screenshot_hashes["done_loading"]:
+            logger_print(f"  {screenshot_hash.hex()}")
+        await asyncio.sleep(1)
+        for i in range(30):
+            screenshot_path = get_screenshot(center_pos=self.chromium_reload_page_pos)
+            screenshot_hash = sha1sum(screenshot_path)
+            logger_print("screenshot_hash", screenshot_hash.hex())
+            os.unlink(screenshot_path)
+            if screenshot_hash in self.screenshot_hashes["done_loading"]:
+                break
+            await asyncio.sleep(1)
+        logger_print("waiting for page load done")
+
+        # save output file
+        if False:
+            # save html file
+            # use a random path to avoid the "file exists" dialog
+            html_file_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.html"
+            sleep_seconds = 5
+            notify_message = f"saving html to {html_file_path}"
+            logger_print(notify_message)
+            notify_send(f"""notify-send -t {sleep_seconds}000 -u normal -e "fetch-subs.py" "{notify_message}" """)
+            await clipboard_set_text(html_file_path)
+            xdotool(f"windowactivate --sync {self.chromium_window_id}")
+            xdotool(f"key control+s")
+            await asyncio.sleep(5) # TODO dynamic
+            xdotool(f"key control+a control+v return")
+
+        # save har file
+        # note: file extension must be ".har" otherwise chromium will add ".har"
+        har_file_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.har"
+        logger_print(f"exporting har file to {har_file_path}")
+        await clipboard_set_text(har_file_path)
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        xdotool(f"mousemove {self.chromium_devtools_network_tab_export_har_pos}")
+        xdotool(f"click 1") # left click
+        await asyncio.sleep(5) # TODO dynamic
+        xdotool(f"key control+a control+v return")
+        # wait for the har file
+        if False:
+            # old code
+            # chromium needs some time before it starts saving the har file
+            await asyncio.sleep(5)
+            # TODO handle timeout
+            # debug
+            logger_print("expected screenshot hashes:")
+            for screenshot_hash in self.screenshot_hashes["done_saving_har_file"]:
+                logger_print(f"  {screenshot_hash.hex()}")
+            await asyncio.sleep(1)
+            for i in range(30):
+                screenshot_path = get_screenshot(center_pos=self.chromium_saving_har_file_pos)
+                screenshot_hash = sha1sum(screenshot_path)
+                logger_print("screenshot_hash", screenshot_hash.hex())
+                os.unlink(screenshot_path)
+                if screenshot_hash in self.screenshot_hashes["done_saving_har_file"]:
+                    logger_print("done saving the har file")
+                    break
+                await asyncio.sleep(1)
+        # wait for chromium to start writing the har file
+        while True:
+            if os.path.exists(har_file_path):
+                break
+            await asyncio.sleep(1)
+        # wait for chromium to finish writing the har file
+        previous_size = 0
+        har = None
+        while True:
+            await asyncio.sleep(1)
+            size = os.path.getsize(har_file_path)
+            logger_print("har file size:", size)
+            if size != previous_size:
+                previous_size = size
+                continue
+            # constant size is not enough. also try to parse it
+            with open(har_file_path, "r") as har_file:
+                try:
+                    har = json.load(har_file)
+                    break
+                except json.decoder.JSONDecodeError:
+                    logger_print("failed to parse json in har file:", har_file_path)
+                    continue
+        # parse the HAR file
+        # see also chrome-example-har-file.json
+        response_har = None
+        response_har_path = None
+        if return_har_path:
+            response_har_path = har_file_path
+        #with open(har_file_path, "r") as har_file:
+        #    har = json.load(har_file)
+        if return_har:
+            response_har = har
+        if not "log" in har:
+            raise NotImplementedError(f"failed to parse har file: {har_file_path}")
+        if not "entries" in har["log"] or len(har["log"]["entries"]) == 0:
+            raise NotImplementedError(f"no entries in har file: {har_file_path}")
+            #raise NotImplementedError(f"not found response in har file: {har_file_path}")
+        har_entry = har["log"]["entries"][0]
+        if har_entry["request"]["url"] != url:
+            logger_print(f"url =", repr(url))
+            logger_print(f"har_entry request url =", repr(har_entry["request"]["url"]))
+            logger_print(f"har_entry request queryString =", repr(har_entry["request"]["queryString"]))
+            raise NotImplementedError(f"unexpected url in har file: {har_file_path}")
+        # validate
+        if not "response" in har_entry:
+            raise NotImplementedError(f"missing response in har file: {har_file_path}")
+        if not "content" in har_entry["response"]:
+            raise NotImplementedError(f"missing response content in har file: {har_file_path}")
+        if not "text" in har_entry["response"]["content"]:
+            raise NotImplementedError(f"missing response text in har file: {har_file_path}")
+        # finally: set status and response_text
+        response_status = har_entry["response"]["status"]
+        response_type = har_entry["response"]["content"]["mimeType"]
+        response_headers = har_entry["response"]["headers"]
+        # TODO handle binary response
+        response_text = har_entry["response"]["content"]["text"]
+        # validate
+        # note: size is the byte size == len(response_text.encode("utf8"))
+        # not the number of characters == len(response_text)
+        if har_entry["response"]["content"]["size"] != len(response_text.encode("utf8")):
+            logger_print(f"len(response_text) =", len(response_text.encode("utf8")))
+            logger_print(f"har_entry request content size =", repr(har_entry["response"]["content"]["size"]))
+            raise NotImplementedError(f"unexpected response text size in har file: {har_file_path}")
+
+        # delete har file
+        # TODO allow to keep the har file for debugging
+        if return_har_path == False:
+            os.unlink(har_file_path)
+
+        #raise NotImplementedError
+
+        #await asyncio.sleep(5) # TODO dynamic
+
+        logger_print("stopping network logging")
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        xdotool(f"mousemove {self.chromium_devtools_network_tab_start_stop_log_pos}")
+        xdotool(f"click 1") # left click
+        await asyncio.sleep(1)
+
+        logger_print("clearing the network log")
+        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        xdotool(f"mousemove {self.chromium_devtools_network_tab_clear_log_pos}")
+        xdotool(f"click 1") # left click
+
+        # done. close the page
+        if keep_page_open == False:
+            url = "data:text/html;charset=utf-8," + urllib.parse.quote(self.scraper_tab_html)
+            clipboard_set_text(url)
+            xdotool(f"windowactivate --sync {self.chromium_window_id}")
+            xdotool(f"mousemove {self.chromium_address_bar_pos}")
+            xdotool(f"click 1") # left click
+            # paste the url with control+v
+            xdotool(f"key control+l control+v return")
+
+        response = self.Response(
+            response_status,
+            self.Headers(response_headers),
+            response_type,
+            response_text,
+            response_har,
+            response_har_path,
+        )
+
+        return response
+
 
 
 async def main():
 
     global user_agents
+    global chromium_headful_scraper
 
     if options.proxy_provider == "zenrows.com":
+
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+    elif options.proxy_provider == "chromium":
+
+        chromium_headful_scraper = await ChromiumHeadfulScraper()
+
     elif options.proxy_provider == "pyppeteer":
-        # puppeteer is old, chrome only, but stealth plugin works?
+
+        #sys.path.append("pyppeteer") # local version https://github.com/pyppeteer/pyppeteer/pull/16
+        logger_print("import pyppeteer")
         import pyppeteer
+        logger_print("pyppeteer", pyppeteer)
+
         # https://github.com/towry/n/issues/148
         # https://pypi.org/project/pyppeteer-stealth/
         # https://github.com/MeiK2333/pyppeteer_stealth
         sys.path.append("pyppeteer_stealth") # local version
+        logger_print("import pyppeteer_stealth")
         import pyppeteer_stealth
         logger_print("pyppeteer_stealth", pyppeteer_stealth)
-        # TODO test sites:
-        # https://abrahamjuliot.github.io/creepjs/
-        # http://f.vision/
-        # via https://github.com/QIN2DIM/undetected-playwright/issues/2
 
         logger_print("pyppeteer.launch")
         pyppeteer_browser = await pyppeteer.launch(
             # https://pptr.dev/api/puppeteer.puppeteerlaunchoptions
             headless=pyppeteer_headless,
+            # path to /bin/chromium
+            # chrome binaries from ~/.cache/puppeteer/chrome are not working on nixos linux
+            # ldd ~/.cache/puppeteer/chrome/linux-*/chrome-linux/chrome | grep "not found"
             executablePath=os.environ["PUPPETEER_EXECUTABLE_PATH"],
             args=[
                 # no effect
@@ -1036,25 +1745,24 @@ async def main():
         pyppeteer_page = await pyppeteer_browser.newPage()
 
         # TODO why is this not working?
+        # selenium-detector still says "detected"
+        # opensubtitles.org hangs at the cloudflare portal
+        # only bot.sannysoft.com says "ok"
         logger_print("pyppeteer_stealth.stealth")
         await pyppeteer_stealth.stealth(pyppeteer_page)
 
-        for url, path in [
-            ('https://hmaker.github.io/selenium-detector/', 'chrome_headless_stealth.selenium-detector.png'),
-            ('https://bot.sannysoft.com/', 'chrome_headless_stealth.bot.sannysoft.com.png'), # outdated
-            #('https://whatsmyuseragent.org/', 'chrome_headless_stealth.whatsmyuseragent.org.png'),
-            #("https://dl.opensubtitles.org/en/download/sub/9184234", 'chrome_headless_stealth.dl.opensubtitles.org.png'),
-            ('https://abrahamjuliot.github.io/creepjs/', 'chrome_headless_stealth.creepjs.png'),
-            ('http://f.vision/', 'chrome_headless_stealth.fake-vision.png'),
-        ]:
+        for url, path, sleep in [
+            ('https://hmaker.github.io/selenium-detector/', 'chrome_headless_stealth.selenium-detector.png', 0), # wrong result?
+            ('https://bot.sannysoft.com/', 'chrome_headless_stealth.bot.sannysoft.com.png', 0), # outdated?
+            ('https://abrahamjuliot.github.io/creepjs/', 'chrome_headless_stealth.creepjs.png', 10),
+            ('http://f.vision/', 'chrome_headless_stealth.fake-vision.png', 0),
+            ('https://www.opensubtitles.org/en/search/subs', 'chrome_headless_stealth.opensubtitles-search-subs.png', 60),
+        ][-1:]:
+            logger_print("pyppeteer_page.goto", url)
             await pyppeteer_page.goto(url)
-            if url == 'https://abrahamjuliot.github.io/creepjs/':
-                #for i in range(3):
-                #    await asyncio.sleep(10)
-                #    await pyppeteer_page.screenshot(path=path + f".{(i + 1) * 10}.png", fullPage=True)
-                await asyncio.sleep(10)
+            await asyncio.sleep(sleep)
+            logger_print("pyppeteer_page.screenshot", path)
             await pyppeteer_page.screenshot(path=path, fullPage=True)
-            logger_print(f"done: {path}")
 
         #await pyppeteer_browser.close()
 
@@ -1119,7 +1827,7 @@ async def main():
     #if options.first_num and num_stack_last < (options.first_num - 1):
     #    num_stack_last = options.first_num - 1
     if options.first_num and num_stack_first < options.first_num:
-        logger.info(f"raising num_stack_first {num_stack_first} to options.first_num {options.first_num}")
+        logger_print(f"raising num_stack_first {num_stack_first} to options.first_num {options.first_num}")
         num_stack_first = options.first_num
     #else:
     #    num_stack_first = num_stack_last
@@ -1169,21 +1877,45 @@ async def main():
         async with aiohttp.ClientSession(**aiohttp_kwargs) as aiohttp_session:
 
             if options.last_num == None:
-                logger.info(f"getting options.last_num from remote")
+                logger_print(f"getting options.last_num from remote")
                 url = "https://www.opensubtitles.org/en/search/subs"
-                # TODO use proxy
-                response = await aiohttp_session.get(url)
-                status_code = response.status
-                # status_code can be 429 Too Many Requests -> fatal error
-                if options.proxy_provider == None and status_code == 429:
-                    logger.info(f"/en/search/subs 429 Too Many Requests -> fatal error")
+
+                response_status = None
+                response_text = None
+
+                if options.proxy_provider == None:
+                    response = await aiohttp_session.get(url)
+                    response_status = response.status
+                    response_type = response.headers.get("Content-Type")
+                    # TODO response_headers?
+                    # TODO handle binary response
+                    response_text = await response.text()
+
+                elif options.proxy_provider == "chromium":
+                    response = await chromium_headful_scraper.get_response(url)
+                    response_status = response.status
+                    response_type = response.headers.get("Content-Type")
+                    # TODO handle binary response
+                    response_text = await response.text()
+
+                else:
+                    raise NotImplementedError(f"options.proxy_provider {options.proxy_provider}")
+
+                # response_status can be 429 Too Many Requests -> fatal error
+                if response_status == 403:
+                    if response_text.startswith("""<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="/cdn-cgi/styles/challenges.css" rel="stylesheet"></head><body class="no-js"><div class="main-wrapper" role="main"><div class="main-content"><noscript><div id="challenge-error-title"><div class="h2"><span class="icon-wrapper"><div class="heading-icon warning-icon"></div></span><span id="challenge-error-text">Enable JavaScript and cookies to continue</span></div></div></noscript></div></div><script>(function(){window._cf_chl_opt="""):
+                        logger_print(f"/en/search/subs 403 Access Denied [blocked by cloudflare] -> fatal error")
+                        sys.exit(1)
+                    logger_print(f"/en/search/subs 403 Access Denied -> fatal error")
                     sys.exit(1)
-                if options.proxy_provider == None and status_code == 503:
-                    logger.info(f"/en/search/subs 503 Service Unavailable -> fatal error")
+                if response_status == 429:
+                    logger_print(f"/en/search/subs 429 Too Many Requests -> fatal error")
                     sys.exit(1)
-                assert status_code == 200, f"unexpected status_code {status_code}"
-                content_type = response.headers.get("Content-Type")
-                assert content_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
+                if response_status == 503:
+                    logger_print(f"/en/search/subs 503 Service Unavailable -> fatal error")
+                    sys.exit(1)
+                assert response_status == 200, f"unexpected response_status {response_status}"
+                assert response_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
                 remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', await response.text())
                 logger.debug(f"remote_nums {repr(remote_nums)}")
                 options.last_num = max(map(int, remote_nums))
@@ -1192,18 +1924,19 @@ async def main():
             if options.show_ip_address:
                 url = "https://httpbin.org/ip"
                 # TODO use proxy
+                # no? no need to use proxy?
                 response = None
-                status_code = None
+                response_status = None
                 for retry_step in range(20):
                     response = await aiohttp_session.get(url)
-                    status_code = response.status
-                    if status_code == 200:
+                    response_status = response.status
+                    if response_status == 200:
                         break
-                    # status_code example: 504
-                    logger_print(f"unexpected status_code {status_code} -> retry")
-                    time.sleep(5)
-                content_type = response.headers.get("Content-Type")
-                assert content_type == "application/json", f"unexpected content_type {repr(content_type)}"
+                    # response_status example: 504
+                    logger_print(f"unexpected response_status {response_status} -> retry")
+                    await asyncio.sleep(5)
+                response_type = response.headers.get("Content-Type")
+                assert response_type == "application/json", f"unexpected content_type {repr(content_type)}"
                 response_data = json.loads(await response.text())
                 logger_print(f"IP address: {response_data.get('origin')}")
 
@@ -1233,11 +1966,11 @@ async def main():
                 #num_stack_first = num_stack_last + 1
 
                 if options.last_num and num_stack_last > options.last_num:
-                    logger.info(f"lowering num_stack_last {num_stack_last} to options.last_num {options.last_num}")
+                    logger_print(f"lowering num_stack_last {num_stack_last} to options.last_num {options.last_num}")
                     num_stack_last = options.last_num
-                logger.info(f"stack range: ({num_stack_first}, {num_stack_last})")
+                logger_print(f"stack range: ({num_stack_first}, {num_stack_last})")
                 if num_stack_last < num_stack_first:
-                    logger.info(f"stack range is empty")
+                    logger_print(f"stack range is empty")
                     break
                 def filter_num(num):
                     return (
@@ -1251,9 +1984,9 @@ async def main():
                         #random.sample(range(num_stack_first, options.last_num + 1), options.sample_size)
                     )
                 )
-                logger.info(f"num_stack_expand: {repr(num_stack_expand)}")
+                logger_print(f"num_stack_expand: {repr(num_stack_expand)}")
                 #if len(num_stack_expand) == 0:
-                #    logger.info(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
+                #    logger_print(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
                 #    break
                 num_stack += num_stack_expand
 
@@ -1266,7 +1999,7 @@ async def main():
                     break
 
             if len(num_stack) == 0:
-                logger.info(f"done all nums until {options.last_num}")
+                logger_print(f"done all nums until {options.last_num}")
                 raise SystemExit
 
             logger.debug(f"num_stack: {num_stack}")
@@ -1275,14 +2008,14 @@ async def main():
             if options.num_downloads:
                 num_remain = options.num_downloads - num_downloads_done
                 if num_remain <= 0:
-                    logger.info(f"done {options.num_downloads} nums")
+                    logger_print(f"done {options.num_downloads} nums")
                     raise SystemExit
-                logger.info(f"done: {num_downloads_done}. remain: {num_remain}")
+                logger_print(f"done: {num_downloads_done}. remain: {num_remain}")
                 num_stack = num_stack[0:num_remain]
                 logger.debug(f"num_stack: {num_stack}")
 
-            logger.info(f"batch size: {len(num_stack)}")
-            logger.info(f"batch: {num_stack}")
+            logger_print(f"batch size: {len(num_stack)}")
+            logger_print(f"batch: {num_stack}")
 
             tasks = []
             while num_stack:
@@ -1315,13 +2048,13 @@ async def main():
                         do_change_ipaddr = True
 
             if do_change_ipaddr:
-                logger.info("changing IP address")
+                logger_print("changing IP address")
                 change_ipaddr()
 
             if pause_scraper:
                 t_sleep = random.randrange(20, 60)
-                logger.info(f"pausing scraper for {t_sleep} seconds")
-                time.sleep(t_sleep)
+                logger_print(f"pausing scraper for {t_sleep} seconds")
+                await asyncio.sleep(t_sleep)
                 # reset t2 values
                 while t2_download_list:
                     t2_download_list.pop()
