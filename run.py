@@ -23,8 +23,13 @@ zipfiles_table_name = "subz"
 zipfile_names_table_name = "zipfile_names"
 zipfile_names_parsed_table_name = "zipfile_names_parsed"
 
+# rebuild table: opensubs-metadata-rebuild-metadata.sh
 # https://dl.opensubtitles.org/addons/export/
 # https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
+# TODO incremental update with day/week/month release
+# https://dl.opensubtitles.org/addons/export/subtitles_day.txt.gz
+# https://dl.opensubtitles.org/addons/export/subtitles_week.txt.gz
+# https://dl.opensubtitles.org/addons/export/subtitles_month.txt.gz
 subtitles_all_txt_gz_path = "opensubtitles.org.Actually.Open.Edition.2022.07.25/subtitles_all.txt.gz"
 subtitles_all_table_name = "subz_metadata" # TODO rename to subtitles_all
 
@@ -82,7 +87,7 @@ else:
     print(f"building table {table_name} ...")
     args = [
         sys.executable, # python exe
-        "subtitles_all/subtitles_all.txt.gz-parse.py",
+        "subtitles_all.txt.gz-parse.py",
         metadata_db_path,
         table_name,
         subtitles_all_txt_gz_path,
