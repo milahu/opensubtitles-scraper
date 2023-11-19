@@ -1,3 +1,7 @@
+# TODO add timeout. usually the scraper runs only about 30 seconds
+# add timeout at 2 minutes?
+# worst case so far was 4 hours (deadloop)
+
 # TODO these limits apply only to private repos?
 
 # https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions#included-storage-and-minutes
