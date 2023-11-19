@@ -63,3 +63,7 @@ videos:
 
 - https://asciinema.org/a/6fG6TXEkF3UOOL0qu8tivViXF
 - [docs/fetch-subs.py.cast](docs/fetch-subs.py.cast)
+
+## todo
+
+- write an API server as a replacement for opensubtitles.org, so in a local network, one computer (with large hard drives) can store the subtitles database and the IMDB movies database, and serve queries from other "thin clients" on the network
