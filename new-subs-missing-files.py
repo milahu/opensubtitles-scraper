@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 input_dir = "new-subs"
+#input_dir = "new-subs-todo"
 
 import os
 
