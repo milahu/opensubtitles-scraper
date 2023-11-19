@@ -56,11 +56,23 @@ assert os.path.exists(subtitles_all_txt_gz_path), "error: missing input file"
 
 assert has_table(metadata_db_path, table_name) == False, f"error: output table exists: {table_name}"
 
-sqlite_connection = sqlite3.connect(metadata_db_path)
+sqlite_connection = sqlite3.connect(
+    metadata_db_path,
+    # https://www.sqlite.org/lang_transaction.html#deferred_immediate_and_exclusive_transactions
+    # EXCLUSIVE is similar to IMMEDIATE in that a write transaction is started immediately.
+    # EXCLUSIVE and IMMEDIATE are the same in WAL mode, but in other journaling modes,
+    # EXCLUSIVE prevents other database connections from reading the database while the transaction is underway.
+    #isolation_level="EXCLUSIVE",
+)
 # default: rows are tuples
 sqlite_connection.row_factory = sqlite3.Row # rows are dicts
 sqlite_cursor = sqlite_connection.cursor()
 
+# default header of ".dump" command
+sqlite_cursor.execute("PRAGMA foreign_keys=OFF")
+
+# BEGIN TRANSACTION -> ... -> COMMIT
+#sqlite_cursor.execute("BEGIN TRANSACTION")
 
 if has_table(metadata_db_path, table_name_tmp):
     print(f"deleting tmp table {table_name_tmp}")
@@ -94,43 +106,47 @@ idx_IDSubtitle = col_names.index("IDSubtitle")
 idx_MovieName = col_names.index("MovieName")
 idx_MovieReleaseName = col_names.index("MovieReleaseName")
 
-col_exprs = [
-    r"\d{1,7}", # 1 = IDSubtitle. between 1 and 9180517
-    r".*", # 2 = MovieName
-    r"\d{0,4}", # 3 = MovieYear. can be empty or 0 or 1 or 666 or ...
-    r".*", # 4 = LanguageName
-    r"([a-z]{2})?", # 5 = ISO639 = LanguageCode
-    r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", # 6 = SubAddDate. example: 2006-11-19 04:26:07
-    r"\d*", # 7 = ImdbID
-    r"(srt|sub|txt|mpl|smi|ssa|tmp|vtt|oth|)", # 8 = SubFormat # TODO more
-    r"\d+", # 9 = SubSumCD
-    None, # r".*", # 10 = MovieReleaseName. can contain "\t" -> parse until next valid field
-    r"\d{1,3}\.\d{3}", # 11 = MovieFPS. values: 0.000 15.000 23.000 23.976 23.977 23.980 24.000 25.000 29.970 30.000
-    r"\d*", # 12 = SeriesSeason
-    r"\d*", # 13 = SeriesEpisode
-    r"\d*", # 14 = SeriesIMDBParent
-    r"(movie|tv)", # 15 = MovieKind # TODO more
-    r"http://www.opensubtitles.org/subtitles/\d+/.*", # 16 = URL
-]
+# done?
+# TODO list -> dict
+col_exprs = {
+    "IDSubtitle": r"\d{1,9}", # between 1 and 9180517
+    "MovieName": r".*",
+    "MovieYear": r"\d{0,4}", # can be empty or 0 or 1 or 666 or ...
+    "LanguageName": r".*",
+    "ISO639": r"([a-z]{2})?", # Language Code
+    "SubAddDate": r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", # example: 2006-11-19 04:26:07
+    "ImdbID": r"\d*",
+    "SubFormat": r"(srt|sub|txt|mpl|smi|ssa|tmp|vtt|oth|)", # TODO more
+    "SubSumCD": r"\d+",
+    "MovieReleaseName": None, # can contain "\t" -> parse until next valid field
+    "MovieFPS": r"\d{1,3}\.\d{3}", # values: 0.000 15.000 23.000 23.976 23.977 23.980 24.000 25.000 29.970 30.000
+    "SeriesSeason":r"\d*",
+    "SeriesEpisode": r"\d*",
+    "SeriesIMDBParent": r"\d*",
+    "MovieKind": r"(movie|tv)", # TODO more
+    "URL": r"http://www.opensubtitles.org/subtitles/\d+/.*",
+}
+
+col_exprs_list = list(col_exprs.values())
 
 # expected count:
 # $ ./opensubs.db-count.sh 
 # 5719123 opensubtitles_dump_client/index.txt
-# actual count with col_exprs[0:6]: ID, name, year, languageName, languageCode, date
+# actual count with col_exprs_list[0:6]: ID, name, year, languageName, languageCode, date
 # $ grep -P '^\d{1,7}\t.+\t\d{4}\t.+\t[a-z]{2}\t\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}' subtitles_all.txt | wc -l
 # 5706193
-# actual count with col_exprs[0:5]: ID, name, year, languageName, languageCode
+# actual count with col_exprs_list[0:5]: ID, name, year, languageName, languageCode
 # $ grep -P '^\d{1,7}\t.+\t\d{4}\t.+\t[a-z]{2}' subtitles_all.txt | wc -l
 # 5706223 # max?
-# actual count with col_exprs[0:4]: ID, name, year, languageName
+# actual count with col_exprs_list[0:4]: ID, name, year, languageName
 # $ grep -P '^\d{1,7}\t.+\t\d{4}\t.+' subtitles_all.txt | wc -l
 # 5706223 # max?
-# actual count with col_exprs[0:3]: ID, name, year
+# actual count with col_exprs_list[0:3]: ID, name, year
 # $ grep -P '^\d{1,7}\t.+\t\d{4}' subtitles_all.txt | wc -l
 # 5729486 # too much? more than 5719123
 # $ diff -u <(grep -P '^\d{1,7}\t.+\t\d{4}\t.+' subtitles_all.txt) <(grep -P '^\d{1,7}\t.+\t\d{4}' subtitles_all.txt) >count.diff
-#line_start_expr = r"\t".join(col_exprs[0:6])
-line_start_expr = r"^" + r"\t".join(col_exprs[0:5]) + r"\t"
+#line_start_expr = r"\t".join(col_exprs_list[0:6])
+line_start_expr = r"^" + r"\t".join(col_exprs_list[0:5]) + r"\t"
 #print("line_start_expr", line_start_expr); sys.exit()
 
 # TODO assert
@@ -140,33 +156,36 @@ line_start_expr = r"^" + r"\t".join(col_exprs[0:5]) + r"\t"
 # 0a
 # $ printf "\n" | xxd -ps
 # 0a
-line_end_expr = r"\t" + r"\t".join(col_exprs[-1:]) + r"\n$"
+line_end_expr = r"\t" + r"\t".join(col_exprs_list[-1:]) + r"\n$"
 
 # get all language names
 # $ grep -P '^\d{1,7}\t.+\t\d{4}\t.+\t[a-z]{2}' subtitles_all.txt | cut -d$'\t' -f4 | grep . | sort | uniq >subtitles_all.txt-language-names.txt
 
-col_types = [
-    int, # 1 = IDSubtitle
-    str, # 2 = MovieName
-    int, # 3 = MovieYear
-    str, # 4 = LanguageName
-    str, # 5 = ISO639 = LanguageCode
-    str, # 6 = SubAddDate. example: 2006-11-19 04:26:07
-    int, # 7 = ImdbID
-    str, # 8 = SubFormat # TODO more
-    int, # 9 = SubSumCD
-    str, # 10 = MovieReleaseName
-    float, # 11 = MovieFPS. default: 0.000. other values: 23.976
-    int, # 12 = SeriesSeason
-    int, # 13 = SeriesEpisode
-    int, # 14 = SeriesIMDBParent
-    str, # 15 = MovieKind # TODO more
-    str, # 16 = URL
-]
+# done?
+# TODO list -> dict
+col_types = {
+    "IDSubtitle": int,
+    "MovieName": str,
+    "MovieYear": int,
+    "LanguageName": str,
+    "ISO639": str,
+    "SubAddDate": str,
+    "ImdbID": int,
+    "SubFormat": str,
+    "SubSumCD": int,
+    "MovieReleaseName": str,
+    "MovieFPS": float,
+    "SeriesSeason": int,
+    "SeriesEpisode": int,
+    "SeriesIMDBParent": int,
+    "MovieKind": str,
+    "URL": str,
+}
 
 col_names_types = []
 for idx, col_name in enumerate(col_names):
-    col_type = col_types[idx]
+    #col_type = col_types[idx]
+    col_type = col_types[col_name]
     sql_type = ""
     if col_type == int:
         sql_type = "INTEGER"
@@ -183,7 +202,7 @@ for idx, col_name in enumerate(col_names):
 create_query = f"CREATE TABLE IF NOT EXISTS {table_name_tmp} (\n  "
 create_query += ",\n  ".join(col_names_types)
 create_query += "\n)"
-print(create_query); raise NotImplementedError("todo")
+#print(create_query); raise NotImplementedError("todo")
 sqlite_cursor.execute(create_query)
 
 t1 = time.time()
@@ -279,8 +298,9 @@ with (
         def parse_column(idx, raw_col):
             global col_names, col_exprs, col_types, raw_cols, parsed_cols, parse_failed
             col_name = col_names[idx]
-            col_expr = col_exprs[idx]
-            col_type = col_types[idx]
+            col_expr = col_exprs_list[idx]
+            #col_type = col_types[idx]
+            col_type = col_types[col_name]
             # re.match: match from start of string
             # re.fullmatch: match from start to end of string
             if re.fullmatch(col_expr, raw_col):
@@ -339,6 +359,9 @@ sqlite_cursor.execute(f"""
 
 if create_tmp_table:
     sqlite_cursor.execute(f"ALTER TABLE {table_name_tmp} RENAME TO {table_name}")
+
+# BEGIN TRANSACTION -> ... -> COMMIT
+#sqlite_cursor.execute("COMMIT")
 
 sqlite_connection.commit()
 sqlite_connection.close()
