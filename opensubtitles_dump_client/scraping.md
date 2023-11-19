@@ -291,8 +291,7 @@ Return HTML efficiently from any website using a single API.
 free: requires "Payment Info"
 2USD: 10K requests
 120USD: 1M requests
-
-
+free: scrapy cloud starter, 1 thread, 1 hour per day
 
 ## expensive proxy providers
 
