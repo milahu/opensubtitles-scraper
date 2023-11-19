@@ -47,6 +47,7 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
         "git",
         "-C", new_subs_dir,
         "branch",
+        "--all", # List both remote-tracking branches and local branches.
     ]
     debug_print(shlex.join(args))
     proc = subprocess.run(
@@ -76,6 +77,7 @@ if not os.path.exists(f"{new_subs_dir}/.git"):
         "git",
         "-C", new_subs_dir,
         "branch",
+        "--all", # List both remote-tracking branches and local branches.
     ]
     debug_print(shlex.join(args))
     proc = subprocess.run(
@@ -110,6 +112,7 @@ args = [
     "git",
     "-C", new_subs_dir,
     "branch",
+    "--all", # List both remote-tracking branches and local branches.
 ]
 debug_print(shlex.join(args))
 proc = subprocess.run(
@@ -177,6 +180,7 @@ args = [
     "git",
     "-C", new_subs_dir,
     "branch",
+    "--all", # List both remote-tracking branches and local branches.
 ]
 debug_print(shlex.join(args))
 proc = subprocess.run(
