@@ -23,7 +23,7 @@ subtitles_all.txt.gz-parse-errors.txt
 done-zips/
 repack-grouped/
 repack.py.log
-secrets.py
+fetch_subs_secrets.py
 *.log
 new-subs-archive.py-sum_files.txt
 new-subs-archive.py-tempdir/
