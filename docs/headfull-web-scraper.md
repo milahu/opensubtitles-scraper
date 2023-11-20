@@ -22,6 +22,23 @@ see also [screen parsing](#screen-parsing)
 - make this run in a headless environment like github CI.
 start an xorg-server with some lightweight desktop manager (example: openbox),
 and on that virtual desktop, create the chromium window
+- allow passive monitoring of the xorg-server via [tigervnc](https://github.com/TigerVNC/tigervnc)
+- allow active control of the xorg-server to solve captchas manually.
+this is a challenge in environments like github CI,
+where we cannot do port-forwarding to expose a public SSH server.
+the scraper needs a way to "call home" to my computer,
+which is running some server with a public port.
+  - similar: reverse shell ssh server
+    - https://medium.com/opsops/getting-reverse-shell-into-dorker-container-6b0e16483bf2
+    - https://www.howtogeek.com/428413/what-is-reverse-ssh-tunneling-and-how-to-use-it/
+    - https://unix.stackexchange.com/questions/46235/how-does-reverse-ssh-tunneling-work
+    - https://stackoverflow.com/questions/11793019/how-to-provide-reverse-ssh-to-a-shell
+  - reverse vnc shell
+    - https://unix.stackexchange.com/questions/82386/remote-desktop-over-ssh-reverse-tunnel-to-replace-teamviewer
+    - https://superuser.com/questions/856969/vnc-over-reverse-ssh-tunnel-or-vpn
+    - https://serverfault.com/questions/1011000/open-source-remote-access-using-vnc-and-reverse-ssh
+  - make my computer reachable via https://www.duckdns.org/
+    - alternative: https://ngrok.com/docs/how-ngrok-works/
 
 
 
