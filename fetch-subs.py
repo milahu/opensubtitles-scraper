@@ -2,7 +2,7 @@
 
 # watch "ls -lt new-subs/ | head"
 
-# FIXME posprocess: fix wrong dcma entries
+# FIXME postprocess: fix wrong dcma entries
 # examples:
 # these files were not processed by new-subs-migrate.py
 # because dcma entries exist in new-subs-repo/files.txt
@@ -87,10 +87,16 @@ import zipfile
 import base64
 import asyncio
 import argparse
+import atexit
+import traceback
+import shlex
+import shutil
+import tempfile
 
 import aiohttp
 import requests
 import magic # libmagic
+import psutil
 
 
 
@@ -183,6 +189,8 @@ new_subs_dir = "new-subs"
 # use tmpfs in RAM to avoid disk writes
 tempdir = "/run/user/1000"
 
+global_remove_files_when_done = []
+
 # https://www.opensubtitles.org/en/search/subs
 # https://www.opensubtitles.org/ # New subtitles
 #options.last_num = 9520468 # 2023-04-25
@@ -222,6 +230,45 @@ parser.add_argument(
         f"proxy provider. "
         f"default: {default_proxy_provider}. "
         f"values: {', '.join(proxy_provider_values)}"
+    ),
+)
+parser.add_argument(
+    '--start-vnc-client',
+    dest="start_vnc_client", # options.start_vnc_client
+    action='store_true',
+    help=(
+        f"start a local vnc client. "
+        f"useful for running the scraper on a local machine. "
+    ),
+)
+parser.add_argument(
+    '--reverse-vnc-servers',
+    dest="vnc_client_list", # options.vnc_client_list
+    default=[],
+    type=str,
+    metavar="S",
+    nargs="*",
+    help=(
+        f"reverse vnc servers. "
+        f"only used with proxy provider \"chromium\". "
+        f"this will try to connect to one of the ssh servers, "
+        f"to create a TCP tunnel between the VNC server and vnc_port on the ssh server. "
+        f"The default vnc_port is 5901. "
+        f"alternative: pass a space-delimited list to the environment variable \"REVERSE_VNC_SERVERS\". "
+        f"format: [user@]host[:ssh_port[:vnc_port]]. "
+        f"example: --reverse-vnc-servers example.com someuser@example2.com:22:1234"
+    ),
+)
+parser.add_argument(
+    '--ssh-id-file',
+    dest="ssh_id_file_path", # options.ssh_id_file_path
+    default=None,
+    type=str,
+    metavar="S",
+    help=(
+        f"ssh id file path. "
+        f"used for \"ssh -i path/to/ssh-id-file\" to connect to a vnc client. "
+        f"example: ~/.ssh/id_rsa"
     ),
 )
 parser.add_argument(
@@ -289,6 +336,8 @@ parser.add_argument(
 )
 #options = parser.parse_args(sys.argv)
 options = parser.parse_args()
+
+options.vnc_client_list += re.split(r"\s+", os.environ.get("REVERSE_VNC_SERVERS", ""))
 
 logging_level = "INFO"
 if options.debug:
@@ -704,6 +753,10 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # FIXME handle file download. where is the file saved?
             # the last html page is the cloudflare portal saying "Proceeding..."
 
+            # TODO handle captchas by cloudflare.
+            # effectively, implement a semiautomatic web scraper
+            # which asks for help from the user to solve captchas
+
             response = await chromium_headful_scraper.get_response(url, return_har_path=True)
             logger_print(f"TODO debug har file: {response.har_path}")
             response_status = response.status
@@ -750,7 +803,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
 
                 # old code
 
-                args = ["chromium", url]
+                args = ["chromium", f"--user-data-dir={self.chromium_user_data_dir}", url]
                 subprocess.run(
                     args,
                     capture_output=True,
@@ -1147,70 +1200,13 @@ def sha1sum(file_path):
     return sha1.digest()
     #print("SHA1: {0}".format(sha1.hexdigest()))
 
-# gui functions
 
-def xdotool(args):
-    cmd = f"DISPLAY=:0.0 xdotool {args}"
-    logger_print("cmd:", cmd)
-    return subprocess.getoutput(cmd)
 
-def wmctrl(args):
-    cmd = f"DISPLAY=:0.0 wmctrl {args}"
-    logger_print("cmd:", cmd)
-    return subprocess.getoutput(cmd)
+from collections import namedtuple
 
-def notify_send(args):
-    cmd = f"DISPLAY=:0.0 notify-send {args}"
-    logger_print("cmd:", cmd)
-    return subprocess.getoutput(cmd)
 
-async def clipboard_set_text(text):
-    logger_print("clipboard_set_text:", repr(text))
-    subprocess.run(
-        ["xclip", "-i", "-sel", "c"],
-        input=text,
-        encoding="utf8",
-    )
-    #await asyncio.sleep(1) # TODO remove? or more?
 
-def crop_of_center_pos(center_pos, delta=15):
-    if type(center_pos) == str:
-        center_pos = list(map(int, center_pos.split(" ")))
-    return "%sx%s+%s+%s" % (
-        2 * delta,
-        2 * delta,
-        center_pos[0] - delta,
-        center_pos[1] - delta,
-    )
-
-def get_screenshot(center_pos=None, delta=15):
-    # tiff is 2x faster than png, but 20x larger, so only good in tmpfs
-    # use png for storage. the conversion between png and tiff is lossless:
-    # for tiff in *.tiff; do convert $tiff $tiff.png; done
-    # for tiff in *.tiff; do echo $(convert $tiff png:- | convert png:- tiff:- | sha1sum - | cut -d' ' -f1) $tiff; done
-    screenshot_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.tiff"
-    if center_pos:
-        crop = crop_of_center_pos(center_pos, delta)
-        # import -window root -crop $crop -colorspace Gray $screenshot_path
-        args = ["import", "-window", "root", "-crop", crop, "-colorspace", "Gray", screenshot_path]
-        subprocess.run(
-            args,
-            capture_output=True,
-            check=True,
-        )
-        return screenshot_path
-
-    raise NotImplementedError("get_screenshot: center_pos == None")
-
-def show_image(image_path):
-    args = ["feh", image_path]
-    # start the process but dont wait. let it run in the background
-    proc = subprocess.Popen(
-        args,
-        #capture_output=True,
-        #check=True,
-    )
-    return proc
+VNCClient = namedtuple("VNCClient", "user host ssh_port vnc_port")
 
 
 
@@ -1221,6 +1217,248 @@ class ChromiumHeadfulScraper():
     """
 
     chromium_window_id = None
+    vnc_client_list = []
+    vnc_client_port = 43022
+    connected_vnc_client = None
+    xvnc_process = None
+    xvnc_port = None
+    xvnc_display = None
+    xvnc_env = None
+    #window_manager_name = "icewm"
+    window_manager_name = "picom" # needed to invert colors on the xvnc server
+    xvnc_invert_colors = True
+    window_manager_process = None
+    vnc_client_process = None
+    ssh_process = None
+    ssh_id_file_path = None
+    chromium_user_data_dir = None
+    chromium_process = None
+
+    def set_vnc_client_list(self, server_list):
+        # parse list of strings
+        # example string: someuser@somehost.com:22:5901
+        for server_str in server_list:
+            user, host, ssh_port, vnc_port = re.match(r"(?:([a-zA-Z0-9._-]+)@)?([a-zA-Z0-9._-]+)(?::([0-9]+)(?::([0-9]+))?)?", "me@asdf.com:123:456").groups()
+            user = user or "fetch-subs"
+            ssh_port = int(ssh_port) if ssh_port else 22
+            vnc_port = int(vnc_port) if vnc_port else 5901
+            vnc_client = VNCClient(user, host, ssh_port, vnc_port)
+            self.vnc_client_list.append(vnc_client)
+
+    async def start_xvnc_server(self):
+        # Xvnc is provided by the tigervnc package
+        # TODO install tigervnc in github CI
+        # TODO find a free display number on this machine
+        xvnc_display = 2
+        # TODO quiet, only print fatal errors
+        # level is between 0 and 100, 100 meaning most verbose output.
+        log_level = 0
+        args = [
+            "Xvnc",
+            "-Log", f"*:stderr:{log_level}",
+            # dont require a password
+            "-SecurityTypes", "none",
+            # TODO allow to change these options via the fetch-subs.py CLI
+            "-geometry", "1024x768", # default: 1024x768
+            "-depth", "16", # default: 24
+            "-FrameRate", "10", # maximum frame rate. default: 60
+            # run this server for 5 minutes = 300 seconds
+            "-MaxDisconnectionTime", "300",
+            "-MaxConnectionTime", "300",
+            "-MaxIdleTime", "300",
+            "-localhost", # accept connections only from localhost
+            f":{xvnc_display}",
+        ]
+        print("xvnc server args:", shlex.join(args))
+        proc = subprocess.Popen(args)
+        await asyncio.sleep(5) # TODO dynamic
+        # TODO check if the process is running
+        self.xvnc_process = proc
+        self.xvnc_display = xvnc_display
+        self.xvnc_port = 5900 + xvnc_display
+        self.xvnc_env["DISPLAY"] = f":{self.xvnc_display}"
+
+        # not working. instead, use "picom"
+        # TODO install xcalib on github CI
+        # invert colors: xcalib -i -a
+        # https://github.com/zoltanp/xrandr-invert-colors#alternatives
+        #self.subprocess_getoutput(["xcalib", "-i", "-a"])
+
+    async def start_window_manager(self):
+        # https://en.wikipedia.org/wiki/Comparison_of_X_window_managers
+        # https://wiki.archlinux.org/title/Window_manager#List_of_window_managers
+        # https://wiki.archlinux.org/title/List_of_applications/Other#Taskbars
+        args = None
+        local_remove_files = []
+        # nice, looks like a "normal" desktop, similar to xfce, pseudo-tiling
+        if self.window_manager_name == "icewm": # dynamic window manager
+            # https://ice-wm.org/man/icewm-preferences.html
+            icewm_preferences_list = [
+                'TaskBarShowCPUStatus=0',
+                'CPUStatusShowRamUsage=0',
+                'CPUStatusShowSwapUsage=0',
+                'CPUStatusShowAcpiTemp=0',
+                'CPUStatusShowCpuFreq=0',
+                'TaskBarShowMEMStatus=0',
+                'TaskBarShowNetStatus=0',
+                'TaskBarShowAPMStatus=0',
+                'TaskBarShowAPMAuto=0',
+                'TaskBarShowAPMGraph=0',
+                'TaskBarShowAPMTime=0',
+                'TaskBarShowMailboxStatus=0',
+                'TimeFormat="%F %T"',
+                'WorkspaceNames="1","2","3","4"',
+                'ColorClock = "rgb:C0/C0/C0"',
+                'ColorClockText="rgb:00/00/00"',
+            ]
+            icewm_preferences_path = tempfile.mktemp(suffix="-icewm-preferences.txt")
+            with open(icewm_preferences_path, "w") as f:
+                f.write("\n".join(icewm_preferences_list) + "\n")
+            # the preferences file is needed only to start icewm
+            local_remove_files.append(icewm_preferences_path)
+            args = [
+                "icewm",
+                f"--config={icewm_preferences_path}",
+                #f"--theme=FILE",
+            ]
+        # lightweight compositor, not a window manager
+        # needed to invert colors on the xvnc server
+        elif self.window_manager_name == "picom":
+            args = [
+                "picom",
+            ]
+            if self.xvnc_invert_colors:
+                args += [
+                    # FIXME this fails with "only copy the PATH env"
+                    # https://askubuntu.com/questions/134668/how-to-trigger-a-color-inversion-effect-for-one-window
+                    "--invert-color-include", 'class_g="Chromium-browser"',
+                ]
+        # menu on desktop, but too much by default, no tiling?
+        elif self.window_manager_name == "fvwm": # dynamic window manager
+            args = [
+                "fvwm",
+                #"--config=FILE",
+            ]
+        # taskbar, menu on desktop, no tiling
+        elif self.window_manager_name == "fluxbox": # stacking window manager
+            args = [
+                "fluxbox",
+                "-rc", "rcfile",
+            ]
+        # okay... menu shows only some apps, no tiling
+        elif self.window_manager_name == "jwm": # stacking window manager
+            args = [
+                "jwm",
+            ]
+        # ugly by default, no tiling, no taskbar, no menu, hard to kill
+        elif self.window_manager_name == "sawfish": # stacking window manager
+            args = [
+                "sawfish",
+            ]
+        # no mouse menu
+        elif self.window_manager_name == "i3": # dynamic window manager
+            args = [
+                "i3",
+                #"-c", "configfile",
+            ]
+        # no mouse menu
+        elif self.window_manager_name == "openbox": # stacking window manager
+            raise NotImplementedError
+        # no mouse menu
+        elif self.window_manager_name == "spectrwm": # dynamic window manager
+            raise NotImplementedError
+        # no mouse menu
+        elif self.window_manager_name == "qtile": # dynamic window manager
+            raise NotImplementedError
+        # no mouse menu
+        elif self.window_manager_name == "dwm": # dynamic window manager
+            raise NotImplementedError
+        else:
+            raise ValueError(f"unknown window manager: {repr(self.window_manager_name)}")
+        print("window manager args:", shlex.join(args))
+        proc = subprocess.Popen(
+            args,
+            env=self.xvnc_env,
+        )
+        await asyncio.sleep(5) # TODO dynamic
+        # TODO check if the process is running
+        self.window_manager_process = proc
+        for temp_path in local_remove_files:
+            try:
+                shutil.rmtree(temp_path)
+            except NotADirectoryError:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+
+    async def try_connect_vnc_client(self):
+        """
+        try to connect to a vnc client
+        """
+        if self.connected_vnc_client:
+            return True
+        if len(self.vnc_client_list) == 0:
+            return False
+        # VNCClient(user, host, ssh_port, vnc_port)
+        vnc_client_id_list = list(range(len(self.vnc_client_list)))
+        random.shuffle(vnc_client_id_list)
+        for vnc_client_id in vnc_client_id_list:
+            vnc_client = self.vnc_client_list[vnc_client_id]
+            ssh_server = f"{vnc_client.user}@{vnc_client.host}:{vnc_client.port}"
+            ssh_r_arg = f"{vnc_client.vnc_port}:localhost:{self.xvnc_port}"
+            # ssh -R 1234:localhost:5901 example.com
+            # ssh_server is secret, dont print it
+            print(f"trying to connect to VNC client {vnc_client_id}")
+            # TODO quiet, only print fatal errors
+            args = [
+                "ssh",
+                "-R", ssh_r_arg,
+            ]
+            if self.ssh_id_file_path:
+                args += [
+                    "-i", self.ssh_id_file_path,
+                ]
+            args += [
+                ssh_server,
+            ]
+            print("ssh client args:", shlex.join(args))
+            proc = subprocess.Popen(args)
+            await asyncio.sleep(5) # TODO dynamic
+            raise NotImplementedError("TODO check ssh connection")
+            # TODO wait 5 seconds for connection
+            # if connection is working, set self.ssh_process and "return True"
+            # else continue and try next vnc client
+            #self.ssh_process = proc
+            return True
+
+    # TODO skip ssh, use "reverse vnc"
+    # https://tigervnc.org/doc/vncviewer.html
+    # vncviewer −listen 5500
+    # Causes vncviewer to listen on the given port (default 5500) for reverse connections from a VNC server
+    # https://help.ubuntu.com/community/VNC/Reverse
+    # x11vnc -quiet -safer -rfbport 0 -xkb -connect_or_exit mymachine.dyndns.org:5505 -display :0
+
+    async def do_start_vnc_client(self):
+        # vncviewer is provided by the tigervnc package
+        # level is between 0 and 100, 100 meaning most verbose output.
+        # TODO invert colors for darkmode
+        # http://ssb22.user.srcf.net/setup/vnc-invert.html
+        log_level = 0
+        args = [
+            "vncviewer",
+            "-Log", f"*:stderr:{log_level}",
+            # disable automatic selection of encoding and pixel format
+            # force vncviewer to use reduced color level
+            #"-AutoSelect=0",
+            # Selects the reduced color level to use on slow links
+            # 0 meaning 8 colors, 1 meaning 64 colors (the default), 2 meaning 256 colors
+            #"-LowColourLevel", "0",
+            #"-PreferredEncoding", "tight",
+            f"::{self.xvnc_port}",
+        ]
+        print("vnc client args:", shlex.join(args))
+        self.vnc_client_process = subprocess.Popen(args)
+        await asyncio.sleep(5) # TODO dynamic
 
     class Response():
         status = 0
@@ -1253,7 +1491,12 @@ class ChromiumHeadfulScraper():
             except StopIteration: # not found
                 raise KeyError
 
-    def __init__(self):
+    def __init__(
+        self,
+        start_vnc_client=False,
+        vnc_client_list=[],
+        ssh_id_file_path=None,
+    ):
 
         """
         initialize the scraper
@@ -1263,7 +1506,41 @@ class ChromiumHeadfulScraper():
         (todo: get positions of buttons and icons)
         """
 
-        # TODO add args to __init__?
+        self.start_vnc_client = start_vnc_client
+        self.set_vnc_client_list(vnc_client_list)
+        self.ssh_id_file_path = ssh_id_file_path
+
+        if False:
+            # copy all envs
+            self.xvnc_env = dict(os.environ)
+        else:
+            # only copy the PATH env, to make env consistent
+            temp_home = tempfile.mkdtemp(suffix="-home")
+            global_remove_files_when_done.append(temp_home)
+            self.xvnc_env = {
+                "PATH": os.environ["PATH"],
+                # fix "invert-color-include" of picom
+                "HOME": temp_home,
+            }
+            if False:
+                # debug: copy some random envs
+                all_envs = os.environ
+                if True:
+                    # use a reduced dict of envs which is known to work
+                    # to further reduce the dict of envs
+                    with open("env.json.lightmode-inverted.5", "r") as f:
+                        all_envs = json.load(f)
+                if False:
+                    # add some envs
+                    for key in random.sample(all_envs.keys(), int(len(all_envs.keys()) / 2)):
+                        self.xvnc_env[key] = all_envs[key]
+                    print("debug: writing /tmp/env.json")
+                    with open("/tmp/env.json", "w") as f:
+                        json.dump(self.xvnc_env, f, indent=2)
+                else:
+                    # add all envs
+                    for key in all_envs.keys():
+                        self.xvnc_env[key] = all_envs[key]
 
         # async init is done in async def async_init(self)
         # to create a class instance, simply do
@@ -1290,8 +1567,11 @@ class ChromiumHeadfulScraper():
         def search_chromium_window_id():
             window_id_list = []
             desktop_id_list = []
-            for window_id in xdotool(f"search --classname Chromium").split("\n"):
-                desktop_id = xdotool(f"get_desktop_for_window {window_id}")
+            for window_id in self.xdotool("search", "--classname", "Chromium").strip().split("\n"):
+                if window_id == "":
+                    # this should be prevented by strip()
+                    continue
+                desktop_id = self.xdotool("get_desktop_for_window", window_id).strip()
                 if desktop_id.endswith("-1"): # invalid window_id
                     continue
                 logger_print(f"found chromium window {window_id} on desktop {desktop_id}")
@@ -1305,23 +1585,82 @@ class ChromiumHeadfulScraper():
                 return window_id
             return None # not found
 
-        sleep_seconds = 5
-        notify_message = f"searching for an existing chromium window"
-        logger_print(notify_message)
-        notify_send(f"""notify-send -t {sleep_seconds}000 -u normal -e "fetch-subs.py" "{notify_message}" """)
+        logger_print("starting Xvnc server")
+        await self.start_xvnc_server()
+        logger_print("starting Xvnc server done (TODO verify)")
 
+        # TODO init xsession
+        # see also: man i3
+        """
+        # Disable DPMS turning off the screen
+        xset -dpms
+        xset s off
+
+        # Disable bell
+        xset -b
+
+        # Enable zapping (C-A-<Bksp> kills X)
+        setxkbmap -option terminate:ctrl_alt_bksp
+
+        # Enforce correct locales from the beginning:
+        # LC_ALL is unset since it overwrites everything
+        # LANG=de_DE.UTF-8 is used, except for:
+        # LC_MESSAGES=C never translates program output
+        # LC_TIME=en_DK leads to yyyy-mm-dd hh:mm date/time output
+        unset LC_ALL
+        export LANG=de_DE.UTF-8
+        export LC_MESSAGES=C
+        export LC_TIME=en_DK.UTF-8
+
+        # Use XToolkit in java applications
+        export AWT_TOOLKIT=XToolkit
+
+        # Set background color
+        xsetroot -solid "#333333"
+
+        # Enable core dumps in case something goes wrong
+        ulimit -c unlimited
+        """
+
+        # Set desktop background color to white
+        # to make it consistent with the lightmode theme
+        if False:
+            logger_print("setting desktop background color")
+            self.subprocess_getoutput(["xsetroot", "-solid", "#ffffff"])
+
+        logger_print("starting window manager")
+        await self.start_window_manager()
+        logger_print("starting window manager done (TODO verify)")
+
+        if self.start_vnc_client:
+            logger_print("starting vnc client")
+            await self.do_start_vnc_client()
+            logger_print("starting vnc client done (TODO verify)")
+        else:
+            logger_print("trying to connect to a VNC client")
+            await self.try_connect_vnc_client()
+            # TODO print status. are we connected to a VNC client?
+            logger_print("trying to connect to a VNC client done (TODO verify)")
+
+        self.chromium_user_data_dir = tempfile.mkdtemp()
+        global_remove_files_when_done.append(self.chromium_user_data_dir)
+
+        self.notify_send_message("searching for an existing chromium window")
+        # FIXME this is blocking with picom
         self.chromium_window_id = search_chromium_window_id()
+
+        if self.chromium_window_id != None:
+            # this should never happen...
+            # we have just started a fresh Xvnc server
+            # so there should be no apps running inside it
+            raise Exception(f"FIXME chromium is already running on display {self.xvnc_display} with window id {self.chromium_window_id}")
 
         #self.chromium_window_id = None # test
 
         #if self.chromium_window_id == None:
         #    logger_print(f"no existing chromium window was found. creating a new chromium window")
 
-        logger_print(f"creating a new chromium tab")
-
-        sleep_seconds = 5
-        notify_message = f"creating a new chromium window"
-        notify_send(f"""notify-send -t {sleep_seconds}000 -u normal -e "fetch-subs.py" "{notify_message}" """)
+        self.notify_send_message("creating a new chromium window")
 
         self.scraper_tab_html = (
             "<html>\n"
@@ -1329,9 +1668,9 @@ class ChromiumHeadfulScraper():
             "<title>scraper tab</title>\n"
             "<style>\n"
             # darkreader fails on data urls, so we enable darkmode here
-            "@media (prefers-color-scheme: dark) {\n"
-            "body { background: black; color: white; }\n"
-            "}\n"
+            #"@media (prefers-color-scheme: dark) {\n"
+            #"body { background: black; color: white; }\n"
+            #"}\n"
             "</style>\n"
             "</head>\n"
             "<body>\n"
@@ -1343,19 +1682,45 @@ class ChromiumHeadfulScraper():
             "</html>\n"
         )
 
-        # create a new tab
+        # create a new chromium window
         # https://developer.mozilla.org/en-US/docs/web/http/basics_of_http/data_urls
         url = "data:text/html;charset=utf-8," + urllib.parse.quote(self.scraper_tab_html)
-        args = ["chromium", url]
-        subprocess.run(
+        args = ["chromium", f"--user-data-dir={self.chromium_user_data_dir}", url]
+        # note: when we call chromium for the first time
+        # it will create the main process
+        # further calls to chromium will create a new tab in the existing window
+        # and the process ends immediately
+        # TODO keep the logfile small
+        chromium_logfile_handle = subprocess.DEVNULL
+        # TODO enable for debug
+        if False:
+            chromium_logfile_path = tempfile.mktemp(suffix="-chromium-logfile.txt")
+            chromium_logfile_handle = open(chromium_logfile_path, "w")
+            global_remove_files_when_done.append(chromium_logfile_path)
+            logger_print(f"writing chromium logfile: {chromium_logfile_path}")
+        self.chromium_process = subprocess.Popen(
             args,
-            capture_output=True,
-            check=True,
+            stdout=chromium_logfile_handle,
+            stderr=subprocess.STDOUT, # merge with stdout
+            #check=True,
+            env=self.xvnc_env,
         )
         await asyncio.sleep(5) # TODO dynamic
+        logger_print("creating a new chromium window: waiting done")
+
+        # TODO xprop | grep WM_CLASS
+        # WM_CLASS(STRING) = "chromium-browser (/run/user/1000/tmp3er0bm23)", "Chromium-browser"
+        if False:
+            logger_print("TODO click on the chromium window")
+            xprop_output = self.subprocess_getoutput(["xprop"])
+            logger_print("xprop_output:", xprop_output)
+
+        # TODO maximize the chromium window
+        logger_print("TODO maximize the chromium window")
 
         if self.chromium_window_id == None:
             # search for the created chromium window
+            logger_print("searching for the created chromium window")
             self.chromium_window_id = search_chromium_window_id()
 
         if self.chromium_window_id == None:
@@ -1363,17 +1728,17 @@ class ChromiumHeadfulScraper():
 
         logger_print("chromium_window_id", self.chromium_window_id)
 
-        logger_print("chromium_window_geometry", repr(xdotool(f"getwindowgeometry {self.chromium_window_id}")))
+        logger_print("chromium_window_geometry", repr(self.xdotool(f"getwindowgeometry {self.chromium_window_id}")))
         # Window 52428803
         #   Position: 0,0 (screen: 0)
         #   Geometry: 1920x1040
         # -> already maximized
-        chromium_window_size = list(map(int, xdotool(f"getwindowgeometry {self.chromium_window_id}").split("\n")[-1].split(" ")[3].split("x")))
+        chromium_window_size = list(map(int, self.xdotool("getwindowgeometry", self.chromium_window_id).strip().split("\n")[-1].split(" ")[3].split("x")))
 
         logger_print("focussing the chromium window")
         # TODO is "windowfocus" enough?
         #xdotool(f"windowfocus --sync {self.chromium_window_id}")
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
         await asyncio.sleep(3) # TODO dynamic
 
         maximized_window_size = [1920, 1040]
@@ -1382,16 +1747,19 @@ class ChromiumHeadfulScraper():
             logger_print("maximizing the chromium window")
             # https://askubuntu.com/questions/703628/how-to-close-minimize-and-maximize-a-specified-window-from-terminal
             #xdotool(f"windowsize {self.chromium_window_id} 100% 100%") # not working
-            wmctrl(f"-ir {self.chromium_window_id} -b add,maximized_vert,maximized_horz")
+            self.wmctrl("-ir", self.chromium_window_id, "-b", "add,maximized_vert,maximized_horz")
             await asyncio.sleep(3) # TODO dynamic
 
         #print("xdotool.get_window_geometry()", xdotool.get_window_geometry())
-        logger_print("chromium_window_geometry", repr(xdotool(f"getwindowgeometry {self.chromium_window_id}")))
+        logger_print("chromium_window_geometry", repr(self.xdotool(f"getwindowgeometry {self.chromium_window_id}")))
 
         logger_print("opening chromium devtools")
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
-        xdotool(f"key control+I")
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.xdotool("key", "control+I")
         await asyncio.sleep(3) # TODO dynamic
+        # TODO get position of the "customize and control devtools" icon (triple-dot icon)
+        #   in the top-right corner of the devtools widget
+        # TODO "dock to bottom". default position is "dock to right"
 
         # TODO automatically find the positions from a screenshot
         self.chromium_devtools_top_y = 930
@@ -1400,8 +1768,8 @@ class ChromiumHeadfulScraper():
         self.chromium_devtools_network_tab_pos = f"620 {self.chromium_devtools_top_y + 20}"
 
         logger_print("opening network tab of chromium devtools")
-        xdotool(f"mousemove {self.chromium_devtools_network_tab_pos}")
-        xdotool(f"click 1") # left click
+        self.xdotool("mousemove", self.chromium_devtools_network_tab_pos)
+        self.xdotool("click", "1") # left click
         await asyncio.sleep(3) # TODO dynamic
 
         # TODO automatically find the positions from a screenshot
@@ -1412,9 +1780,9 @@ class ChromiumHeadfulScraper():
 
         # network logging is enabled by default
         logger_print("stopping network logging")
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
-        xdotool(f"mousemove {self.chromium_devtools_network_tab_start_stop_log_pos}")
-        xdotool(f"click 1") # left click
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.xdotool("mousemove", self.chromium_devtools_network_tab_start_stop_log_pos)
+        self.xdotool("click", "1") # left click
         await asyncio.sleep(1)
 
         # TODO automatically find the positions from a screenshot
@@ -1487,42 +1855,39 @@ class ChromiumHeadfulScraper():
         # similar to other http client libraries: requests, aiohttp, ...
 
         logger_print(f"focussing the chromium window")
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
-        sleep_seconds = 10
-        notify_message = f"opening url: {url}"
-        logger_print(notify_message)
-        notify_send(f"""notify-send -t {sleep_seconds}000 -u normal -e "fetch-subs.py" "{notify_message}" """)
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.notify_send_message(f"opening url: {url}", t=10)
 
         # TODO stop previous request if it is still loading. check screenshot of self.chromium_reload_page_pos
 
         logger_print("clearing the network log")
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
-        xdotool(f"mousemove {self.chromium_devtools_network_tab_clear_log_pos}")
-        xdotool(f"click 1") # left click
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.xdotool("mousemove", self.chromium_devtools_network_tab_clear_log_pos)
+        self.xdotool("click", "1") # left click
         await asyncio.sleep(1)
 
         logger_print("starting network logging")
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
-        xdotool(f"mousemove {self.chromium_devtools_network_tab_start_stop_log_pos}")
-        xdotool(f"click 1") # left click
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.xdotool("mousemove", self.chromium_devtools_network_tab_start_stop_log_pos)
+        self.xdotool("click", "1") # left click
 
         # open the url
         if False:
             # no. this creates a new tab
             # but we want to re-use one tab with chromium devtools
-            args = ["chromium", url]
+            args = ["chromium", f"--user-data-dir={self.chromium_user_data_dir}", url]
             subprocess.run(
                 args,
                 capture_output=True,
                 check=True,
             )
 
-        await clipboard_set_text(url)
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
-        xdotool(f"mousemove {self.chromium_address_bar_pos}")
-        xdotool(f"click 1") # left click
+        await self.clipboard_set_text(url)
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.xdotool("mousemove", self.chromium_address_bar_pos)
+        self.xdotool("click", "1") # left click
         # paste the url with control+v
-        xdotool(f"key control+l control+v return")
+        self.xdotool("key", "control+l", "control+v", "return")
         # TODO copy-paste via clipboard?
         # TODO escape url or better: use subprocess.run(["xdotool", "type", "..."])
         #await asyncio.sleep(sleep_seconds) # TODO dynamic
@@ -1536,7 +1901,7 @@ class ChromiumHeadfulScraper():
             logger_print(f"  {screenshot_hash.hex()}")
         await asyncio.sleep(1)
         for i in range(30):
-            screenshot_path = get_screenshot(center_pos=self.chromium_reload_page_pos)
+            screenshot_path = self.get_screenshot(center_pos=self.chromium_reload_page_pos)
             screenshot_hash = sha1sum(screenshot_path)
             logger_print("screenshot_hash", screenshot_hash.hex())
             os.unlink(screenshot_path)
@@ -1550,26 +1915,25 @@ class ChromiumHeadfulScraper():
             # save html file
             # use a random path to avoid the "file exists" dialog
             html_file_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.html"
-            sleep_seconds = 5
-            notify_message = f"saving html to {html_file_path}"
-            logger_print(notify_message)
-            notify_send(f"""notify-send -t {sleep_seconds}000 -u normal -e "fetch-subs.py" "{notify_message}" """)
-            await clipboard_set_text(html_file_path)
-            xdotool(f"windowactivate --sync {self.chromium_window_id}")
-            xdotool(f"key control+s")
+            self.notify_send_message(f"saving html to {html_file_path}")
+            await self.clipboard_set_text(html_file_path)
+            self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+            self.xdotool("key", "control+s")
             await asyncio.sleep(5) # TODO dynamic
-            xdotool(f"key control+a control+v return")
+            self.xdotool("key", "control+a", "control+v", "return")
+
+        # TODO click "block notifications" on the first time we visit opensubtiles.org
 
         # save har file
         # note: file extension must be ".har" otherwise chromium will add ".har"
         har_file_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.har"
         logger_print(f"exporting har file to {har_file_path}")
-        await clipboard_set_text(har_file_path)
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
-        xdotool(f"mousemove {self.chromium_devtools_network_tab_export_har_pos}")
-        xdotool(f"click 1") # left click
+        await self.clipboard_set_text(har_file_path)
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.xdotool("mousemove", self.chromium_devtools_network_tab_export_har_pos)
+        self.xdotool("click", "1") # left click
         await asyncio.sleep(5) # TODO dynamic
-        xdotool(f"key control+a control+v return")
+        self.xdotool("key", "control+a", "control+v", "return")
         # wait for the har file
         if False:
             # old code
@@ -1582,7 +1946,7 @@ class ChromiumHeadfulScraper():
                 logger_print(f"  {screenshot_hash.hex()}")
             await asyncio.sleep(1)
             for i in range(30):
-                screenshot_path = get_screenshot(center_pos=self.chromium_saving_har_file_pos)
+                screenshot_path = self.get_screenshot(center_pos=self.chromium_saving_har_file_pos)
                 screenshot_hash = sha1sum(screenshot_path)
                 logger_print("screenshot_hash", screenshot_hash.hex())
                 os.unlink(screenshot_path)
@@ -1665,25 +2029,25 @@ class ChromiumHeadfulScraper():
         #await asyncio.sleep(5) # TODO dynamic
 
         logger_print("stopping network logging")
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
-        xdotool(f"mousemove {self.chromium_devtools_network_tab_start_stop_log_pos}")
-        xdotool(f"click 1") # left click
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.xdotool("mousemove", self.chromium_devtools_network_tab_start_stop_log_pos)
+        self.xdotool("click", "1") # left click
         await asyncio.sleep(1)
 
         logger_print("clearing the network log")
-        xdotool(f"windowactivate --sync {self.chromium_window_id}")
-        xdotool(f"mousemove {self.chromium_devtools_network_tab_clear_log_pos}")
-        xdotool(f"click 1") # left click
+        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.xdotool("mousemove", self.chromium_devtools_network_tab_clear_log_pos)
+        self.xdotool("click", "1") # left click
 
         # done. close the page
         if keep_page_open == False:
             url = "data:text/html;charset=utf-8," + urllib.parse.quote(self.scraper_tab_html)
-            clipboard_set_text(url)
-            xdotool(f"windowactivate --sync {self.chromium_window_id}")
-            xdotool(f"mousemove {self.chromium_address_bar_pos}")
-            xdotool(f"click 1") # left click
+            self.clipboard_set_text(url)
+            self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+            self.xdotool("mousemove", self.chromium_address_bar_pos)
+            self.xdotool("click", "1") # left click
             # paste the url with control+v
-            xdotool(f"key control+l control+v return")
+            self.xdotool("key", "control+l", "control+v", "return")
 
         response = self.Response(
             response_status,
@@ -1695,6 +2059,148 @@ class ChromiumHeadfulScraper():
         )
 
         return response
+
+
+    def subprocess_getoutput(self, args, kwargs={}):
+        args = list(map(str, args))
+        logger_print("cmd:", shlex.join(args))
+        proc = subprocess.run(
+            args,
+            capture_output=True,
+            encoding="utf8",
+            env=self.xvnc_env,
+            **kwargs,
+        )
+        output = proc.stdout
+        logger_print("cmd:", shlex.join(args), "-> output:", output)
+        return output
+
+    def xdotool(self, *args):
+        return self.subprocess_getoutput(["xdotool"] + list(args))
+
+    def wmctrl(self, *args):
+        return self.subprocess_getoutput(["wmctrl"] + list(args))
+
+    def notify_send(self, *args):
+        return self.subprocess_getoutput(["notify-send"] + list(args))
+
+    def notify_send_message(self, notify_message, t=5):
+        logger_print(notify_message)
+        # FIXME notify-send is not working with icewm
+        #if self.window_manager_name == "icewm":
+        if True:
+            return
+        return self.notify_send("-t", f"{t}000", "-u", "normal", "-e", "fetch-subs.py", notify_message)
+
+    async def clipboard_set_text(self, text):
+        logger_print("clipboard_set_text:", repr(text))
+        subprocess.run(
+            ["xclip", "-i", "-sel", "c"],
+            input=text,
+            encoding="utf8",
+            env=self.xvnc_env,
+        )
+        #await asyncio.sleep(1) # TODO remove? or more?
+
+    def crop_of_center_pos(self, center_pos, delta=15):
+        if type(center_pos) == str:
+            center_pos = list(map(int, center_pos.split(" ")))
+        return "%sx%s+%s+%s" % (
+            2 * delta,
+            2 * delta,
+            center_pos[0] - delta,
+            center_pos[1] - delta,
+        )
+
+    def get_screenshot(self, center_pos=None, delta=15):
+        # tiff is 2x faster than png, but 20x larger, so only good in tmpfs
+        # use png for storage. the conversion between png and tiff is lossless:
+        # for tiff in *.tiff; do convert $tiff $tiff.png; done
+        # for tiff in *.tiff; do echo $(convert $tiff png:- | convert png:- tiff:- | sha1sum - | cut -d' ' -f1) $tiff; done
+        screenshot_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.tiff"
+        if center_pos:
+            crop = self.crop_of_center_pos(center_pos, delta)
+            # import -window root -crop $crop -colorspace Gray $screenshot_path
+            args = ["import", "-window", "root", "-crop", crop, "-colorspace", "Gray", screenshot_path]
+            subprocess.run(
+                args,
+                capture_output=True,
+                check=True,
+                env=self.xvnc_env,
+            )
+            return screenshot_path
+
+        raise NotImplementedError("get_screenshot: center_pos == None")
+
+    def show_image(self, image_path):
+        args = ["feh", image_path]
+        # start the process but dont wait. let it run in the background
+        proc = subprocess.Popen(
+            args,
+            #capture_output=True,
+            #check=True,
+            env=self.xvnc_env,
+        )
+        return proc
+
+
+
+# kill all child processes when this script ends
+# https://stackoverflow.com/a/51240825/10440128
+
+class ExitHooks(object):
+    def __init__(self):
+        self.exit_code = None
+        self.exception_type = None
+        self.exception = None
+        self.exception_args = None
+        self.hook()
+
+    def hook(self):
+        self._orig_exit = sys.exit
+        sys.exit = self.exit
+        sys.excepthook = self.handle_exception
+
+    def exit(self, code=0):
+        self.exit_code = code
+        self._orig_exit(code)
+
+    def handle_exception(self, exc_type, exc, *exc_args):
+        self.exception = (exc_type, exc, exc_args)
+        cleanup_main()
+
+hooks = ExitHooks()
+
+@atexit.register
+def cleanup_main():
+    print("cleanup_main ...")
+    if hooks.exit_code is not None:
+        print("cleanup_main: death by sys.exit(%d)" % hooks.exit_code)
+    elif hooks.exception is not None:
+        (exc_type, exc, exc_args) = hooks.exception
+        print(f"cleanup_main: death by exception: {exc_type.__name__}: {exc}")
+        traceback.print_exception(exc)
+    else:
+        print("cleanup_main: natural death")
+    current_process = psutil.Process()
+    children = current_process.children(recursive=True)
+    for child in children:
+        print(f'cleanup_main: killing child process {child.name()} pid {child.pid}')
+        try:
+            child.terminate()
+            # TODO wait max 30sec and then child.kill()?
+        except Exception as e:
+            print(f'cleanup_main: killing child process failed: {e}')
+    # remove tempfiles
+    for temp_path in global_remove_files_when_done:
+        print(f'cleanup_main: removing temp path: {temp_path}')
+        try:
+            shutil.rmtree(temp_path)
+        except NotADirectoryError:
+            os.unlink(temp_path)
+        except FileNotFoundError:
+            pass
+    print("cleanup_main done")
 
 
 
@@ -1710,7 +2216,11 @@ async def main():
 
     elif options.proxy_provider == "chromium":
 
-        chromium_headful_scraper = await ChromiumHeadfulScraper()
+        chromium_headful_scraper = await ChromiumHeadfulScraper(
+            start_vnc_client=options.start_vnc_client,
+            vnc_client_list=options.vnc_client_list,
+            ssh_id_file_path=options.ssh_id_file_path,
+        )
 
     elif options.proxy_provider == "pyppeteer":
 

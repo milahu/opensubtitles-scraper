@@ -40,6 +40,7 @@ let
     aiohttp
     natsort
     #pycdlib
+    psutil
   ]);
 
   # building sqlite took about 15 minutes on my laptop
@@ -81,6 +82,32 @@ buildInputs = (with pkgs; [
   udftools # mkudffs
   xorriso # xorrisofs
   #libfaketime # faketime # this was a desperate attempt at reproducible UDF images
+  tigervnc # vnc server: Xvnc
+  xcalib # invert colors: xcalib -i -a
+  openssh # ssh client
+
+  # https://en.wikipedia.org/wiki/Compositing_window_manager
+  # compositing window managers are not lightweight
+  # so we just use a compositor
+  picom
+
+  /*
+  # lightweight window managers
+  icewm
+  openbox
+  tint2 # taskbar (for openbox etc)
+  # https://wiki.archlinux.org/title/List_of_applications/Other#Taskbars
+  awesome
+  fluxbox
+  spectrwm
+  qtile
+  #worm # error: undefined variable 'worm'
+  dwm
+  fvwm
+  dmenu
+  i3 xss-lock dex networkmanagerapplet i3status
+  */
+
 ]) ++ [
   python
   #sqlite-debug
