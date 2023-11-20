@@ -14,7 +14,6 @@ let
     #undetected-playwright = pkgs.python3.pkgs.callPackage ./nix/undetected-playwright.nix {};
     #pygnuutils = pkgs.python3.pkgs.callPackage ./nix/pygnuutils.nix {};
     #pycdlib = pkgs.python3.pkgs.callPackage ./nix/pycdlib.nix {};
-    websockets = pkgs.python3.pkgs.callPackage ./nix/websockets.nix {};
   };
 
   #sqlite-bench = pkgs.callPackage ./nix/sqlite-bench.nix {};
@@ -30,30 +29,7 @@ let
     #extraPythonPackages.pyppeteer-stealth # FIXME not found
     #extraPythonPackages.undetected-playwright # FIXME not found
     setuptools # pkg_resources for playwright-stealth
-    # KeyError: 'PUPPETEER_EXECUTABLE_PATH'
-    #pyppeteer # puppeteer # old # use local version in pyppeteer/
-
-    # dependencies of pyppeteer
-    # nixpkgs/pkgs/development/python-modules/pyppeteer/default.nix
-    appdirs
-    certifi
-    importlib-metadata
-    pyee
-    tqdm
-    urllib3
-    # FIXME update
-    # File "/nix/store/8pxfz6km4sgfpxra81y4k5q6cplqvxnn-python3-3.10.12-env/lib/python3.10/site-packages/websockets/utils.py", line 20, in generate_key
-    # key = secrets.token_bytes(16)
-    # AttributeError: module 'secrets' has no attribute 'token_bytes'
-    #websockets
-    # no. same error
-    extraPythonPackages.websockets
-
-    # new dependencies of pyppeteer https://github.com/pyppeteer/pyppeteer/pull/16
-    #ordered_set # error: undefined variable 'ordered_set'
-    ordered-set
-
-    #pyppeteer-stealth # puppeteer # old
+    #pyppeteer pyppeteer-stealth # puppeteer # old
     #kaitaistruct
     #sqlglot
     # distributed processing
@@ -93,7 +69,6 @@ pkgs.mkShell rec {
   # https://github.com/puppeteer/puppeteer/issues/244 # Method to skip installing Chromium
   #PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "1";
   #PUPPETEER_EXECUTABLE_PATH = "${pkgs.chromium.outPath}/bin/chromium";
-  PUPPETEER_EXECUTABLE_PATH = "${pkgs.ungoogled-chromium.outPath}/bin/chromium";
 
   #PYPPETEER_SKIP_CHROMIUM_DOWNLOAD = PUPPETEER_SKIP_CHROMIUM_DOWNLOAD;
   #PYPPETEER_EXECUTABLE_PATH = PUPPETEER_EXECUTABLE_PATH;
@@ -106,7 +81,6 @@ buildInputs = (with pkgs; [
   udftools # mkudffs
   xorriso # xorrisofs
   #libfaketime # faketime # this was a desperate attempt at reproducible UDF images
-  asciinema
 ]) ++ [
   python
   #sqlite-debug
