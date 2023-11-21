@@ -250,11 +250,11 @@ parser.add_argument(
     nargs="*",
     help=(
         f"reverse vnc servers. "
-        f"only used with proxy provider \"chromium\". "
+        f'only used with proxy provider "chromium". '
         f"this will try to connect to one of the ssh servers, "
         f"to create a TCP tunnel between the VNC server and vnc_port on the ssh server. "
         f"The default vnc_port is 5901. "
-        f"alternative: pass a space-delimited list to the environment variable \"REVERSE_VNC_SERVERS\". "
+        f'alternative: pass a space-delimited list to the environment variable "REVERSE_VNC_SERVERS". '
         f"format: [user@]host[:ssh_port[:vnc_port]]. "
         f"example: --reverse-vnc-servers example.com someuser@example2.com:22:1234"
     ),
@@ -267,7 +267,7 @@ parser.add_argument(
     metavar="S",
     help=(
         f"ssh id file path. "
-        f"used for \"ssh -i path/to/ssh-id-file\" to connect to a vnc client. "
+        f'used for "ssh -i path/to/ssh-id-file" to connect to a vnc client. '
         f"example: ~/.ssh/id_rsa"
     ),
 )
@@ -509,9 +509,9 @@ def new_requests_session():
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "en-US,en;q=0.9",
-        "Sec-Ch-Ua": "\"Not A(Brand\";v=\"24\", \"Chromium\";v=\"110\"",
+        "Sec-Ch-Ua": '"Not A(Brand";v="24", "Chromium";v="110"',
         "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": "\"Linux\"",
+        "Sec-Ch-Ua-Platform": '"Linux"',
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "none",
@@ -543,6 +543,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             return
         """
 
+        # note: later use actual filename from content_disposition
         filename_zip = f"{new_subs_dir}/{num}.zip"
         filename_notfound = f"{new_subs_dir}/{num}.not-found"
 
@@ -760,19 +761,21 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             response = await chromium_headful_scraper.get_response(url, return_har_path=True)
             logger_print(f"TODO debug har file: {response.har_path}")
             response_status = response.status
+            response_headers = response.headers
             response_type = response.headers.get("Content-Type")
+
             # TODO handle binary response
-            response_text = await response.text()
+            #response_text = await response.text()
+
+            response_content = response.content
 
             logger_print("response_status", response_status)
             logger_print("response_type", response_type)
             logger_print("response_text", repr(response_text)[0:100] + " ...")
 
-            await asyncio.sleep(10)
+            time.sleep(10)
 
-            # TODO get the actual download path of chromium
-            # this can be different than $HOME/Downloads
-            downloaded_files = glob.glob(f"/home/user/Downloads/*.({num}).zip")
+            downloaded_files = glob.glob(chromium_headful_scraper.downloads_path + f"/*.({num}).zip")
             logger_print("downloaded_files", downloaded_files)
 
             raise NotImplementedError
@@ -795,68 +798,9 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}")
             #if dt_download_avg_parallel > 1:
             #    logger_print(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
-            await asyncio.sleep(sleep_each)
+            time.sleep(sleep_each)
             #continue
             return
-
-            if False:
-
-                # old code
-
-                args = ["chromium", f"--user-data-dir={self.chromium_user_data_dir}", url]
-                subprocess.run(
-                    args,
-                    capture_output=True,
-                    check=True,
-                )
-                await asyncio.sleep(2)
-                downloaded_files = glob.glob(f"/home/user/Downloads/*.({num}).zip")
-                if len(downloaded_files) == 0:
-                    response_status = 404
-                elif len(downloaded_files) == 1:
-                    filepath = downloaded_files[0]
-                    filename = os.path.basename(filepath)
-                    os.rename(filepath, f"{new_subs_dir}/{num}.{filename}")
-
-                    t2_download = time.time()
-                    dt_download = t2_download - t1_download
-                    dt_download_list.append(dt_download)
-                    t2_download_list.append(t2_download)
-                    dt_download_avg = sum(dt_download_list) / len(dt_download_list)
-                    # FIXME use options.jobs to get dt_download_avg_parallel
-                    dt_download_list_parallel = []
-                    t2_download_list_sorted = sorted(t2_download_list)
-                    for i in range(0, len(t2_download_list_sorted) - 1):
-                        t2 = t2_download_list_sorted[i]
-                        t2_next = t2_download_list_sorted[i + 1]
-                        dt = t2_next - t2
-                        dt_download_list_parallel.append(dt)
-                    if len(dt_download_list_parallel) > 0:
-                        dt_download_avg_parallel = sum(dt_download_list_parallel) / len(dt_download_list_parallel)
-                    else:
-                        dt_download_avg_parallel = 0
-
-                    dt_par_str = ""
-                    if options.jobs > 1:
-                        dt_par_str = f" dt_par={dt_download_avg_parallel:.3f}"
-
-                    logger_print("t2_download_list", t2_download_list)
-                    logger_print("dt_download_list_parallel", dt_download_list_parallel)
-
-                    #logger.debug("headers: " + repr(dict(headers)))
-                    sleep_each = random.randint(sleep_each_min, sleep_each_max)
-                    if sleep_each > 0:
-                        logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str} -> waiting {sleep_each} seconds")
-                    else:
-                        logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}")
-                    #if dt_download_avg_parallel > 1:
-                    #    logger_print(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
-                    await asyncio.sleep(sleep_each)
-                    #continue
-                    return
-                else:
-                    logger_print(f"error: found multiple downloaded files for num={num}:", downloaded_files)
-                    raise NotImplementedError
 
         elif options.proxy_provider == "pyppeteer":
             logger_print("pyppeteer_page.goto", url)
@@ -966,7 +910,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # fix: http.client.RemoteDisconnected: Remote end closed connection without response
             # TODO aiohttp
             requests_session = new_requests_session()
-            await asyncio.sleep(sleep_change_ipaddr)
+            time.sleep(sleep_change_ipaddr)
             #continue
             return # success
 
@@ -1105,13 +1049,18 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         file_open_mode = "wb"
         if type(response_content) == str:
             file_open_mode = "w"
-        if fetcher_lib == "aiohttp":
+
+        if type(response_content) in {str, bytes}:
+            # requests
+            with open(filename_tmp, file_open_mode) as f:
+                f.write(response_content)
+        elif hasattr(response_content, "read"):
+            # aiohttp
             with open(filename_tmp, file_open_mode) as f:
                 f.write(await response_content.read())
-        #else:
-        #    # requests
-        #    with open(filename_tmp, file_open_mode) as f:
-        #        f.write(response_content)
+        else:
+            raise NotImplementedError(f"read response_content object of type {type(response_content)}")
+
         os.rename(filename_tmp, filename)
 
         if filename.endswith(".html"):
@@ -1227,12 +1176,57 @@ class ChromiumHeadfulScraper():
     #window_manager_name = "icewm"
     window_manager_name = "picom" # needed to invert colors on the xvnc server
     xvnc_invert_colors = True
+    is_multi_window = False # "picom" is not a window manager
     window_manager_process = None
     vnc_client_process = None
     ssh_process = None
     ssh_id_file_path = None
-    chromium_user_data_dir = None
+
+    temp_home = None
+    downloads_path = None
+
     chromium_process = None
+    chromium_user_data_dir = None
+    chromium_config = None
+    chromium_config_path = None
+
+    request_number = 0
+
+    # TODO more + dynamic learning of screenshot hashes
+    screenshot_hashes = {
+        # "X" = loading, click to stop loading
+        "loading": set([
+            bytes.fromhex("52912e087f65890ff39ca19064e3a63b5209d521"),
+        ]),
+        # "O" = done loading, click to reload
+        "done_loading": set([
+            bytes.fromhex("0258982600b873d822665e520de4573ac62d4f08"),
+        ]),
+        "done_saving_har_file": set([
+            # this is just black (background in darkmode)
+            # when the har file is being saved
+            # then there is a red square "stop" symbol, next to a progress bar
+            # this is only visible for large har files
+            bytes.fromhex("8ea5cf7fbe847958705fc069903e8889806adbf2"),
+        ]),
+        "show_notifications_popup_block_allow": set([
+            bytes.fromhex("107cdc4400f0e53cc5b70de7b11d9fcb128767ac"),
+        ]),
+        "chromium_address_bar_icon_has_popup": set([
+            #bytes.fromhex("cc9d2009ad00574cfc7c7885e4dc99a6153f1b5f"), # TODO remove?
+            bytes.fromhex("60dc87cda1947c632d4d1634bbeff953738d059e"),
+        ]),
+        "chromium_devtools_sources_breakpoints_on": set([
+            #bytes.fromhex("f25ccb7db0f786dd69cbe6fcb0338847eda3866c"), # TODO remove?
+            #bytes.fromhex("41bbbc18a3c90e34bc51dfb8761aeaaed487d63f"), # TODO remove?
+            bytes.fromhex("671a42024e4774a7e043506c0c6d257ed3fc8fbb"),
+        ]),
+        "chromium_devtools_sources_breakpoints_off": set([
+            #bytes.fromhex("adbfb14d3993ccbd48b1334e5aac6a6afff85a20"), # TODO remove?
+            #bytes.fromhex("b2a289dde8618a46814c44b3be52b9c2d391069a"), # TODO remove?
+            bytes.fromhex("9d6b983460965ad2773c6754adbb39fbf698bd58"),
+        ]),
+    }
 
     def set_vnc_client_list(self, server_list):
         # parse list of strings
@@ -1247,6 +1241,11 @@ class ChromiumHeadfulScraper():
 
     async def start_xvnc_server(self):
         # Xvnc is provided by the tigervnc package
+
+        # FIXME the script hangs when Xvnc stops
+        # [ 11/21/23 15:19:07.725 handle_queued_x_events FATAL ERROR ] X11 server connection broke (error 1)
+        # X connection to :2 broken (explicit kill or server shutdown).
+
         # TODO install tigervnc in github CI
         # TODO find a free display number on this machine
         xvnc_display = 2
@@ -1262,16 +1261,24 @@ class ChromiumHeadfulScraper():
             "-geometry", "1024x768", # default: 1024x768
             "-depth", "16", # default: 24
             "-FrameRate", "10", # maximum frame rate. default: 60
-            # run this server for 5 minutes = 300 seconds
-            "-MaxDisconnectionTime", "300",
-            "-MaxConnectionTime", "300",
-            "-MaxIdleTime", "300",
             "-localhost", # accept connections only from localhost
+        ]
+
+        if False:
+            # run this server for 5 minutes = 300 seconds
+            args += [
+                "-MaxDisconnectionTime", "300",
+                "-MaxConnectionTime", "300",
+                "-MaxIdleTime", "300",
+            ]
+
+        args += [
             f":{xvnc_display}",
         ]
+
         print("xvnc server args:", shlex.join(args))
         proc = subprocess.Popen(args)
-        await asyncio.sleep(5) # TODO dynamic
+        time.sleep(5) # TODO dynamic
         # TODO check if the process is running
         self.xvnc_process = proc
         self.xvnc_display = xvnc_display
@@ -1331,7 +1338,10 @@ class ChromiumHeadfulScraper():
                 args += [
                     # FIXME this fails with "only copy the PATH env"
                     # https://askubuntu.com/questions/134668/how-to-trigger-a-color-inversion-effect-for-one-window
-                    "--invert-color-include", 'class_g="Chromium-browser"',
+                    #"--invert-color-include", 'class_g="Chromium-browser"',
+                    # invert colors of all windows
+                    # also "save file" dialogs
+                    "--invert-color-include", 'name ~= "."',
                 ]
         # menu on desktop, but too much by default, no tiling?
         elif self.window_manager_name == "fvwm": # dynamic window manager
@@ -1380,7 +1390,7 @@ class ChromiumHeadfulScraper():
             args,
             env=self.xvnc_env,
         )
-        await asyncio.sleep(5) # TODO dynamic
+        time.sleep(5) # TODO dynamic
         # TODO check if the process is running
         self.window_manager_process = proc
         for temp_path in local_remove_files:
@@ -1423,7 +1433,7 @@ class ChromiumHeadfulScraper():
             ]
             print("ssh client args:", shlex.join(args))
             proc = subprocess.Popen(args)
-            await asyncio.sleep(5) # TODO dynamic
+            time.sleep(5) # TODO dynamic
             raise NotImplementedError("TODO check ssh connection")
             # TODO wait 5 seconds for connection
             # if connection is working, set self.ssh_process and "return True"
@@ -1458,23 +1468,26 @@ class ChromiumHeadfulScraper():
         ]
         print("vnc client args:", shlex.join(args))
         self.vnc_client_process = subprocess.Popen(args)
-        await asyncio.sleep(5) # TODO dynamic
+        time.sleep(5) # TODO dynamic
 
     class Response():
         status = 0
         content_type = None
+        content = None
         headers = None
-        _text = None
-        def __init__(self, status, headers, content_type, text, har, har_path):
+        #_text = None
+        def __init__(self, status, headers, content_type, encoding, content, har, har_path):
             self.status = status
             self.headers = headers
             self.content_type = content_type
-            self._text = text
+            #self._text = text
+            self.encoding = encoding
+            self.content = content
             self.har = har
             self.har_path = har_path
-        # await response.text()
         async def text(self):
-            return self._text
+            # await response.text()
+            return self.content.decode(self.encoding)
 
     class Headers():
         def __init__(self, headers):
@@ -1492,11 +1505,11 @@ class ChromiumHeadfulScraper():
                 raise KeyError
 
     def __init__(
-        self,
-        start_vnc_client=False,
-        vnc_client_list=[],
-        ssh_id_file_path=None,
-    ):
+            self,
+            start_vnc_client=False,
+            vnc_client_list=[],
+            ssh_id_file_path=None,
+        ):
 
         """
         initialize the scraper
@@ -1515,12 +1528,22 @@ class ChromiumHeadfulScraper():
             self.xvnc_env = dict(os.environ)
         else:
             # only copy the PATH env, to make env consistent
-            temp_home = tempfile.mkdtemp(suffix="-home")
-            global_remove_files_when_done.append(temp_home)
+            self.temp_home = tempfile.mkdtemp(suffix="-fetch-subs-home")
+            if False:
+                global_remove_files_when_done.append(self.temp_home)
+            else:
+                # debug: keep home
+                logger_print("keeping tempfiles after exti: temp home:", self.temp_home)
+                # delete some cache files we dont need
+                global_remove_files_when_done.append(self.temp_home + "/.cache")
+                global_remove_files_when_done.append(self.temp_home + "/.config")
+                global_remove_files_when_done.append(self.temp_home + "/.local")
+                global_remove_files_when_done.append(self.temp_home + "/.pki")
+
             self.xvnc_env = {
                 "PATH": os.environ["PATH"],
                 # fix "invert-color-include" of picom
-                "HOME": temp_home,
+                "HOME": self.temp_home,
             }
             if False:
                 # debug: copy some random envs
@@ -1642,8 +1665,50 @@ class ChromiumHeadfulScraper():
             # TODO print status. are we connected to a VNC client?
             logger_print("trying to connect to a VNC client done (TODO verify)")
 
-        self.chromium_user_data_dir = tempfile.mkdtemp()
-        global_remove_files_when_done.append(self.chromium_user_data_dir)
+        self.chromium_user_data_dir = tempfile.mkdtemp(suffix="-fetch-subs-chromium-user-data")
+        #if False: # debug: keep tempdir
+        if True:
+            global_remove_files_when_done.append(self.chromium_user_data_dir)
+        else:
+            # debug: keep chromium user-data-dir
+            logger_print("keeping tempfiles after exit: chromium user-data-dir:", self.chromium_user_data_dir)
+
+        self.downloads_path = self.temp_home + "/Downloads"
+
+        # set some config here
+        # so later, we need less clicks and commands
+        self.chromium_config = {
+            "devtools": {
+                "preferences": {
+                    # devtools: default position is "dock to right"
+                    # change position to "dock to bottom"
+                    "currentDockState": '"bottom"',
+                    # disable async debugger in devtools sources tab
+                    "disableAsyncStackTraces": "true",
+                    # disable network cache while devtools is open
+                    "cacheDisabled": "true",
+                },
+            },
+            "download": {
+                # ask where to save each file before downloading
+                "prompt_for_download": False,
+            },
+            "download_bubble": {
+                # Show downloads when they're done
+                "partial_view_enabled": False,
+            },
+            "selectfile": {
+                # default download location
+                "last_directory": self.downloads_path,
+            },
+        }
+
+        # write chromium config file
+        self.chromium_config_path = self.chromium_user_data_dir + "/Default/Preferences"
+        logger_print(f"writing chromium config file:", self.chromium_config_path)
+        os.makedirs(self.chromium_user_data_dir + "/Default")
+        with open(self.chromium_config_path, "w") as f:
+            json.dump(self.chromium_config, f, indent=2)
 
         self.notify_send_message("searching for an existing chromium window")
         # FIXME this is blocking with picom
@@ -1705,7 +1770,7 @@ class ChromiumHeadfulScraper():
             #check=True,
             env=self.xvnc_env,
         )
-        await asyncio.sleep(5) # TODO dynamic
+        time.sleep(5) # TODO dynamic
         logger_print("creating a new chromium window: waiting done")
 
         # TODO xprop | grep WM_CLASS
@@ -1728,92 +1793,169 @@ class ChromiumHeadfulScraper():
 
         logger_print("chromium_window_id", self.chromium_window_id)
 
-        logger_print("chromium_window_geometry", repr(self.xdotool(f"getwindowgeometry {self.chromium_window_id}")))
+        logger_print("chromium_window_geometry", repr(self.xdotool("getwindowgeometry", self.chromium_window_id).strip()))
         # Window 52428803
         #   Position: 0,0 (screen: 0)
         #   Geometry: 1920x1040
         # -> already maximized
-        chromium_window_size = list(map(int, self.xdotool("getwindowgeometry", self.chromium_window_id).strip().split("\n")[-1].split(" ")[3].split("x")))
+        chromium_window_size = tuple(map(int, self.xdotool("getwindowgeometry", self.chromium_window_id).strip().split("\n")[-1].split(" ")[3].split("x")))
 
         logger_print("focussing the chromium window")
         # TODO is "windowfocus" enough?
         #xdotool(f"windowfocus --sync {self.chromium_window_id}")
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-        await asyncio.sleep(3) # TODO dynamic
+        if self.is_multi_window:
+            self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        time.sleep(3) # TODO dynamic
 
-        maximized_window_size = [1920, 1040]
+        #maximized_window_size = (1920, 1040) # kde plasma desktop
+        #maximized_window_size = (1024, 768)
+        maximized_window_size = (1024, 740) # Xvnc + picom # TODO height
 
         if chromium_window_size != maximized_window_size:
             logger_print("maximizing the chromium window")
             # https://askubuntu.com/questions/703628/how-to-close-minimize-and-maximize-a-specified-window-from-terminal
-            #xdotool(f"windowsize {self.chromium_window_id} 100% 100%") # not working
+            #xdotool("windowsize", self.chromium_window_id, "100%", "100%") # not working
             self.wmctrl("-ir", self.chromium_window_id, "-b", "add,maximized_vert,maximized_horz")
-            await asyncio.sleep(3) # TODO dynamic
+            time.sleep(3) # TODO dynamic
 
-        #print("xdotool.get_window_geometry()", xdotool.get_window_geometry())
-        logger_print("chromium_window_geometry", repr(self.xdotool(f"getwindowgeometry {self.chromium_window_id}")))
+        # TODO use this to update maximized_window_size
+        logger_print("chromium_window_geometry", repr(self.xdotool("getwindowgeometry", self.chromium_window_id).strip()))
 
         logger_print("opening chromium devtools")
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-        self.xdotool("key", "control+I")
-        await asyncio.sleep(3) # TODO dynamic
-        # TODO get position of the "customize and control devtools" icon (triple-dot icon)
-        #   in the top-right corner of the devtools widget
-        # TODO "dock to bottom". default position is "dock to right"
+        if self.is_multi_window:
+            self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        self.xdotool("key", "Control+I")
+        # this can take some seconds, better wait longer
+        time.sleep(6) # TODO dynamic
+
+        # calibration should not be needed
+        # as long as the Xvnc display resolution stays at 1024x768
+        self.calibrate_positions = False
+
+        def verbose_sleep(wait_seconds):
+            logger_print(f"verbose sleep: waiting {wait_seconds} seconds")
+            for loop_idx in range(wait_seconds + 1):
+                time_left = wait_seconds - loop_idx
+                logger_print(f"verbose sleep: {time_left} seconds left")
+                time.sleep(1)
+
+        logger_print("opening chromium devtools command shell for the first time")
+        # open the command shell for the first time
+        # so later, it opens faster in chromium_command
+        self.xdotool("key", "Control+P")
+        time.sleep(1)
+        # close the command shell
+        self.xdotool("key", "Escape")
+        time.sleep(0.5)
+
+        if False:
+            # done in chromium_config currentDockState
+            # devtools: default position is "dock to right"
+            # change position to "dock to bottom"
+            self.chromium_command("Dock to bottom")
+            time.sleep(3) # TODO dynamic
 
         # TODO automatically find the positions from a screenshot
-        self.chromium_devtools_top_y = 930
+        self.chromium_devtools_top_y = 460
+
+        if self.calibrate_positions:
+            self.chromium_devtools_top_y = self.calibrate_pos("chromium_devtools_top_y")
 
         # TODO automatically find the positions from a screenshot
-        self.chromium_devtools_network_tab_pos = f"620 {self.chromium_devtools_top_y + 20}"
+        self.chromium_devtools_network_tab_pos = (325, 475)
+
+        if self.calibrate_positions:
+            self.chromium_devtools_network_tab_pos = self.calibrate_pos("chromium_devtools_network_tab_pos")
+
+        # disable the javascript debugger
+        # avoid "debugger paused" blocking the page
+        self.chromium_command("Deactivate breakpoints")
+        self.chromium_command("Disable JavaScript")
+        # done in chromium_config disableAsyncStackTraces
+        #self.chromium_command("Do not capture async stack traces")
 
         logger_print("opening network tab of chromium devtools")
-        self.xdotool("mousemove", self.chromium_devtools_network_tab_pos)
+        self.xdotool("mousemove", *self.chromium_devtools_network_tab_pos)
         self.xdotool("click", "1") # left click
-        await asyncio.sleep(3) # TODO dynamic
+        time.sleep(3) # TODO dynamic
 
         # TODO automatically find the positions from a screenshot
-        self.chromium_devtools_toolbar_y = self.chromium_devtools_top_y + 60
+        self.chromium_devtools_toolbar_y = 500
+
+        if self.calibrate_positions:
+            self.chromium_devtools_toolbar_y = self.calibrate_pos("chromium_devtools_toolbar_y")
 
         # TODO automatically find the positions from a screenshot
-        self.chromium_devtools_network_tab_start_stop_log_pos = f"25 {self.chromium_devtools_toolbar_y}" # the "start/stop network log" button
+        self.chromium_devtools_network_tab_start_stop_log_pos = (30, self.chromium_devtools_toolbar_y)
 
-        # network logging is enabled by default
-        logger_print("stopping network logging")
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-        self.xdotool("mousemove", self.chromium_devtools_network_tab_start_stop_log_pos)
-        self.xdotool("click", "1") # left click
-        await asyncio.sleep(1)
+        if self.calibrate_positions:
+            self.chromium_devtools_network_tab_start_stop_log_pos = self.calibrate_pos("chromium_devtools_network_tab_start_stop_log_pos")
 
+        # these positions are calibrated to a 1024x768 Xvnc desktop
+        # running picom and chromium
+        # on the display-bottom, there is a black bar
+        # under the chromium window. TODO remove?
         # TODO automatically find the positions from a screenshot
         # manually find position:
         # while true; do xdotool getmouselocation; sleep 0.5; done
-        self.chromium_address_bar_pos = "800 80"
-        self.chromium_reload_page_pos = "130 80"
-        self.chromium_devtools_network_tab_export_har_pos = f"780 {self.chromium_devtools_toolbar_y}" # the "export HAR" button
-        self.chromium_devtools_network_tab_clear_log_pos = f"65 {self.chromium_devtools_toolbar_y}" # the "clear network log" button
-        self.chromium_saving_har_file_pos = f"1850 {self.chromium_devtools_toolbar_y}" # the "saving HAR file" status icon
+        address_bar_pos_y = 65
+        self.chromium_address_bar_pos = (480, address_bar_pos_y)
+        self.chromium_reload_page_pos = (95, address_bar_pos_y)
 
-        # TODO more + dynamic learning of screenshot hashes
-        self.screenshot_hashes = {
-            # "X" = loading, click to stop loading
-            "loading": set([
-                bytes.fromhex("d77321bb9a8d0b6725b83f04fc1e0ff8bf99b2be"),
-            ]),
-            # "O" = done loading, click to reload
-            "done_loading": set([
-                bytes.fromhex("6dbac9c6970f81aa78cd983214bf20488cbfb9c1"),
-            ]),
-            "done_saving_har_file": set([
-                # this is just black (background in darkmode)
-                # when the har file is being saved
-                # then there is a red square "stop" symbol, next to a progress bar
-                # this is only visible for large har files
-                bytes.fromhex("8ea5cf7fbe847958705fc069903e8889806adbf2"),
-            ])
-        }
+        self.chromium_devtools_network_tab_export_har_pos = (530, self.chromium_devtools_toolbar_y)
+        self.chromium_devtools_network_tab_clear_log_pos = (55, self.chromium_devtools_toolbar_y)
+
+        self.chromium_saving_har_file_pos = (965, self.chromium_devtools_toolbar_y)
+
+        self.chromium_show_notifications_popup_block_button_pos = (320, 190)
+
+        if self.calibrate_positions:
+            self.chromium_address_bar_pos = self.calibrate_pos("chromium_address_bar_pos")
+            self.chromium_reload_page_pos = self.calibrate_pos("chromium_reload_page_pos")
+            self.chromium_devtools_network_tab_export_har_pos = self.calibrate_pos("chromium_devtools_network_tab_export_har_pos")
+            self.chromium_devtools_network_tab_clear_log_pos = self.calibrate_pos("chromium_devtools_network_tab_clear_log_pos")
+            self.chromium_saving_har_file_pos = self.calibrate_pos("chromium_saving_har_file_pos")
+
+        self.chromium_command("Stop recording network log")
+        self.chromium_command("Clear network log")
 
         return self
+
+    def calibrate_pos(self, name):
+        logger_print(f"calibrate_pos {name}: move your mouse to this position for the next 5 seconds")
+        wait_seconds = 8
+        for loop_idx in range(wait_seconds + 1):
+            time_left = wait_seconds - loop_idx
+            # x:534 y:793 screen:0 window:1035
+            pos = tuple(map(lambda s: int(s.split(":")[1]), self.xdotool("getmouselocation").strip().split(" ")[0:2]))
+            if time_left > 0:
+                logger_print(f"calibrate_pos {name}: position {pos} - {time_left} seconds left to move your mouse")
+                time.sleep(1)
+            else:
+                logger_print(f"calibrate_pos {name}: position {pos} - done")
+                return pos
+
+    def chromium_command(self, command_str):
+        # funny: missing command: "Export HAR file"
+        # so we still need to click the "export HAR" icon
+        # debug
+        #logger_print("chromium command:", command_str)
+        self.clipboard_set_text(command_str)
+        # TODO activate the chromium window if window manager != "picom"
+        # open the command shell of devtools
+        # note: when devtools is closed, this will open a "print" dialog
+        # TODO detect this case from screenshot
+        self.xdotool("key", "Control+P")
+        time.sleep(0.2)
+        # paste the command and hit enter
+        # note: we must wait between "Control+v" and "return"
+        # otherwise chromium will ignore the command
+        #self.xdotool("key", "Control+v", "return")
+        self.xdotool("key", "Control+v")
+        time.sleep(0.2)
+        self.xdotool("key", "return")
+        # wait for the command to finish
+        time.sleep(0.5)
 
     async def get_response(
             self,
@@ -1822,6 +1964,11 @@ class ChromiumHeadfulScraper():
             return_har_path=False,
             keep_page_open=False,
         ):
+
+        self.request_number += 1
+
+        # create a local copy
+        request_number = self.request_number
 
         """
         send request and get response
@@ -1854,22 +2001,15 @@ class ChromiumHeadfulScraper():
         # TODO make this return a "response" object?
         # similar to other http client libraries: requests, aiohttp, ...
 
-        logger_print(f"focussing the chromium window")
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        logger_print(f"req{request_number}: focussing the chromium window")
+        if self.is_multi_window:
+            self.xdotool("windowactivate", "--sync", self.chromium_window_id)
         self.notify_send_message(f"opening url: {url}", t=10)
 
         # TODO stop previous request if it is still loading. check screenshot of self.chromium_reload_page_pos
 
-        logger_print("clearing the network log")
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-        self.xdotool("mousemove", self.chromium_devtools_network_tab_clear_log_pos)
-        self.xdotool("click", "1") # left click
-        await asyncio.sleep(1)
-
-        logger_print("starting network logging")
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-        self.xdotool("mousemove", self.chromium_devtools_network_tab_start_stop_log_pos)
-        self.xdotool("click", "1") # left click
+        self.chromium_command("Clear network log")
+        self.chromium_command("Record network log")
 
         # open the url
         if False:
@@ -1882,90 +2022,167 @@ class ChromiumHeadfulScraper():
                 check=True,
             )
 
-        await self.clipboard_set_text(url)
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-        self.xdotool("mousemove", self.chromium_address_bar_pos)
+        self.clipboard_set_text(url)
+        if self.is_multi_window:
+            self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+        # focus the address bar
+        # control+l is not enough. when devtools/network is open
+        # this would focus the network log filter input element
+        self.xdotool("mousemove", *self.chromium_address_bar_pos)
         self.xdotool("click", "1") # left click
-        # paste the url with control+v
-        self.xdotool("key", "control+l", "control+v", "return")
+        # paste the url
+        self.xdotool("key", "Control+l", "Control+v", "return")
         # TODO copy-paste via clipboard?
         # TODO escape url or better: use subprocess.run(["xdotool", "type", "..."])
         #await asyncio.sleep(sleep_seconds) # TODO dynamic
 
+        # bbox: x, y, width, height
+        self.chromium_address_bar_icon_bbox = (120, 50, 32, 30)
+        self.chromium_show_notifications_popup_block_allow_bbox = (280, 172, 144, 37)
+
         # wait for page load
-        logger_print("waiting for page load ...")
+        logger_print(f"req{request_number}: waiting for page load ...")
         # TODO handle timeout
         # debug
-        logger_print("expected screenshot hashes:")
+        logger_print(f"req{request_number}: expected screenshot hashes:")
         for screenshot_hash in self.screenshot_hashes["done_loading"]:
             logger_print(f"  {screenshot_hash.hex()}")
-        await asyncio.sleep(1)
+        time.sleep(1)
+
         for i in range(30):
-            screenshot_path = self.get_screenshot(center_pos=self.chromium_reload_page_pos)
+
+            delete_screenshot_files = True
+            #delete_screenshot_files = False # debug: keep screenshot files
+
+            # check for popup: "show notifications? block | allow"
+            screenshot_path = self.get_screenshot(bbox=self.chromium_address_bar_icon_bbox, name="chromium_address_bar_icon")
             screenshot_hash = sha1sum(screenshot_path)
-            logger_print("screenshot_hash", screenshot_hash.hex())
-            os.unlink(screenshot_path)
+            logger_print(f"req{request_number}: chromium_address_bar_icon: screenshot_hash", screenshot_hash.hex())
+            if delete_screenshot_files:
+                os.unlink(screenshot_path)
+            else:
+                logger_print(f"req{request_number}: chromium_address_bar_icon: screenshot_path", screenshot_path)
+
+            if screenshot_hash in self.screenshot_hashes["chromium_address_bar_icon_has_popup"]:
+                # has popup
+                screenshot_path = self.get_screenshot(bbox=self.chromium_show_notifications_popup_block_allow_bbox, name="chromium_show_notifications_popup_block_allow")
+                screenshot_hash = sha1sum(screenshot_path)
+                logger_print(f"req{request_number}: chromium_show_notifications_popup_block_allow: screenshot_hash", screenshot_hash.hex())
+                if delete_screenshot_files:
+                    os.unlink(screenshot_path)
+                else:
+                    logger_print(f"req{request_number}: chromium_show_notifications_popup_block_allow: screenshot_path", screenshot_path)
+                if screenshot_hash in self.screenshot_hashes["show_notifications_popup_block_allow"]:
+                    # has "show notifications" popup
+                    # click the "block" button
+
+                    if self.calibrate_positions:
+                        self.chromium_show_notifications_popup_block_button_pos = self.calibrate_pos("chromium_show_notifications_popup_block_button_pos")
+
+                    logger_print(f"req{request_number}: clicking the block button")
+                    self.xdotool("mousemove", *self.chromium_show_notifications_popup_block_button_pos)
+                    self.xdotool("click", "1") # left click
+                    time.sleep(1) # TODO dynamic
+
+            screenshot_path = self.get_screenshot(center_pos=self.chromium_reload_page_pos, name="chromium_reload_page")
+            screenshot_hash = sha1sum(screenshot_path)
+            logger_print(f"req{request_number}: chromium_reload_page: screenshot_hash", screenshot_hash.hex())
+            if delete_screenshot_files:
+                os.unlink(screenshot_path)
+            else:
+                logger_print(f"req{request_number}: chromium_reload_page: screenshot_path", screenshot_path)
+
+            if True:
+                # debug: write full screen shot
+                # useful for manually calibrating positions
+                full_screenshot_path = self.get_full_screenshot()
+                logger_print(f"req{request_number}: debug: full screenshot:", full_screenshot_path)
+
             if screenshot_hash in self.screenshot_hashes["done_loading"]:
                 break
-            await asyncio.sleep(1)
-        logger_print("waiting for page load done")
+                #pass # debug: keep looping to get screenshots
+
+            time.sleep(1)
+
+        logger_print(f"req{request_number}: waiting for page load done")
 
         # save output file
         if False:
             # save html file
             # use a random path to avoid the "file exists" dialog
             html_file_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.html"
-            self.notify_send_message(f"saving html to {html_file_path}")
-            await self.clipboard_set_text(html_file_path)
-            self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-            self.xdotool("key", "control+s")
-            await asyncio.sleep(5) # TODO dynamic
-            self.xdotool("key", "control+a", "control+v", "return")
+            self.notify_send_message(f"req{request_number}: saving html to {html_file_path}")
+            self.clipboard_set_text(html_file_path)
+            if self.is_multi_window:
+                self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+            self.xdotool("key", "Control+s")
+            time.sleep(5) # TODO dynamic
+            self.xdotool("key", "Control+a", "Control+v", "return")
 
         # TODO click "block notifications" on the first time we visit opensubtiles.org
 
         # save har file
         # note: file extension must be ".har" otherwise chromium will add ".har"
         har_file_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.har"
-        logger_print(f"exporting har file to {har_file_path}")
-        await self.clipboard_set_text(har_file_path)
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-        self.xdotool("mousemove", self.chromium_devtools_network_tab_export_har_pos)
+        logger_print(f"req{request_number}: exporting har file to {har_file_path}")
+        self.clipboard_set_text(har_file_path)
+        if self.is_multi_window:
+            self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+
+        logger_print(f"req{request_number}: opening network tab of chromium devtools")
+        self.xdotool("mousemove", *self.chromium_devtools_network_tab_pos)
         self.xdotool("click", "1") # left click
-        await asyncio.sleep(5) # TODO dynamic
-        self.xdotool("key", "control+a", "control+v", "return")
+        ##await asyncio.sleep(2) # TODO dynamic
+        time.sleep(1) # TODO dynamic
+
+        # FIXME why is this printed twice
+        # blame asyncio.sleep?
+        logger_print(f'req{request_number}: clicking the "export har" icon')
+        # FIXME this position is wrong
+        #self.chromium_devtools_network_tab_export_har_pos = self.calibrate_pos("self.chromium_devtools_network_tab_export_har_pos")
+        self.xdotool("mousemove", *self.chromium_devtools_network_tab_export_har_pos)
+        self.xdotool("click", "1") # left click
+        #await asyncio.sleep(5) # TODO dynamic
+        time.sleep(5) # TODO dynamic
+        self.xdotool("key", "Control+a", "Control+v", "return")
         # wait for the har file
         if False:
             # old code
             # chromium needs some time before it starts saving the har file
-            await asyncio.sleep(5)
+            #await asyncio.sleep(5)
+            time.sleep(5)
             # TODO handle timeout
             # debug
-            logger_print("expected screenshot hashes:")
+            logger_print(f"req{request_number}: expected screenshot hashes:")
             for screenshot_hash in self.screenshot_hashes["done_saving_har_file"]:
                 logger_print(f"  {screenshot_hash.hex()}")
-            await asyncio.sleep(1)
+            #await asyncio.sleep(1)
+            time.sleep(1)
             for i in range(30):
-                screenshot_path = self.get_screenshot(center_pos=self.chromium_saving_har_file_pos)
+                screenshot_path = self.get_screenshot(center_pos=self.chromium_saving_har_file_pos, name="chromium_saving_har_file")
                 screenshot_hash = sha1sum(screenshot_path)
-                logger_print("screenshot_hash", screenshot_hash.hex())
+                logger_print(f"req{request_number}: screenshot_hash", screenshot_hash.hex())
                 os.unlink(screenshot_path)
                 if screenshot_hash in self.screenshot_hashes["done_saving_har_file"]:
-                    logger_print("done saving the har file")
+                    logger_print(f"req{request_number}: done saving the har file")
                     break
-                await asyncio.sleep(1)
+                #await asyncio.sleep(1)
+                time.sleep(1)
         # wait for chromium to start writing the har file
         while True:
             if os.path.exists(har_file_path):
                 break
-            await asyncio.sleep(1)
+            #await asyncio.sleep(1)
+            time.sleep(1)
         # wait for chromium to finish writing the har file
         previous_size = 0
         har = None
+        # TODO check screenshots? "saving HAR file icon" in devtools
         while True:
-            await asyncio.sleep(1)
+            #await asyncio.sleep(1)
+            time.sleep(1)
             size = os.path.getsize(har_file_path)
-            logger_print("har file size:", size)
+            logger_print(f"req{request_number}: har file size:", size)
             if size != previous_size:
                 previous_size = size
                 continue
@@ -1975,10 +2192,15 @@ class ChromiumHeadfulScraper():
                     har = json.load(har_file)
                     break
                 except json.decoder.JSONDecodeError:
-                    logger_print("failed to parse json in har file:", har_file_path)
+                    logger_print(f"req{request_number}: failed to parse json in har file:", har_file_path)
                     continue
         # parse the HAR file
         # see also chrome-example-har-file.json
+        # see also docs/example-empty-har-file.json
+        # FIXME every second har file is empty = has 155 bytes
+        # 5 of 10 requests return an empty har file
+        # maybe we need more time.sleep?
+        # or less "clear network log" commands?
         response_har = None
         response_har_path = None
         if return_har_path:
@@ -1994,9 +2216,9 @@ class ChromiumHeadfulScraper():
             #raise NotImplementedError(f"not found response in har file: {har_file_path}")
         har_entry = har["log"]["entries"][0]
         if har_entry["request"]["url"] != url:
-            logger_print(f"url =", repr(url))
-            logger_print(f"har_entry request url =", repr(har_entry["request"]["url"]))
-            logger_print(f"har_entry request queryString =", repr(har_entry["request"]["queryString"]))
+            logger_print(f"req{request_number}: url =", repr(url))
+            logger_print(f"req{request_number}: har_entry request url =", repr(har_entry["request"]["url"]))
+            logger_print(f"req{request_number}: har_entry request queryString =", repr(har_entry["request"]["queryString"]))
             raise NotImplementedError(f"unexpected url in har file: {har_file_path}")
         # validate
         if not "response" in har_entry:
@@ -2004,19 +2226,30 @@ class ChromiumHeadfulScraper():
         if not "content" in har_entry["response"]:
             raise NotImplementedError(f"missing response content in har file: {har_file_path}")
         if not "text" in har_entry["response"]["content"]:
+            # TODO when the response is binary only
+            # then the response content is written only to disk
+            # and is not stored in the HAR file
+            # TODO for binary response
+            # add a file handle response.content to the downloaded file
+            # the file name should be in response_headers.get("Content-Disposition")
+            # example content_disposition: 'attachment; filename="some-file.zip"'
             raise NotImplementedError(f"missing response text in har file: {har_file_path}")
         # finally: set status and response_text
         response_status = har_entry["response"]["status"]
         response_type = har_entry["response"]["content"]["mimeType"]
         response_headers = har_entry["response"]["headers"]
         # TODO handle binary response
-        response_text = har_entry["response"]["content"]["text"]
+        #response_text = har_entry["response"]["content"]["text"]
+        response_encoding = "utf8" # TODO
+        response_content = har_entry["response"]["content"]["text"].encode(response_encoding)
         # validate
         # note: size is the byte size == len(response_text.encode("utf8"))
         # not the number of characters == len(response_text)
-        if har_entry["response"]["content"]["size"] != len(response_text.encode("utf8")):
-            logger_print(f"len(response_text) =", len(response_text.encode("utf8")))
-            logger_print(f"har_entry request content size =", repr(har_entry["response"]["content"]["size"]))
+        #if har_entry["response"]["content"]["size"] != len(response_text.encode(response_encoding)):
+        if har_entry["response"]["content"]["size"] != len(response_content):
+            #logger_print(f"req{request_number}: len(response_text) =", len(response_text.encode("utf8")))
+            logger_print(f"req{request_number}: len(response_content) =", len(response_content))
+            logger_print(f"req{request_number}: har_entry request content size =", repr(har_entry["response"]["content"]["size"]))
             raise NotImplementedError(f"unexpected response text size in har file: {har_file_path}")
 
         # delete har file
@@ -2028,42 +2261,38 @@ class ChromiumHeadfulScraper():
 
         #await asyncio.sleep(5) # TODO dynamic
 
-        logger_print("stopping network logging")
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-        self.xdotool("mousemove", self.chromium_devtools_network_tab_start_stop_log_pos)
-        self.xdotool("click", "1") # left click
-        await asyncio.sleep(1)
-
-        logger_print("clearing the network log")
-        self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-        self.xdotool("mousemove", self.chromium_devtools_network_tab_clear_log_pos)
-        self.xdotool("click", "1") # left click
+        self.chromium_command("Stop recording network log")
+        self.chromium_command("Clear network log")
 
         # done. close the page
         if keep_page_open == False:
             url = "data:text/html;charset=utf-8," + urllib.parse.quote(self.scraper_tab_html)
             self.clipboard_set_text(url)
-            self.xdotool("windowactivate", "--sync", self.chromium_window_id)
-            self.xdotool("mousemove", self.chromium_address_bar_pos)
+            if self.is_multi_window:
+                self.xdotool("windowactivate", "--sync", self.chromium_window_id)
+            self.xdotool("mousemove", *self.chromium_address_bar_pos)
             self.xdotool("click", "1") # left click
             # paste the url with control+v
-            self.xdotool("key", "control+l", "control+v", "return")
+            self.xdotool("key", "Control+l", "Control+v", "return")
 
         response = self.Response(
             response_status,
             self.Headers(response_headers),
             response_type,
-            response_text,
+            response_encoding,
+            #response_text,
+            response_content,
             response_har,
             response_har_path,
         )
 
         return response
 
-
     def subprocess_getoutput(self, args, kwargs={}):
+        debug = False
         args = list(map(str, args))
-        logger_print("cmd:", shlex.join(args))
+        if debug:
+            logger_print("cmd:", shlex.join(args))
         proc = subprocess.run(
             args,
             capture_output=True,
@@ -2072,7 +2301,8 @@ class ChromiumHeadfulScraper():
             **kwargs,
         )
         output = proc.stdout
-        logger_print("cmd:", shlex.join(args), "-> output:", output)
+        if debug:
+            logger_print("cmd:", shlex.join(args), "-> output:", output)
         return output
 
     def xdotool(self, *args):
@@ -2092,7 +2322,7 @@ class ChromiumHeadfulScraper():
             return
         return self.notify_send("-t", f"{t}000", "-u", "normal", "-e", "fetch-subs.py", notify_message)
 
-    async def clipboard_set_text(self, text):
+    def clipboard_set_text(self, text):
         logger_print("clipboard_set_text:", repr(text))
         subprocess.run(
             ["xclip", "-i", "-sel", "c"],
@@ -2112,12 +2342,22 @@ class ChromiumHeadfulScraper():
             center_pos[1] - delta,
         )
 
-    def get_screenshot(self, center_pos=None, delta=15):
+    def crop_of_bbox(self, bbox):
+        x, y, width, height = bbox
+        return "%sx%s+%s+%s" % (
+            width,
+            height,
+            x,
+            y,
+        )
+
+    def get_screenshot(self, center_pos=None, bbox=None, name=None, delta=15):
         # tiff is 2x faster than png, but 20x larger, so only good in tmpfs
         # use png for storage. the conversion between png and tiff is lossless:
         # for tiff in *.tiff; do convert $tiff $tiff.png; done
         # for tiff in *.tiff; do echo $(convert $tiff png:- | convert png:- tiff:- | sha1sum - | cut -d' ' -f1) $tiff; done
-        screenshot_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.tiff"
+        basename = f"fetch-subs-{name}" if name else "fetch-subs"
+        screenshot_path = f"{tempdir}/{basename}-{datetime_str()}-{random_hash()}.tiff"
         if center_pos:
             crop = self.crop_of_center_pos(center_pos, delta)
             # import -window root -crop $crop -colorspace Gray $screenshot_path
@@ -2130,7 +2370,29 @@ class ChromiumHeadfulScraper():
             )
             return screenshot_path
 
+        if bbox:
+            crop = self.crop_of_bbox(bbox)
+            args = ["import", "-window", "root", "-crop", crop, "-colorspace", "Gray", screenshot_path]
+            subprocess.run(
+                args,
+                capture_output=True,
+                check=True,
+                env=self.xvnc_env,
+            )
+            return screenshot_path
+
         raise NotImplementedError("get_screenshot: center_pos == None")
+
+    def get_full_screenshot(self):
+        screenshot_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.tiff"
+        args = ["import", "-window", "root", "-colorspace", "Gray", screenshot_path]
+        subprocess.run(
+            args,
+            capture_output=True,
+            check=True,
+            env=self.xvnc_env,
+        )
+        return screenshot_path
 
     def show_image(self, image_path):
         args = ["feh", image_path]
@@ -2266,11 +2528,11 @@ async def main():
             ('https://bot.sannysoft.com/', 'chrome_headless_stealth.bot.sannysoft.com.png', 0), # outdated?
             ('https://abrahamjuliot.github.io/creepjs/', 'chrome_headless_stealth.creepjs.png', 10),
             ('http://f.vision/', 'chrome_headless_stealth.fake-vision.png', 0),
-            ('https://www.opensubtitles.org/en/search/subs', 'chrome_headless_stealth.opensubtitles-search-subs.png', 60),
+            #('https://www.opensubtitles.org/en/search/subs', 'chrome_headless_stealth.opensubtitles-search-subs.png', 60),
         ][-1:]:
             logger_print("pyppeteer_page.goto", url)
             await pyppeteer_page.goto(url)
-            await asyncio.sleep(sleep)
+            time.sleep(sleep)
             logger_print("pyppeteer_page.screenshot", path)
             await pyppeteer_page.screenshot(path=path, fullPage=True)
 
@@ -2373,9 +2635,9 @@ async def main():
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
             "Accept-Encoding": "gzip, deflate",
             "Accept-Language": "en-US,en;q=0.9",
-            #"Sec-Ch-Ua": "\"Not A(Brand\";v=\"24\", \"Chromium\";v=\"110\"",
+            #"Sec-Ch-Ua": '"Not A(Brand";v="24", "Chromium";v="110"',
             #"Sec-Ch-Ua-Mobile": "?0",
-            #"Sec-Ch-Ua-Platform": "\"Linux\"",
+            #"Sec-Ch-Ua-Platform": '"Linux"',
             #"Sec-Fetch-Dest": "document",
             #"Sec-Fetch-Mode": "navigate",
             #"Sec-Fetch-Site": "none",
@@ -2444,7 +2706,7 @@ async def main():
                         break
                     # response_status example: 504
                     logger_print(f"unexpected response_status {response_status} -> retry")
-                    await asyncio.sleep(5)
+                    time.sleep(5)
                 response_type = response.headers.get("Content-Type")
                 assert response_type == "application/json", f"unexpected content_type {repr(content_type)}"
                 response_data = json.loads(await response.text())
@@ -2564,7 +2826,7 @@ async def main():
             if pause_scraper:
                 t_sleep = random.randrange(20, 60)
                 logger_print(f"pausing scraper for {t_sleep} seconds")
-                await asyncio.sleep(t_sleep)
+                time.sleep(t_sleep)
                 # reset t2 values
                 while t2_download_list:
                     t2_download_list.pop()
