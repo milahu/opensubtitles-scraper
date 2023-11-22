@@ -92,13 +92,15 @@ import traceback
 import shlex
 import shutil
 import tempfile
+import cgi
+import _io
 
 import aiohttp
 import requests
 import magic # libmagic
 import psutil
 
-
+import pyrfc6266
 
 # https://www.zenrows.com/ # Startup plan
 #max_concurrency = 25 # concurrency limit was reached
@@ -185,9 +187,19 @@ new_subs_dir = "new-subs"
 #new_subs_dir = "new-subs-repo"
 #new_subs_dir = "new-subs-temp-debug"
 
-# TODO instead of 1000, get actual system user id. bash: id -u
 # use tmpfs in RAM to avoid disk writes
-tempdir = "/run/user/1000"
+tempdir = f"/run/user/{os.getuid()}"
+
+if not os.path.exists(tempdir):
+    raise ValueError(f"tempdir does not exist: {tempdir}")
+
+def datetime_str():
+    # https://stackoverflow.com/questions/2150739/iso-time-iso-8601-in-python#28147286
+    return datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%S.%fZ")
+
+tempdir = tempdir + f"/fetch-subs-{datetime_str()}"
+
+
 
 global_remove_files_when_done = []
 
@@ -567,7 +579,10 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         # redirect location:
         #url = f"https://dl.opensubtitles.org/en/download/sub/{num}"
         # use http protocol to fix: aiohttp.client_exceptions.ClientConnectorCertificateError: Cannot connect to host dl.opensubtitles.org:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:997)')]
-        url = f"http://dl.opensubtitles.org/en/download/sub/{num}"
+        # TODO why was i using http? to make it work with proxies?
+        # for the "chromium" scraper, we want https to make our requests look normal
+        #url = f"http://dl.opensubtitles.org/en/download/sub/{num}"
+        url = f"https://dl.opensubtitles.org/en/download/sub/{num}"
         proxies = {}
         requests_get_kwargs = {}
         content_type = None
@@ -751,56 +766,72 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
 
         elif options.proxy_provider == "chromium":
 
-            # FIXME handle file download. where is the file saved?
-            # the last html page is the cloudflare portal saying "Proceeding..."
-
             # TODO handle captchas by cloudflare.
             # effectively, implement a semiautomatic web scraper
             # which asks for help from the user to solve captchas
+            # see also docs/captchas.md
 
-            response = await chromium_headful_scraper.get_response(url, return_har_path=True)
-            logger_print(f"TODO debug har file: {response.har_path}")
-            response_status = response.status
-            response_headers = response.headers
-            response_type = response.headers.get("Content-Type")
+            response = await chromium_headful_scraper.get_response(
+                url,
+                return_har_path=True, # debug
+            )
 
-            # TODO handle binary response
-            #response_text = await response.text()
+            # no. handle this later
+            if False and response.content_is_file:
+                # read the file into memory
+                # this works because the files are small
+                # (tempfiles are stored in tmpfs anyway...)
+                response_content = response.content.read()
+                response.delete_content_file() # TODO implement
 
-            response_content = response.content
+            # no. all this is already handled by the generic code, see below
+            if False:
+                #logger_print(f"TODO debug har file: {response.har_path}")
+                response_status = response.status
+                response_headers = response.headers
+                response_type = response.headers.get("Content-Type")
+                response_content = response.content
 
-            logger_print("response_status", response_status)
-            logger_print("response_type", response_type)
-            logger_print("response_text", repr(response_text)[0:100] + " ...")
+                # TODO handle binary response
+                #response_text = await response.text()
 
-            time.sleep(10)
+                logger_print("response_status", response_status)
+                logger_print("response_type", response_type)
+                #logger_print("response_text", repr(response_text)[0:100] + " ...")
 
-            downloaded_files = glob.glob(chromium_headful_scraper.downloads_path + f"/*.({num}).zip")
-            logger_print("downloaded_files", downloaded_files)
+                # TODO implement response.is_file
+                if response.is_file:
+                    filename = response.content_filename
+                    # only prepend num
+                    # risk: this can exceed the maximum filename length of 255 bytes
+                    new_filename = f"{num}.{filename}"
+                    parsed_filename = re.match(r"(.*)\.\(([0-9]+)\)\.zip", filename)
+                    if parsed_filename:
+                        # move num from end to start of filename
+                        # moving num is needed to stay below the maximum filename length of 255 bytes
+                        prefix, num_str = parsed_filename.groups()
+                        if num_str == str(num):
+                            new_filename = f"{num}.{prefix}.zip"
+                        else:
+                            logger_print(f"{num}: warning: sub number mismatch between url and filename")
+                    output_path = f"{new_subs_dir}/{new_filename}"
+                    logger_print(f"{num} writing", output_path)
+                    response.move_to(output_path)
+                else:
+                    logger_print(f"{num} response.content:", response.content)
+                    raise NotImplementedError("response is not a file")
 
-            raise NotImplementedError
-
-            if len(downloaded_files) != 1:
-                logger_print(f"error: found multiple downloaded files for num={num}:", downloaded_files)
-                raise NotImplementedError
-
-            # len(downloaded_files) == 1
-            filepath = downloaded_files[0]
-            filename = os.path.basename(filepath)
-            output_path = f"{new_subs_dir}/{num}.{filename}"
-            os.rename(filepath, output_path)
-
-            #logger.debug("headers: " + repr(dict(headers)))
-            sleep_each = random.randint(sleep_each_min, sleep_each_max)
-            if sleep_each > 0:
-                logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str} -> waiting {sleep_each} seconds")
-            else:
-                logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}")
-            #if dt_download_avg_parallel > 1:
-            #    logger_print(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
-            time.sleep(sleep_each)
-            #continue
-            return
+                #logger.debug("headers: " + repr(dict(headers)))
+                sleep_each = random.randint(sleep_each_min, sleep_each_max)
+                if sleep_each > 0:
+                    logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str} -> waiting {sleep_each} seconds")
+                else:
+                    logger_print(f"{num} 200 dt={dt_download:.3f} dt_avg={dt_download_avg:.3f}{dt_par_str}")
+                #if dt_download_avg_parallel > 1:
+                #    logger_print(f"460: {num} 200 dt_download_avg_parallel > 1: dt_download_list_parallel = {dt_download_list_parallel}")
+                time.sleep(sleep_each)
+                #continue
+                return
 
         elif options.proxy_provider == "pyppeteer":
             logger_print("pyppeteer_page.goto", url)
@@ -818,6 +849,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             logger.debug(f"{num} response_status: {response_status}")
             logger.debug(f"{num} headers: {response.headers}")
 
+        response_status = response_status or response.status
         response_content = response_content or response.content
         response_headers = response_headers or response.headers
 
@@ -967,12 +999,34 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             logger_print(f"{num} {response_status} retry. headers: {response_headers}. content: {await response_content.read()}")
             return num # retry
 
-        # requests
-        #assert response_status == 200, f"{num} unexpected response_status {response_status}. headers: {response_headers}. content: {response_content[0:100]}..."
-        # aiohttp
-        assert response_status == 200, f"{num} unexpected response_status {response_status}. headers: {response_headers}. content: {await response_content.read()}"
+        response_content_str_or_bytes = None
+        if type(response_content) in {str, bytes}:
+            # requests
+            response_content_str_or_bytes = response_content
+        if type(response_content) in {_io.TextIOWrapper, _io.BufferedReader}:
+            # ChromiumHeadfulScraper.Response
+            response_content_str_or_bytes = response_content.read()
+        # TODO require type of aiohttp response object
+        elif hasattr(response_content, "read"):
+            # aiohttp
+            response_content_str_or_bytes = await response_content.read()
+        else:
+            raise NotImplementedError(f"read response_content object of type {type(response_content)}")
+
+        assert response_status == 200, f"{num} unexpected response_status {response_status}. headers: {response_headers}. content: {response_content_str_or_bytes}"
+
+        if False:
+            # debug
+            logger_print(f"{num} content_type:", content_type)
+            logger_print(f"{num} response.headers Content-Type:", response.headers.get("Content-Type"))
+            # this works only with my custom "class Headers"
+            logger_print(f"{num} response.headers.headers:", response.headers.headers)
+            logger_print(f"{num} response.content:", response.content)
 
         content_type = content_type or response_headers.get("Content-Type")
+
+        # FIXME detect captcha
+        # see also docs/captchas.md
 
         if content_type != "application/zip":
             # blocked
@@ -1012,8 +1066,12 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         content_disposition = content_disposition or response_headers.get("Content-Disposition")
 
         if content_disposition:
-            # use filename from response_headers
-            content_filename = content_disposition[22:-1]
+            # parse filename from the Content-Disposition header
+            # https://stackoverflow.com/a/73418983/10440128
+            value, params = cgi.parse_header(content_disposition)
+            if value != "attachment":
+                raise NotImplementedError(f"TODO handle non-attachment content_disposition {repr(content_disposition)}")
+            content_filename = pyrfc6266.parse_filename(content_disposition)
             filename = f"{new_subs_dir}/{num}.{content_filename}"
             # remove the f".({num})" part from filename
             # adding f"{num}." to start of filename makes the filename too long
@@ -1024,7 +1082,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             # a: new-subs/1.alien.3.(1992).eng.2cd.(1).zip
             # b: new-subs/1.alien.3.(1992).eng.2cd.zip
             suffix = f".({num}).zip"
-            assert filename.endswith(suffix)
+            assert filename.endswith(suffix), f"num mismatch between url and filename. num: {num}, filename: {filename}"
             filename = filename[0:(-1 * len(suffix))] + ".zip"
         else:
             # file basename is f"{num}.zip"
@@ -1047,19 +1105,11 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         filename_tmp = filename_tmp_base + ".tmp"
 
         file_open_mode = "wb"
-        if type(response_content) == str:
+        if type(response_content_str_or_bytes) == str:
             file_open_mode = "w"
 
-        if type(response_content) in {str, bytes}:
-            # requests
-            with open(filename_tmp, file_open_mode) as f:
-                f.write(response_content)
-        elif hasattr(response_content, "read"):
-            # aiohttp
-            with open(filename_tmp, file_open_mode) as f:
-                f.write(await response_content.read())
-        else:
-            raise NotImplementedError(f"read response_content object of type {type(response_content)}")
+        with open(filename_tmp, file_open_mode) as f:
+            f.write(response_content_str_or_bytes)
 
         os.rename(filename_tmp, filename)
 
@@ -1070,6 +1120,10 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
             return num # retry
         else:
            html_errors.append(False)
+
+        # cleanup
+        # ChromiumHeadfulScraper.Response.__del__: close and delete the tempfile
+        del response
 
         # check file
         if filename.endswith(".zip"):
@@ -1131,10 +1185,6 @@ chromium_headful_scraper = None
 
 def random_hash():
     return hex(random.getrandbits(128))[2:]
-
-def datetime_str():
-    # https://stackoverflow.com/questions/2150739/iso-time-iso-8601-in-python#28147286
-    return datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%S.%fZ")
 
 def sha1sum(file_path):
     # https://stackoverflow.com/questions/22058048/hashing-a-file-in-python
@@ -1318,7 +1368,7 @@ class ChromiumHeadfulScraper():
                 'ColorClock = "rgb:C0/C0/C0"',
                 'ColorClockText="rgb:00/00/00"',
             ]
-            icewm_preferences_path = tempfile.mktemp(suffix="-icewm-preferences.txt")
+            icewm_preferences_path = f"{tempdir}/icewm-preferences.txt"
             with open(icewm_preferences_path, "w") as f:
                 f.write("\n".join(icewm_preferences_list) + "\n")
             # the preferences file is needed only to start icewm
@@ -1471,38 +1521,73 @@ class ChromiumHeadfulScraper():
         time.sleep(5) # TODO dynamic
 
     class Response():
-        status = 0
-        content_type = None
-        content = None
-        headers = None
-        #_text = None
-        def __init__(self, status, headers, content_type, encoding, content, har, har_path):
+
+        def __init__(
+                self,
+                status,
+                headers,
+                content_type,
+                encoding,
+                content_length,
+                content_filename,
+                content_filepath,
+                content,
+                har,
+                har_path,
+                request_number,
+            ):
+
+            # standard attributes
+            # same API as requests / aiohttp / ?
             self.status = status
             self.headers = headers
+            self.content = content
+
+            # nonstandard attributes
             self.content_type = content_type
             #self._text = text
             self.encoding = encoding
-            self.content = content
+            self.content_length = content_length
+            self.content_filename = content_filename
+            self.content_filepath = content_filepath
             self.har = har
             self.har_path = har_path
+            self.request_number = request_number
+
+            #self.content_is_file = type(self.content) in {_io.BufferedReader, _io.TextIOWrapper}
+
         async def text(self):
             # await response.text()
             return self.content.decode(self.encoding)
+
+        def __del__(self):
+            # open(file_path, "rb") -> _io.BufferedReader
+            # open(file_path, "r") -> _io.TextIOWrapper
+            if self.content_is_file:
+                # close file handle and delete file
+                # TODO check if self.content is open
+                self.content.close()
+                # TODO check if self.content_filepath exists
+                logger_print(f"deleting tempfile {self.content_filepath}")
+                os.unlink(self.content_filepath)
+                # also delete the f"req{request_number}" folder
+                os.rmdir(os.path.dirname(self.content_filepath))
 
     class Headers():
         def __init__(self, headers):
             # headers from the HAR file is list of objects:
             # [ { "name": "x", "value": "y" } ]
             # transform it to a list of tuples, to save memory
-            # note: all header names in HAR files are lowercase
-            self.headers = list(map(lambda h: (h["name"], h["value"]), headers))
-        def get(self, key):
+            self.headers = list(map(lambda h: (h["name"].lower(), h["value"]), headers))
+        def get(self, key, default=None):
             # return the first matching header
             # TODO better? how to handle duplicate keys in self.headers
+            key = key.lower()
             try:
-                return next(h for h in self.headers if h[0] == key.lower())[1]
+                return next(h for h in self.headers if h[0] == key)[1]
             except StopIteration: # not found
-                raise KeyError
+                #raise KeyError
+                return default
 
     def __init__(
             self,
@@ -1528,7 +1613,8 @@ class ChromiumHeadfulScraper():
             self.xvnc_env = dict(os.environ)
         else:
             # only copy the PATH env, to make env consistent
-            self.temp_home = tempfile.mkdtemp(suffix="-fetch-subs-home")
+            self.temp_home = f"{tempdir}/home"
+            os.makedirs(self.temp_home)
             if False:
                 global_remove_files_when_done.append(self.temp_home)
             else:
@@ -1665,7 +1751,8 @@ class ChromiumHeadfulScraper():
             # TODO print status. are we connected to a VNC client?
             logger_print("trying to connect to a VNC client done (TODO verify)")
 
-        self.chromium_user_data_dir = tempfile.mkdtemp(suffix="-fetch-subs-chromium-user-data")
+        self.chromium_user_data_dir = f"{tempdir}/chromium-user-data"
+        os.makedirs(self.chromium_user_data_dir)
         #if False: # debug: keep tempdir
         if True:
             global_remove_files_when_done.append(self.chromium_user_data_dir)
@@ -1673,7 +1760,17 @@ class ChromiumHeadfulScraper():
             # debug: keep chromium user-data-dir
             logger_print("keeping tempfiles after exit: chromium user-data-dir:", self.chromium_user_data_dir)
 
+        # FIXME find a free TCP port on localhost
+        self.chromium_debug_port = 5222
+
         self.downloads_path = self.temp_home + "/Downloads"
+        os.makedirs(self.downloads_path)
+
+        self.done_downloads_path = self.temp_home + "/done_downloads"
+        os.makedirs(self.done_downloads_path)
+
+        self.screenshots_path = f"{tempdir}/screenshots"
+        os.makedirs(self.screenshots_path)
 
         # set some config here
         # so later, we need less clicks and commands
@@ -1727,6 +1824,7 @@ class ChromiumHeadfulScraper():
 
         self.notify_send_message("creating a new chromium window")
 
+        # TODO remove. fancy but useless
         self.scraper_tab_html = (
             "<html>\n"
             "<head>\n"
@@ -1747,25 +1845,41 @@ class ChromiumHeadfulScraper():
             "</html>\n"
         )
 
+        self.scraper_tab_url = "data:text/html;charset=utf-8," + urllib.parse.quote(self.scraper_tab_html)
+
+        # simple
+        self.scraper_tab_url = "data:text/plain,scraping ..."
+
         # create a new chromium window
         # https://developer.mozilla.org/en-US/docs/web/http/basics_of_http/data_urls
-        url = "data:text/html;charset=utf-8," + urllib.parse.quote(self.scraper_tab_html)
-        args = ["chromium", f"--user-data-dir={self.chromium_user_data_dir}", url]
+        args = [
+            "chromium",
+            f"--user-data-dir={self.chromium_user_data_dir}",
+            f"--remote-debugging-port={self.chromium_debug_port}",
+            self.scraper_tab_url
+        ]
         # note: when we call chromium for the first time
         # it will create the main process
         # further calls to chromium will create a new tab in the existing window
         # and the process ends immediately
+        # TODO parse the live output of chromium
+        # and produce pretty logger output
+        # so chromium does not break our logger output
         # TODO keep the logfile small
         chromium_logfile_handle = subprocess.DEVNULL
+        # verbose: always show the live output of chromium
+        # OSError: [Errno 9] Bad file descriptor
+        #chromium_logfile_handle = subprocess.STDOUT
         # TODO enable for debug
         if False:
-            chromium_logfile_path = tempfile.mktemp(suffix="-chromium-logfile.txt")
+            chromium_logfile_path = f"{tempdir}/chromium-logfile.txt"
             chromium_logfile_handle = open(chromium_logfile_path, "w")
             global_remove_files_when_done.append(chromium_logfile_path)
             logger_print(f"writing chromium logfile: {chromium_logfile_path}")
         self.chromium_process = subprocess.Popen(
             args,
-            stdout=chromium_logfile_handle,
+            # verbose: always show the live output of chromium
+            #stdout=chromium_logfile_handle,
             stderr=subprocess.STDOUT, # merge with stdout
             #check=True,
             env=self.xvnc_env,
@@ -1781,7 +1895,7 @@ class ChromiumHeadfulScraper():
             logger_print("xprop_output:", xprop_output)
 
         # TODO maximize the chromium window
-        logger_print("TODO maximize the chromium window")
+        #logger_print("TODO maximize the chromium window")
 
         if self.chromium_window_id == None:
             # search for the created chromium window
@@ -1789,6 +1903,8 @@ class ChromiumHeadfulScraper():
             self.chromium_window_id = search_chromium_window_id()
 
         if self.chromium_window_id == None:
+            #if chromium_logfile_handle != subprocess.DEVNULL:
+            #    # TODO print the logfile
             raise Exception("failed to create a new chromium window")
 
         logger_print("chromium_window_id", self.chromium_window_id)
@@ -1916,8 +2032,10 @@ class ChromiumHeadfulScraper():
             self.chromium_devtools_network_tab_clear_log_pos = self.calibrate_pos("chromium_devtools_network_tab_clear_log_pos")
             self.chromium_saving_har_file_pos = self.calibrate_pos("chromium_saving_har_file_pos")
 
-        self.chromium_command("Stop recording network log")
-        self.chromium_command("Clear network log")
+        # no. chromium does this by default when "preserve log" is off
+        #self.chromium_command("Stop recording network log")
+        #self.chromium_command("Clear network log")
+        #time.sleep(1)
 
         return self
 
@@ -2008,8 +2126,10 @@ class ChromiumHeadfulScraper():
 
         # TODO stop previous request if it is still loading. check screenshot of self.chromium_reload_page_pos
 
-        self.chromium_command("Clear network log")
-        self.chromium_command("Record network log")
+        # no. chromium does this by default when "preserve log" is off
+        #self.chromium_command("Clear network log")
+        #time.sleep(1)
+        #self.chromium_command("Record network log")
 
         # open the url
         if False:
@@ -2092,7 +2212,7 @@ class ChromiumHeadfulScraper():
             else:
                 logger_print(f"req{request_number}: chromium_reload_page: screenshot_path", screenshot_path)
 
-            if True:
+            if False:
                 # debug: write full screen shot
                 # useful for manually calibrating positions
                 full_screenshot_path = self.get_full_screenshot()
@@ -2110,7 +2230,7 @@ class ChromiumHeadfulScraper():
         if False:
             # save html file
             # use a random path to avoid the "file exists" dialog
-            html_file_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.html"
+            html_file_path = f"{tempdir}/response-{datetime_str()}-{random_hash()[0:8]}.html"
             self.notify_send_message(f"req{request_number}: saving html to {html_file_path}")
             self.clipboard_set_text(html_file_path)
             if self.is_multi_window:
@@ -2121,10 +2241,14 @@ class ChromiumHeadfulScraper():
 
         # TODO click "block notifications" on the first time we visit opensubtiles.org
 
+        # wait some time before saving the har file
+        # to make sure the har file is not empty
+        time.sleep(10)
+
         # save har file
         # note: file extension must be ".har" otherwise chromium will add ".har"
-        har_file_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.har"
-        logger_print(f"req{request_number}: exporting har file to {har_file_path}")
+        har_file_path = f"{tempdir}/response-{datetime_str()}-{random_hash()[0:8]}.har"
+        logger_print(f"req{request_number}: exporting har file: {har_file_path}")
         self.clipboard_set_text(har_file_path)
         if self.is_multi_window:
             self.xdotool("windowactivate", "--sync", self.chromium_window_id)
@@ -2174,13 +2298,15 @@ class ChromiumHeadfulScraper():
                 break
             #await asyncio.sleep(1)
             time.sleep(1)
+
         # wait for chromium to finish writing the har file
+        logger_print(f"req{request_number}: waiting for har file")
         previous_size = 0
         har = None
         # TODO check screenshots? "saving HAR file icon" in devtools
         while True:
             #await asyncio.sleep(1)
-            time.sleep(1)
+            time.sleep(2)
             size = os.path.getsize(har_file_path)
             logger_print(f"req{request_number}: har file size:", size)
             if size != previous_size:
@@ -2190,42 +2316,86 @@ class ChromiumHeadfulScraper():
             with open(har_file_path, "r") as har_file:
                 try:
                     har = json.load(har_file)
+                    logger_print(f"req{request_number}: done waiting for har file")
                     break
                 except json.decoder.JSONDecodeError:
-                    logger_print(f"req{request_number}: failed to parse json in har file:", har_file_path)
+                    logger_print(f"req{request_number}: failed to parse json in har file")
                     continue
+
+        logger_print(f"req{request_number}: parsing har file")
+
         # parse the HAR file
         # see also chrome-example-har-file.json
         # see also docs/example-empty-har-file.json
         # FIXME every second har file is empty = has 155 bytes
         # 5 of 10 requests return an empty har file
         # maybe we need more time.sleep?
-        # or less "clear network log" commands?
+        # or less "Clear network log" commands?
         response_har = None
         response_har_path = None
+
+        response_content = None
+        response_encoding = None
+
+        content_length = None
+        content_filename = None
+        content_filepath = None
+
         if return_har_path:
             response_har_path = har_file_path
+
         #with open(har_file_path, "r") as har_file:
         #    har = json.load(har_file)
+
         if return_har:
             response_har = har
+
         if not "log" in har:
-            raise NotImplementedError(f"failed to parse har file: {har_file_path}")
+            raise NotImplementedError(f"req{request_number}: failed to parse har file: {har_file_path}")
+
+        # FIXME why?
         if not "entries" in har["log"] or len(har["log"]["entries"]) == 0:
-            raise NotImplementedError(f"no entries in har file: {har_file_path}")
+            # debug: write full screen shot
+            full_screenshot_path = self.get_full_screenshot()
+            logger_print(f"req{request_number}: debug: full screenshot:", full_screenshot_path)
+            raise NotImplementedError(f"req{request_number}: no entries in har file: {har_file_path}")
             #raise NotImplementedError(f"not found response in har file: {har_file_path}")
+
         har_entry = har["log"]["entries"][0]
+
         if har_entry["request"]["url"] != url:
             logger_print(f"req{request_number}: url =", repr(url))
             logger_print(f"req{request_number}: har_entry request url =", repr(har_entry["request"]["url"]))
             logger_print(f"req{request_number}: har_entry request queryString =", repr(har_entry["request"]["queryString"]))
-            raise NotImplementedError(f"unexpected url in har file: {har_file_path}")
+            raise NotImplementedError(f"req{request_number}: unexpected url in har file: {har_file_path}")
+
+        logger_print(f"req{request_number}: validating har file")
+
         # validate
         if not "response" in har_entry:
-            raise NotImplementedError(f"missing response in har file: {har_file_path}")
+            raise NotImplementedError(f"req{request_number}: missing response in har file: {har_file_path}")
+
         if not "content" in har_entry["response"]:
-            raise NotImplementedError(f"missing response content in har file: {har_file_path}")
+            raise NotImplementedError(f"req{request_number}: missing response content in har file: {har_file_path}")
+
+        response_status = har_entry["response"]["status"]
+        response_type = har_entry["response"]["content"]["mimeType"]
+        response_headers = self.Headers(har_entry["response"]["headers"])
+
+        # har_entry["response"]["status"] = 200
+
+        # har_entry["response"]["headers"]
+        # Content-Disposition: attachment; filename="asdf.zip"
+        # Content-Length: 12345
+        # Content-Type: application/zip
+        # Content-Transfer-Encoding: Binary
+
+        # har_entry["response"]["content"]["size"] = 0
+        # har_entry["response"]["content"]["mimeType"] = "application/zip"
+        # har_entry["response"]["content"]["compression"] = 0
+
         if not "text" in har_entry["response"]["content"]:
+
             # TODO when the response is binary only
             # then the response content is written only to disk
             # and is not stored in the HAR file
@@ -2233,41 +2403,134 @@ class ChromiumHeadfulScraper():
             # add a file handle response.content to the downloaded file
             # the file name should be in response_headers.get("Content-Disposition")
             # example content_disposition: 'attachment; filename="some-file.zip"'
-            raise NotImplementedError(f"missing response text in har file: {har_file_path}")
-        # finally: set status and response_text
-        response_status = har_entry["response"]["status"]
-        response_type = har_entry["response"]["content"]["mimeType"]
-        response_headers = har_entry["response"]["headers"]
-        # TODO handle binary response
-        #response_text = har_entry["response"]["content"]["text"]
-        response_encoding = "utf8" # TODO
-        response_content = har_entry["response"]["content"]["text"].encode(response_encoding)
-        # validate
-        # note: size is the byte size == len(response_text.encode("utf8"))
-        # not the number of characters == len(response_text)
-        #if har_entry["response"]["content"]["size"] != len(response_text.encode(response_encoding)):
-        if har_entry["response"]["content"]["size"] != len(response_content):
-            #logger_print(f"req{request_number}: len(response_text) =", len(response_text.encode("utf8")))
-            logger_print(f"req{request_number}: len(response_content) =", len(response_content))
-            logger_print(f"req{request_number}: har_entry request content size =", repr(har_entry["response"]["content"]["size"]))
-            raise NotImplementedError(f"unexpected response text size in har file: {har_file_path}")
+            #raise NotImplementedError(f"req{request_number}: missing response text in har file: {har_file_path}")
+            # find the downloaded file
+
+            content_disposition = response_headers.get("Content-Disposition")
+            content_length = response_headers.get("Content-Length")
+
+            # TODO remove? already handled by scraper
+            if content_disposition != None and content_length != None:
+
+                # parse filename from the Content-Disposition header
+                # https://stackoverflow.com/a/73418983/10440128
+                value, params = cgi.parse_header(content_disposition)
+
+                if value != "attachment":
+                    raise NotImplementedError(f"TODO handle non-attachment content_disposition {repr(content_disposition)}")
+
+                content_filename = pyrfc6266.parse_filename(content_disposition)
+
+
+
+        if content_filename == None:
+
+            if "text" in har_entry["response"]["content"]:
+
+                #response_text = har_entry["response"]["content"]["text"]
+                response_encoding = "utf8" # TODO
+                response_content = har_entry["response"]["content"]["text"].encode(response_encoding)
+
+                logger_print(f"req{request_number}: validating content size")
+                # validate size
+                # note: size is the byte size == len(response_text.encode("utf8"))
+                # not the number of characters == len(response_text)
+                #if har_entry["response"]["content"]["size"] != len(response_text.encode(response_encoding)):
+                if har_entry["response"]["content"]["size"] != len(response_content):
+                    #logger_print(f"req{request_number}: len(response_text) =", len(response_text.encode("utf8")))
+                    logger_print(f"req{request_number}: len(response_content) =", len(response_content))
+                    logger_print(f"req{request_number}: har_entry request content size =", repr(har_entry["response"]["content"]["size"]))
+                    raise NotImplementedError(f"req{request_number}: unexpected response text size in har file: {har_file_path}")
+
+            # else:
+            # content is missing with status 500
+            #   "response": {
+            #     "status": 500,
+            #     "statusText": "Internal Server Error",
+            #     "httpVersion": "http/2.0",
+            #     "content": {
+            #       "size": 0,
+            #       "mimeType": "text/html"
+            #     },
+
+        else:
+
+            # content_filename is set
+            # find the downloaded file
+            content_filepath = f"{self.downloads_path}/{content_filename}"
+
+            if not os.path.exists(content_filepath):
+
+                # file was renamed by chromium
+
+                # try "file (1).txt", "file (2).txt", "file (3).txt", ...
+                # FIXME chromium will rename *.tar.gz files like "file (1).tar.gz"
+                # currently this is handled by "search by file size and mtime"
+                base, ext = os.path.splitext(content_filename)
+                found = False
+                for num in range(1, 11):
+                    content_filepath = f"{self.downloads_path}/{base} ({num}).{ext}"
+                    if os.path.exists(content_filepath):
+                        found = True
+                        break
+
+                if not found:
+                    # search by file size and mtime
+                    raise NotImplementedError(f"req{request_number}: TODO search by file size and mtime. size={content_length}")
+                    # TODO search by file size and mtime
+                    # find the latest file with the same file size
+                    # glob all files in self.downloads_path, non-recursive
+                    # filter by file size
+                    # sort by mtime descending
+
+                    # old code...
+                    downloaded_files = glob.glob(self.downloads_path + "/*")
+                    logger_print(f"req{request_number}: downloaded_files", downloaded_files)
+                    if len(downloaded_files) != 1:
+                        logger_print(f"req{request_number}: error: found multiple downloaded files:", downloaded_files)
+                        raise NotImplementedError
+                    # len(downloaded_files) == 1
+                    filepath = downloaded_files[0]
+                    filename = os.path.basename(filepath)
+
+            logger_print(f"req{request_number}: found downloaded file", content_filepath)
+
+            # move file to done_downloads folder
+            # note: this folder should not exist, so dont use exist_ok=True
+            os.makedirs(f"{self.done_downloads_path}/req{request_number}")
+            new_content_filepath = f"{self.done_downloads_path}/req{request_number}/{content_filename}"
+            logger_print(f"req{request_number}: moving downloaded file to", new_content_filepath)
+            # os.rename would replace existing dst file
+            if os.path.exists(new_content_filepath):
+                raise Exception(f"file exists: {new_content_filepath}")
+            os.rename(content_filepath, new_content_filepath)
+            content_filepath = new_content_filepath
+
+            # TODO close file handle and delete file in destructor of Response
+            response_content = open(content_filepath, "rb")
+
+        logger_print(f"req{request_number}: getting status + headers + text from har file")
 
         # delete har file
         # TODO allow to keep the har file for debugging
         if return_har_path == False:
+            logger_print(f"req{request_number}: deleting har file")
             os.unlink(har_file_path)
 
         #raise NotImplementedError
 
         #await asyncio.sleep(5) # TODO dynamic
 
-        self.chromium_command("Stop recording network log")
-        self.chromium_command("Clear network log")
+        # no. chromium does this by default when "preserve log" is off
+        #logger_print(f"req{request_number}: Stop recording network log")
+        #self.chromium_command("Stop recording network log")
+        #self.chromium_command("Clear network log")
+        #time.sleep(1)
 
         # done. close the page
         if keep_page_open == False:
-            url = "data:text/html;charset=utf-8," + urllib.parse.quote(self.scraper_tab_html)
-            self.clipboard_set_text(url)
+            logger_print(f"req{request_number}: closing page")
+            self.clipboard_set_text(self.scraper_tab_url)
             if self.is_multi_window:
                 self.xdotool("windowactivate", "--sync", self.chromium_window_id)
             self.xdotool("mousemove", *self.chromium_address_bar_pos)
@@ -2275,16 +2538,26 @@ class ChromiumHeadfulScraper():
             # paste the url with control+v
             self.xdotool("key", "Control+l", "Control+v", "return")
 
+        logger_print(f"req{request_number}: done response")
+
         response = self.Response(
             response_status,
-            self.Headers(response_headers),
+            response_headers,
             response_type,
             response_encoding,
+            content_length,
+            content_filename,
+            content_filepath,
             #response_text,
             response_content,
             response_har,
             response_har_path,
+            request_number,
         )
+
+        # TODO pass to Response
+        # content_filename
+        # content_filepath content_length
 
         return response
 
@@ -2351,41 +2624,26 @@ class ChromiumHeadfulScraper():
             y,
         )
 
-    def get_screenshot(self, center_pos=None, bbox=None, name=None, delta=15):
+    def get_screenshot(self, name=None, center_pos=None, delta=15, bbox=None, full=False):
         # tiff is 2x faster than png, but 20x larger, so only good in tmpfs
         # use png for storage. the conversion between png and tiff is lossless:
         # for tiff in *.tiff; do convert $tiff $tiff.png; done
         # for tiff in *.tiff; do echo $(convert $tiff png:- | convert png:- tiff:- | sha1sum - | cut -d' ' -f1) $tiff; done
-        basename = f"fetch-subs-{name}" if name else "fetch-subs"
-        screenshot_path = f"{tempdir}/{basename}-{datetime_str()}-{random_hash()}.tiff"
+        basename = f"{name}-" or ""
+        screenshot_path = f"{self.screenshots_path}/{basename}{datetime_str()}-{random_hash()[0:8]}.tiff"
+        import_args = ["-window", "root", "-colorspace", "Gray"]
         if center_pos:
             crop = self.crop_of_center_pos(center_pos, delta)
-            # import -window root -crop $crop -colorspace Gray $screenshot_path
-            args = ["import", "-window", "root", "-crop", crop, "-colorspace", "Gray", screenshot_path]
-            subprocess.run(
-                args,
-                capture_output=True,
-                check=True,
-                env=self.xvnc_env,
-            )
-            return screenshot_path
-
-        if bbox:
+            import_args += ["-crop", crop]
+        elif bbox:
             crop = self.crop_of_bbox(bbox)
-            args = ["import", "-window", "root", "-crop", crop, "-colorspace", "Gray", screenshot_path]
-            subprocess.run(
-                args,
-                capture_output=True,
-                check=True,
-                env=self.xvnc_env,
-            )
-            return screenshot_path
-
-        raise NotImplementedError("get_screenshot: center_pos == None")
-
-    def get_full_screenshot(self):
-        screenshot_path = f"{tempdir}/fetch-subs-{datetime_str()}-{random_hash()}.tiff"
-        args = ["import", "-window", "root", "-colorspace", "Gray", screenshot_path]
+            import_args += ["-crop", crop]
+        elif full:
+            # dont crop, capture the full screen
+            pass
+        else:
+            raise NotImplementedError("get_screenshot: center_pos == None")
+        args = ["import"] + import_args + [screenshot_path]
         subprocess.run(
             args,
             capture_output=True,
@@ -2393,6 +2651,9 @@ class ChromiumHeadfulScraper():
             env=self.xvnc_env,
         )
         return screenshot_path
+
+    def get_full_screenshot(self):
+        return self.get_screenshot(full=True, name="full")
 
     def show_image(self, image_path):
         args = ["feh", image_path]
@@ -2470,6 +2731,9 @@ async def main():
 
     global user_agents
     global chromium_headful_scraper
+
+    logger_print(f"creating tempdir {tempdir}")
+    os.makedirs(tempdir, exist_ok=True)
 
     if options.proxy_provider == "zenrows.com":
 
@@ -2649,6 +2913,9 @@ async def main():
         async with aiohttp.ClientSession(**aiohttp_kwargs) as aiohttp_session:
 
             if options.last_num == None:
+
+                # first request
+                # this can already be blocked by captcha
                 logger_print(f"getting options.last_num from remote")
                 url = "https://www.opensubtitles.org/en/search/subs"
 
@@ -2664,11 +2931,21 @@ async def main():
                     response_text = await response.text()
 
                 elif options.proxy_provider == "chromium":
-                    response = await chromium_headful_scraper.get_response(url)
+                    response = await chromium_headful_scraper.get_response(
+                        url,
+                        return_har_path=True, # debug
+                    )
                     response_status = response.status
                     response_type = response.headers.get("Content-Type")
                     # TODO handle binary response
-                    response_text = await response.text()
+                    # FIXME handle redirects to captcha page
+                    # see also docs/captchas.md
+                    if response.status == 200:
+                        response_text = await response.text()
+                    elif response.status == 301:
+                        # first response is a redirect
+                        # probably the result is a captcha page
+                        raise NotImplementedError("FIXME ideally solve this in chromium_headful_scraper.get_response")
 
                 else:
                     raise NotImplementedError(f"options.proxy_provider {options.proxy_provider}")
