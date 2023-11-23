@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 
-# python -u ./repack.py | tee -a repack.py.log
-# python -u opensubtitles_dump_client/repack.py | tee -a repack.py.log
+# python -u opensubtitles_dump_client/repack.py | tee -a opensubtitles_dump_client/repack.py.log
 
 # good signs:
 # - no "keeping weird file name"
@@ -19,6 +18,7 @@ import lzma
 import re
 import hashlib
 import time
+import tempfile
 
 import magic # libmagic
 
@@ -34,11 +34,8 @@ opensubs_db_path = "opensubs.db"
 metadata_db_path = "opensubs-metadata.db"
 movie_names_db_path = "opensubs-movie-names.db"
 
-tempdir = f"/run/user/{os.getuid()}/opensubs-repack" # tmpfs
-
-output_dir = f"repack-grouped/{lang_code}"
-
-cached_zip_dir = "done-zips"
+opensubs_db_first_sub_number = 1
+opensubs_db_last_sub_number = 9180518
 
 convert_to_utf8 = False
 convert_to_utf8 = True
@@ -62,11 +59,10 @@ def is_sub_content(file_content):
             return False
     return True
 
-debug_stop_after_first_group = False
-#debug_stop_after_first_group = True
-
 debug_stop_after_n_groups = None
+#debug_stop_after_n_groups = 1
 #debug_stop_after_n_groups = 1000
+debug_stop_after_n_groups = 10
 
 # good for real-world users:
 # have one movie, get all subs in one language
@@ -82,9 +78,35 @@ repack_strategy_hash_bits = 16 # hash size in bits
 # subs for one movie are fragmented
 # across many archives
 # good for updates: old archives are immutable
-#repack_strategy = "group-by-sub-number"
-repack_strategy_group_size = 100
+# good for storage: old data is immutable
+# good for compression: more files per archive than "group by movie name"
+repack_strategy = "group-by-sub-number"
+# how many files per archive?
+# 1200 new subs per day are added to opensubtitles
+# the first dump had 5719123 (6M) zipped subtitles in 127.70 GiB
+# this means about 23.41 KiB per zipfile
+# TODO uncompressed size
 # bad compression: only 3% better than zip files, see readme.md
+repack_strategy_group_size = 100
+repack_strategy_group_size = 10*1000
+repack_strategy_group_size = 10 # debug
+repack_strategy_group_size = 100 # xz is 40% smaller than zip
+repack_strategy_group_size = 1000 # xz is 40% smaller than zip
+
+debug_stop_after_n_groups = 2
+debug_stop_after_n_groups = 1
+
+# 10 * 100 subs = 70 MB tempfiles
+# 2 * 1000 subs = 140 MB tempfiles
+
+# /run/user/1000/opensubs-repack
+# NOTE tmpfs is limited by size of RAM
+tempdir = f"/run/user/{os.getuid()}/opensubs-repack" # tmpfs
+
+output_dir = f"repack-grouped/{lang_code}/group-size-{repack_strategy_group_size}"
+
+cached_zip_dir = "done-zips"
+
 
 
 # global state
@@ -92,7 +114,13 @@ repack_strategy_group_size = 100
 opensubs_db_connection = None
 metadata_db_connection = None
 movie_names_db_connection = None
+
+opensubs_db_cursor = None
+
 cached_zip_files = None
+
+keep_tempdir = False
+keep_tempdir = True # debug
 
 
 def main():
@@ -102,11 +130,11 @@ def main():
     global metadata_db_connection
     global cached_zip_files
     global opensubs_db_connection
+    global movie_names_db_connection
     global lang_code
 
     assert os.path.exists(opensubs_db_path), "error: missing input file"
     assert os.path.exists(metadata_db_path), "error: missing input file"
-    assert os.path.exists(movie_names_db_path), "error: missing input file"
 
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(cached_zip_dir, exist_ok=True)
@@ -118,8 +146,6 @@ def main():
     # default: rows are tuples (faster)
     #metadata_db_connection.row_factory = sqlite3.Row # rows are dicts
     # metadata_data
-
-    movie_names_db_connection = sqlite3.connect(movie_names_db_path)
 
     cached_zip_files = glob.glob(f"{cached_zip_dir}/*.zip")
     cached_zip_files_by_num = dict()
@@ -135,6 +161,8 @@ def main():
             select num, zipfile
             from subz_zipfiles
         """
+        assert os.path.exists(movie_names_db_path), "error: missing input file"
+        movie_names_db_connection = sqlite3.connect(movie_names_db_path)
         sql_cursor = movie_names_db_connection.cursor()
         # FIXME movie_name != group_name
         # movie_name: '"Abby Hatcher, Fuzzly Catcher" Otis on the Go/Abby\'s Afraid'
@@ -149,63 +177,142 @@ def main():
                 # dont count
                 continue
             done_groups += 1
-            if debug_stop_after_first_group:
-                break
             if debug_stop_after_n_groups and done_groups >= debug_stop_after_n_groups:
                 break
             print()
 
     elif repack_strategy == "group-by-sub-number":
-        group_first_sub_number = 1
-        last_sub_number = 9180517 # opensubs.db-last-num.sh
-        archive_number = 0
-        raise NotImplementedError("dont use index.txt")
-        index_file = open("index.txt", "r")
-        while group_first_sub_number < last_sub_number:
-            archive_number += 1
-            # avoid reading sqlite - prefer index.txt
-            #opensubs_db_cursor.execute(
-            #    "select num from subz where num >= (?) limit (?)",
-            #    (group_first_sub_number, repack_strategy_group_size)
-            #)
-            #sub_numbers = opensubs_db_cursor.fetchall()
-            sub_numbers = []
-            end_of_input = False
-            while len(sub_numbers) < repack_strategy_group_size:
-                try:
-                    line = index_file.readline()
-                # TODO be more specific
-                except Exception as err:
-                    print("end of index_file?", err)
-                    end_of_input = True
+        sql_query = "SELECT IDSubtitle FROM subz_metadata WHERE ISO639 = ? AND IDSubtitle BETWEEN ? AND ?"
+        sql_args = (lang_code_short, opensubs_db_first_sub_number, opensubs_db_last_sub_number)
+        sub_numbers = []
+        done_groups = 0
+        sql_cursor = metadata_db_connection.cursor()
+        for (sub_number,) in sql_cursor.execute(sql_query, sql_args):
+            #print("sub_number", sub_number)
+            #if len(sub_numbers) >= 10: raise NotImplementedError
+            sub_numbers.append(sub_number)
+            if len(sub_numbers) >= repack_strategy_group_size:
+                repack_by_sub_numbers(sub_numbers)
+                sub_numbers = [] # start a new group
+                done_groups += 1
+                if debug_stop_after_n_groups and done_groups >= debug_stop_after_n_groups:
                     break
-                sub_number = int(line.split(" ", 2)[0])
-                sub_numbers.append(sub_number)
-            print(f"archive {archive_number}: sub_numbers:", sub_numbers)
+        # last group
+        if len(sub_numbers) > 0:
             repack_by_sub_numbers(sub_numbers)
-            group_first_sub_number = sub_numbers[-1] + 1
-            if debug_stop_after_first_group:
-                break
-            if end_of_input:
-                break
 
     elif repack_strategy == "group-by-movie-name-hash":
         #repack_strategy_hash_bits = 16 # hash size in bits
         raise NotImplementedError
 
 
-def repack_by_sub_numbers(sub_numbers):
-    range_str = f"{sub_numbers[0]}-{sub_numbers[-1]}"
-    tarxz_path = f"{output_dir}/{range_str}.tar.bz2"
-    if os.path.exists(tarxz_path):
+
+def repack_by_sub_numbers(sub_numbers, group_name=None):
+    sub_numbers.sort()
+    if len(sub_numbers) == 0:
+        print(f"repack_by_sub_numbers: no subs")
         return
+    if not group_name:
+        group_name = f"{sub_numbers[0]}-{sub_numbers[-1]}"
+    print("group", group_name)
+    group_tempdir = f"{tempdir}/{group_name}"
+    #print("group_tempdir", group_tempdir)
+    if os.path.exists(group_tempdir):
+        print("keeping", group_tempdir)
+    else:
+        shutil.rmtree(group_tempdir, ignore_errors=True)
+        os.makedirs(group_tempdir) # exist_ok=True
+        # TODO use files in group_tempdir
+        # to benchmark different compression algorithms
 
-    group_tempdir = f"{tempdir}/{range_str}"
-    shutil.rmtree(group_tempdir, ignore_errors=True)
-    os.makedirs(group_tempdir) # exist_ok=True
-    print("group_tempdir", group_tempdir)
+        #print("group_start", sub_numbers[0])
 
-    print("sub_numbers[0]", sub_numbers[0])
+        """
+        if os.path.exists(tar_xz_path):
+            print(f"xz exists: {tar_xz_path}")
+            return False
+        """
+
+        print(f"group {group_name}: unpacking {len(sub_numbers)} zipfiles")
+
+        for sub_number in sub_numbers:
+            # TODO why movie_name, movie_year
+            #extract_movie_sub(sub_number, group_tempdir, movie_name, movie_year)
+            extract_movie_sub(sub_number, group_tempdir)
+
+        #print("group_tempdir", group_tempdir)
+
+    print(f"group {group_name}: compressing subs")
+
+    # TODO create reproducible archives with python tarfile
+    #compress_group_tempdir_in_memory(group_tempdir, tar_xz_path)
+    #compress_group_in_file(group_tempdir, tar_xz_path)
+
+    # TODO refactor compress_dir_tar and compress_dir_squashfs
+
+    # lzip: command not found
+    # lzop: command not found
+    # compress: command not found
+    #for compressor in ["xz", "gz", "bz2", "lzip", "lzma", "lzop", "zstd", "compress"]:
+    for compressor in ["xz", "gz", "bz2", "lzma", "zstd"]:
+        output_path = f"{output_dir}/{group_name}.tar.{compressor}"
+        if os.path.exists(output_path):
+            print(f"keeping {output_path}")
+            #os.unlink(output_path)
+        else:
+            print(f"writing {output_path}")
+            compress_dir_tar(group_tempdir, output_path, compressor)
+
+    for compressor in ["xz", "gzip", "lzma", "lzo", "lz4", "zstd"]:
+        output_path = f"{output_dir}/{group_name}.{compressor}.sqfs"
+        if os.path.exists(output_path):
+            print(f"keeping {output_path}")
+            #os.unlink(output_path)
+        else:
+            print(f"writing {output_path}")
+            compress_dir_squashfs(group_tempdir, output_path, compressor)
+
+    # https://sigma-star.at/blog/2022/07/squashfs-erofs/
+    # TODO mkfs.erofs --all-root -zxz repack-grouped/eng/group-size-1000/1-17839.xz.erofs /run/user/1000/opensubs-repack/1-17839/
+    # TODO mkfs.erofs --all-root -zlz4_hc repack-grouped/eng/group-size-1000/1-17839.lz4_hc.erofs /run/user/1000/opensubs-repack/1-17839/
+
+    tar_xz_path = f"{output_dir}/{group_name}.tar.xz"
+
+    content_size = path_getsize_recursive(group_tempdir)
+    tar_xz_size = os.path.getsize(tar_xz_path)
+
+    """
+    zip_files_size = 0
+    for sub_number, sub_MovieKind in sql_cursor.execute(sql_query, sql_args):
+        # sub 9175277: FIXME missing metadata, cannot get MovieKind, skipping this sub
+        # KeyError: 9175277
+        # TODO why is sub_number in movie_subs but not in metadata
+        # its not in cached_zip_files because we did not process this sub
+        if sub_MovieKind == "tv": # TODO remove
+            continue
+        if not sub_number in cached_zip_files:
+            continue
+        zip_file = cached_zip_files[sub_number]
+        zip_files_size += os.path.getsize(zip_file)
+    """
+
+    zip_files_size = 0
+    for sub_number in sub_numbers:
+        if not sub_number in cached_zip_files:
+            continue
+        zip_file = cached_zip_files[sub_number]
+        zip_files_size += os.path.getsize(zip_file)
+
+    smaller_percent = (zip_files_size - tar_xz_size) / zip_files_size * 100
+
+    # print compression stats
+    tar_xz_name = os.path.basename(tar_xz_path)
+    print(f"tar {tar_xz_name}: raw {content_size / 1000:.0f}K = zips {zip_files_size / 1000:.0f}K = xz {tar_xz_size / 1000:.0f}K = {smaller_percent:.0f}% smaller")
+
+    # cleanup
+    if not keep_tempdir:
+        shutil.rmtree(group_tempdir, ignore_errors=True)
+
 
 
 def filter_tarinfo(tarinfo):
@@ -241,20 +348,11 @@ def repack_by_movie_name(movie_name, movie_year, lang_code, lang_code_short):
             f"invalid group name: {group_name}"
         )
 
-    group_tempdir = f"{tempdir}/{group_name}"
-    tar_xz_path = f"{output_dir}/{group_name}.tar.xz"
-    if os.path.exists(tar_xz_path):
-        #print(f"exists: {tar_xz_path}")
-        return False
+    sub_numbers = []
+
+# TODO
 
 
-    group_tempdir = f"{tempdir}/{group_name}"
-    shutil.rmtree(group_tempdir, ignore_errors=True)
-    os.makedirs(group_tempdir) # exist_ok=True
-    #print("group_tempdir", group_tempdir)
-
-    #print("movie_subs[0]", movie_subs[0])
-    print(f"dir {group_name}")
 
     # TODO advanced duplicate detection
     # when two subs have the exact same text
@@ -294,43 +392,11 @@ def repack_by_movie_name(movie_name, movie_year, lang_code, lang_code_short):
             # s01e01
             # season1.episode1
             continue
-        extract_movie_sub(sub_number, group_tempdir, movie_name, movie_year)
+        sub_numbers.append(sub_number)
         num_subs += 1
 
-    if num_subs == 0:
-        print(f"dir {group_name}: no subs")
-        return
+    return repack_by_sub_numbers(sub_numbers, group_name)
 
-    #print("group_tempdir", group_tempdir)
-
-    # TODO create reproducible archives with python tarfile
-    #compress_group_tempdir_in_memory(group_tempdir, tar_xz_path)
-    #compress_group_in_file(group_tempdir, tar_xz_path)
-    compress_group_in_file_shell(group_tempdir, tar_xz_path)
-
-    content_size = path_getsize_recursive(group_tempdir)
-    tar_xz_size = os.path.getsize(tar_xz_path)
-    zip_files_size = 0
-    for sub_number, sub_MovieKind in sql_cursor.execute(sql_query, sql_args):
-        # sub 9175277: FIXME missing metadata, cannot get MovieKind, skipping this sub
-        # KeyError: 9175277
-        # TODO why is sub_number in movie_subs but not in metadata
-        # its not in cached_zip_files because we did not process this sub
-        if sub_MovieKind == "tv": # TODO remove
-            continue
-        if not sub_number in cached_zip_files:
-            continue
-        zip_file = cached_zip_files[sub_number]
-        zip_files_size += os.path.getsize(zip_file)
-
-    smaller_percent = (zip_files_size - tar_xz_size) / zip_files_size * 100
-
-    # print compression stats
-    tar_xz_name = os.path.basename(tar_xz_path)
-    print(f"tar {tar_xz_name}: raw {content_size / 1000:.0f}K zips {zip_files_size / 1000:.0f}K xz {tar_xz_size / 1000:.0f}K = {smaller_percent:.0f}% smaller")
-
-    # cleanup
-    shutil.rmtree(group_tempdir, ignore_errors=True)
 
 
 # https://stackoverflow.com/a/1392549/10440128
@@ -396,32 +462,43 @@ def compress_group_in_file(group_tempdir, tar_xz_path):
     print(f"writing {tar_xz_path} done")
 
 
-def compress_group_in_file_shell(group_tempdir, tar_xz_path):
-    """
-    create tar.xz file from tar file
-    using the external tar program
-    """
-    tar_path = tar_xz_path[0:-3] # remove ".xz"
-    group_name = os.path.basename(group_tempdir)
-    #print(f"writing {tar_xz_path} ...")
+def compress_dir_tar(input_path, output_path, compressor="xz"):
+    assert output_path.endswith(f".tar.{compressor}"), f"expected suffix .tar.{compressor} in file path: {output_path}"
+    tar_path = output_path[0:-3] # remove ".xz"
+    group_name = os.path.basename(input_path)
+    #print(f"writing {output_path} ...")
     tar_files = []
     tar_cwd = None
     if False:
         # store multiple folders in the archive
-        for sub_dir in os.listdir(group_tempdir):
+        for sub_dir in os.listdir(input_path):
             if os.path.isfile(sub_dir):
                 continue
             if sub_dir == "split-archives": continue # TODO remove
             tar_files.append(sub_dir)
-        # tar_files are relative to group_tempdir
-        tar_cwd = group_tempdir
+        # tar_files are relative to input_path
+        tar_cwd = input_path
     else:
         # store one folder in the archive
-        tar_files = [os.path.basename(group_tempdir)]
-        # tar_files are relative to parent dir of group_tempdir
-        tar_cwd = os.path.dirname(group_tempdir)
+        tar_files = [os.path.basename(input_path)]
+        # tar_files are relative to parent dir of input_path
+        tar_cwd = os.path.dirname(input_path)
     # need absolute path because we change cwd
-    tar_xz_path_abs = os.path.abspath(tar_xz_path)
+    tar_xz_path_abs = os.path.abspath(output_path)
+
+    compressor_arg_of_compressor = {
+        "xz": "--xz", # compress with xz (default settings: level 6, no --extreme)
+        "gz": "--gzip",
+        "bz2": "--bzip2",
+        "lzip": "--lzip",
+        "lzma": "--lzma",
+        "lzop": "--lzop",
+        "zstd": "--zstd",
+        "compress": "--compress",
+    }
+
+    compressor_arg = compressor_arg_of_compressor[compressor]
+
     subprocess.run(
         [
             "tar",
@@ -436,18 +513,18 @@ def compress_group_in_file_shell(group_tempdir, tar_xz_path):
             "--group=0",
             "--numeric-owner",
             "-c", # create archive
-            "--xz", # compress with xz (default settings: level 6, no --extreme)
+            compressor_arg,
             "-f", tar_xz_path_abs, # output file
         ] + tar_files, # input files
         cwd=tar_cwd,
         check=True,
     )
-    #print(f"writing {tar_xz_path} done")
+    #print(f"writing {output_path} done")
 
     if False:
         # run xz separately to compress .tar to .tar.xz
         # this gives the exact same result as "tar --xz"
-        print(f"writing {tar_xz_path} ...")
+        print(f"writing {output_path} ...")
         subprocess.run(
             [
                 "xz",
@@ -456,10 +533,55 @@ def compress_group_in_file_shell(group_tempdir, tar_xz_path):
             ],
             check=True,
         )
-        print(f"movie {group_name}: writing {tar_xz_path} done")
+        print(f"movie {group_name}: writing {output_path} done")
 
 
-def extract_movie_sub(sub_number, group_tempdir, movie_name, movie_year):
+
+def compress_dir_squashfs(input_path, output_path, compressor="xz"):
+    assert output_path.endswith(f".{compressor}.sqfs"), f"expected suffix .{compressor}.sqfs in file path: {output_path}"
+    #print(f"writing {output_path} ...")
+    pack_file = tempfile.mktemp()
+    with open(pack_file, "w") as f:
+        lines = [
+            f"glob / 0555 0 0 -type d {input_path}",
+            f"glob / 0444 0 0 -type f {input_path}",
+        ]
+        f.write("\n".join(lines) + "\n")
+    args = [
+        "gensquashfs",
+        "--quiet",
+        "--compressor", compressor,
+        "--all-root",
+        "--pack-file", pack_file,
+        "--pack-dir", input_path,
+        output_path
+    ]
+    subprocess.run(
+        args,
+        check=True,
+    )
+    os.unlink(pack_file)
+    #print(f"writing {output_path} done")
+
+
+
+def sha1sum(file_path):
+    # https://stackoverflow.com/questions/22058048/hashing-a-file-in-python
+    # BUF_SIZE is totally arbitrary, change for your app!
+    BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+    #md5 = hashlib.md5()
+    sha1 = hashlib.sha1()
+    with open(file_path, 'rb') as f:
+        while data := f.read(BUF_SIZE):
+            #md5.update(data)
+            sha1.update(data)
+    return sha1.digest()
+    #print("SHA1: {0}".format(sha1.hexdigest()))
+
+
+
+#def extract_movie_sub(sub_number, group_tempdir, movie_name, movie_year):
+def extract_movie_sub(sub_number, group_tempdir):
     # TODO split this function
     # TODO recode in a separate function (convert_to_utf8)
     # TODO test recode
@@ -485,13 +607,24 @@ def extract_movie_sub(sub_number, group_tempdir, movie_name, movie_year):
             # default: rows are tuples
             opensubs_db_connection.row_factory = sqlite3.Row # rows are dicts
             opensubs_db_cursor = opensubs_db_connection.cursor()
+        #print(f"getting zipfile number {sub_number}")
         opensubs_db_cursor.execute("select * from subz where num = (?)", (sub_number,))
         row = opensubs_db_cursor.fetchone()
+        if row == None:
+            # $ sqlite3 opensubs-metadata.db "select * from subz_metadata where IDSubtitle = 504"
+            # 504|Bad Education|2004|English|en|2005-04-14 02:35:02|275491|srt|1|bad education|0.0|0|0|0|movie|http://www.opensubtitles.org/subtitles/504/bad-education-en
+            # $ sqlite3 opensubs.db "select name from subz where num = 504" | wc -l 
+            # 0
+            # FIXME some subs are missing in opensubs.db
+            #raise NotImplementedError(f"FIXME zipfile not found for sub_number {sub_number}")
+            print(f"FIXME zipfile not found for sub_number {sub_number}")
+            return False
         #print("row", repr(row)[0:200], "...")
         zip_name = row["name"][22:-1] # example: pulp.fiction.zip
         zip_basename = zip_name[0:-4] # example: pulp.fiction
         zip_path = f"{cached_zip_dir}/{sub_number:09d}.{zip_name}" # example: ../done-zips/000000123.pulp.fiction.zip
         cached_zip_files[sub_number] = zip_path
+        #print(f"writing zipfile {zip_path}")
         # atomic write
         with open(zip_path + ".tmp", "wb") as f:
             f.write(row["file"])
@@ -901,6 +1034,7 @@ def extract_movie_sub(sub_number, group_tempdir, movie_name, movie_year):
             if not re.fullmatch(expr_filename_extension, filename_extension.lower()):
                 old_filepath_base, filename_extension = filepath, ""
             duplicate_number = 1
+            this_filename_filepaths = [filepath]
             while filepath in seen_filepaths:
                 # TODO check for duplicate file_content
                 # if file exists with exact same file_content, then keep only the first file
@@ -912,11 +1046,8 @@ def extract_movie_sub(sub_number, group_tempdir, movie_name, movie_year):
                 # 3 = duplicate 2
                 duplicate_number += 1
                 filepath = f"{old_filepath_base}.{duplicate_number}{filename_extension}"
+                this_filename_filepaths.append(filepath)
                 done_rename = True
-            seen_filepaths.add(filepath)
-            if done_rename:
-                print(f"sub {group_name} {sub_number}: renaming duplicate file from {repr(old_filepath)} to {repr(filepath)}")
-                # FIXME? sub 62421: renaming duplicate file from 'Magnolia (DVDRip - DivX5.02 - dual English . Espa' to 'Magnolia (DVDRip - DivX5.02 - dual English .2. Espa'
 
             #print(f"sub {group_name} {sub_number}: filepath", filepath)
             # extract cannot change the filename
@@ -951,6 +1082,35 @@ def extract_movie_sub(sub_number, group_tempdir, movie_name, movie_year):
                             print(f"sub {group_name} {sub_number}: recoding file content from {content_encoding} to utf8: {repr(filepath)}")
                         file_content = file_content.decode(content_encoding).encode("utf8") # bytes -> str -> bytes
                 dst.write(file_content)
+
+            if done_rename:
+                # FIXME? sub 62421: renaming duplicate file from 'Magnolia (DVDRip - DivX5.02 - dual English . Espa' to 'Magnolia (DVDRip - DivX5.02 - dual English .2. Espa'
+                # FIXME check for duplicate file content via size and sha1
+                this_filename_filepaths.pop() # last value is filepath
+                this_filepath_size = os.path.getsize(filepath)
+                this_filepath_hash = sha1sum(filepath)
+                #print(f"  {this_filepath_hash}  {filepath}")
+                duplicate_filepath = None
+                for other_filepath in this_filename_filepaths:
+                    other_filepath_size = os.path.getsize(other_filepath)
+                    if other_filepath_size != this_filepath_size:
+                        # content is different
+                        continue
+                    other_filepath_hash = sha1sum(other_filepath)
+                    #print(f"  {other_filepath_hash}  {other_filepath}")
+                    if other_filepath_hash != this_filepath_hash:
+                        # content is different
+                        continue
+                    # content is equal -> remove this filepath
+                    duplicate_filepath = other_filepath
+                    break # stop looking for duplicates
+                if duplicate_filepath:
+                    print(f"sub {group_name} {sub_number}: ignoring duplicate file {repr(old_filepath)} with same content as {repr(duplicate_filepath)}")
+                    os.unlink(filepath)
+                else:
+                    seen_filepaths.add(filepath)
+                    print(f"sub {group_name} {sub_number}: renaming duplicate file from {repr(old_filepath)} to {repr(filepath)}")
+
 
 
 main()
