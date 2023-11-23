@@ -133,8 +133,8 @@ def main():
     global movie_names_db_connection
     global lang_code
 
-    assert os.path.exists(opensubs_db_path), "error: missing input file"
-    assert os.path.exists(metadata_db_path), "error: missing input file"
+    assert os.path.exists(opensubs_db_path), f"error: missing input file: {opensubs_db_path}"
+    assert os.path.exists(metadata_db_path), f"error: missing input file: {metadata_db_path}"
 
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(cached_zip_dir, exist_ok=True)
@@ -217,6 +217,34 @@ def repack_by_sub_numbers(sub_numbers, group_name=None):
     print("group", group_name)
     group_tempdir = f"{tempdir}/{group_name}"
     #print("group_tempdir", group_tempdir)
+
+    # create group of zipfiles so we can compare size and speed
+    group_tempdir_zipfiles = f"{output_dir}/{group_name}.original-zipfiles"
+    if os.path.exists(group_tempdir_zipfiles):
+        print("keeping", group_tempdir_zipfiles)
+    else:
+        print("creating", group_tempdir_zipfiles)
+        os.makedirs(group_tempdir_zipfiles)
+        for sub_number in sub_numbers:
+            if not sub_number in cached_zip_files:
+                # missing zipfile
+                continue
+            zipfile_path = cached_zip_files[sub_number]
+            os.symlink(os.path.abspath(zipfile_path), f"{group_tempdir_zipfiles}/{os.path.basename(zipfile_path)}")
+
+    # create a sqlite database of the original zipfiles
+    group_tempdir_zipfiles_sqlite_db = f"{output_dir}/{group_name}.original-zipfiles.db"
+    if os.path.exists(group_tempdir_zipfiles_sqlite_db):
+        print("keeping", group_tempdir_zipfiles_sqlite_db)
+    else:
+        print("writing", group_tempdir_zipfiles_sqlite_db)
+        store_zipfiles_in_sqlite(group_tempdir_zipfiles, group_tempdir_zipfiles_sqlite_db)
+
+    sub_numbers_txt_path = f"{output_dir}/{group_name}.sub-numbers.txt"
+    print("writing", sub_numbers_txt_path)
+    with open(sub_numbers_txt_path, "w") as f:
+        f.write("\n".join(map(str, sub_numbers)) + "\n")
+
     if os.path.exists(group_tempdir):
         print("keeping", group_tempdir)
     else:
@@ -312,6 +340,46 @@ def repack_by_sub_numbers(sub_numbers, group_name=None):
     # cleanup
     if not keep_tempdir:
         shutil.rmtree(group_tempdir, ignore_errors=True)
+
+
+
+def store_zipfiles_in_sqlite(group_tempdir_zipfiles, group_tempdir_zipfiles_sqlite_db):
+    # based on new-subs-archive.py
+    con = sqlite3.connect(group_tempdir_zipfiles_sqlite_db)
+    cur = con.cursor()
+    table_name = "zipfiles"
+    cur.execute("PRAGMA count_changes=OFF")
+    cur.execute(
+        f"CREATE TABLE {table_name} (\n"
+        f"  num INTEGER PRIMARY KEY,\n"
+        f"  name TEXT,\n"
+        f"  content BLOB\n"
+        f")"
+    )
+    sql_query = f"INSERT INTO {table_name} VALUES (?, ?, ?)"
+    sum_files = list(glob.glob(f"{group_tempdir_zipfiles}/*.zip"))
+    sum_files.sort()
+    for file_path in sum_files:
+        file_name = os.path.basename(file_path)
+        name_parts = file_name.split(".")
+        # note: name_parts[0] is zero-padded with format "%09d"
+        num = int(name_parts[0])
+        assert name_parts[-1] == "zip", f"not a zip file: {file_path}"
+        # check for legacy file format before new-subs-rename-remove-num-part.py
+        # FIXME fix filename format of zipfiles in done-zips/
+        # remove ".(12345)" from "000012345.some.movie.(12345).zip"
+        #assert name_parts[-2] != f"({num})", f"bad filename format: {file_path}"
+        if name_parts[-2] == f"({num})":
+            name_parts.pop() # "zip"
+            name_parts.pop() # f"({num})"
+            name_parts.append("zip")
+        name = ".".join(name_parts[1:-1])
+        with open(file_path, "rb") as f:
+            content = f.read()
+        sql_args = (num, name, content)
+        cur.execute(sql_query, sql_args)
+    con.commit()
+    con.close()
 
 
 
@@ -563,6 +631,11 @@ def compress_dir_squashfs(input_path, output_path, compressor="xz"):
     os.unlink(pack_file)
     #print(f"writing {output_path} done")
 
+
+
+# TODO erofs
+# mkfs.erofs --all-root -zlz4 repack-grouped/eng/group-size-1000/1-17839.lz4.erofs /run/user/1000/opensubs-repack/1-17839/
+# bad compression
 
 
 def sha1sum(file_path):
@@ -1061,9 +1134,13 @@ def extract_movie_sub(sub_number, group_tempdir):
             #   group the.amityville.horror.1979.eng
             #   sub 50324: sub_num_parts '2cd'
             filepath_prefix = f"{sub_number}."
+            # no, too complex. multi-part subs will have multiple files, which is self-explaining
+            # also opensubs-metadata.db stores number of parts (1cd, 2cd, 3cd, ...)
+            """
             if sub_num_parts != "1cd":
                 #print(f"sub {group_name} {sub_number}: sub_num_parts {repr(sub_num_parts)}")
                 filepath_prefix = f"{sub_number}-{sub_num_parts}."
+            """
 
             # dont use sub_tempdir
             # 1cd-subs (98% of all subs) contain only one file
