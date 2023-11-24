@@ -14,9 +14,21 @@ let
     #undetected-playwright = pkgs.python3.pkgs.callPackage ./nix/undetected-playwright.nix {};
     #pygnuutils = pkgs.python3.pkgs.callPackage ./nix/pygnuutils.nix {};
     #pycdlib = pkgs.python3.pkgs.callPackage ./nix/pycdlib.nix {};
+    chromecontroller = pkgs.python3.pkgs.callPackage ./nix/chromecontroller.nix {};
+    browser-debugger-tools = pkgs.python3.pkgs.callPackage ./nix/browser-debugger-tools.nix {};
+    pychrome = pkgs.python3.pkgs.callPackage ./nix/pychrome.nix {};
+    pychromedevtools = pkgs.python3.pkgs.callPackage ./nix/pychromedevtools.nix {};
   };
 
   #sqlite-bench = pkgs.callPackage ./nix/sqlite-bench.nix {};
+
+  buster-client = pkgs.callPackage ./nix/buster-client.nix {};
+  buster-client-setup = pkgs.callPackage ./nix/buster-client-setup.nix {
+    buster-client = pkgs.callPackage ./nix/buster-client.nix {};
+  };
+  buster-client-setup-cli = pkgs.callPackage ./nix/buster-client-setup-cli.nix {
+    buster-client = pkgs.callPackage ./nix/buster-client.nix {};
+  };
 
   python = pkgs.python3.withPackages (pp: with pp; [
     requests
@@ -41,6 +53,11 @@ let
     natsort
     #pycdlib
     psutil
+    pyparsing
+    extraPythonPackages.chromecontroller
+    extraPythonPackages.browser-debugger-tools
+    extraPythonPackages.pychrome
+    extraPythonPackages.pychromedevtools
   ]);
 
   # building sqlite took about 15 minutes on my laptop
@@ -108,6 +125,16 @@ buildInputs = (with pkgs; [
   i3 xss-lock dex networkmanagerapplet i3status
   */
 
+  # compressed filesystems
+  erofs-utils
+  squashfs-tools-ng
+
+  # captcha solver
+  # https://github.com/dessant/buster
+  buster-client
+  #buster-client-setup
+  buster-client-setup-cli
+
 ]) ++ [
   python
   #sqlite-debug
@@ -117,6 +144,10 @@ buildInputs = (with pkgs; [
   #extraPythonPackages.undetected-playwright
   #extraPythonPackages.pycdlib
   #sqlite-bench
+  extraPythonPackages.chromecontroller
+  extraPythonPackages.browser-debugger-tools
+  extraPythonPackages.pychrome
+  extraPythonPackages.pychromedevtools
 ];
 
 }

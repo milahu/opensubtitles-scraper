@@ -94,6 +94,8 @@ import shutil
 import tempfile
 import cgi
 import _io
+import string
+import itertools
 
 import aiohttp
 import requests
@@ -532,6 +534,15 @@ def new_requests_session():
         "User-Agent": user_agent,
     }
     return requests_session
+
+
+
+def chrome_extension_id_of_path(path: str):
+    # FIXME On Windows, the path needs to be encoded as utf-16-le
+    # https://stackoverflow.com/questions/26053434
+    t = str.maketrans(string.hexdigits[:16], string.ascii_lowercase[:16])
+    return hashlib.sha256(path.encode('utf8')).hexdigest()[:32].translate(t)
+
 
 
 async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_download_list, html_errors, config):
@@ -1186,7 +1197,10 @@ chromium_headful_scraper = None
 def random_hash():
     return hex(random.getrandbits(128))[2:]
 
-def sha1sum(file_path):
+def sha1sum(file_path=None, data=None):
+    if data:
+        return hashlib.sha1(data).digest()
+    assert file_path
     # https://stackoverflow.com/questions/22058048/hashing-a-file-in-python
     # BUF_SIZE is totally arbitrary, change for your app!
     BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
@@ -1296,6 +1310,8 @@ class ChromiumHeadfulScraper():
         # [ 11/21/23 15:19:07.725 handle_queued_x_events FATAL ERROR ] X11 server connection broke (error 1)
         # X connection to :2 broken (explicit kill or server shutdown).
 
+        # alternative to Xvnc: x11vnc -display :2 -nopw -create
+
         # TODO install tigervnc in github CI
         # TODO find a free display number on this machine
         xvnc_display = 2
@@ -1328,7 +1344,8 @@ class ChromiumHeadfulScraper():
 
         print("xvnc server args:", shlex.join(args))
         proc = subprocess.Popen(args)
-        time.sleep(5) # TODO dynamic
+        #time.sleep(5) # TODO dynamic # not enough?
+        time.sleep(10) # TODO dynamic
         # TODO check if the process is running
         self.xvnc_process = proc
         self.xvnc_display = xvnc_display
@@ -1514,7 +1531,9 @@ class ChromiumHeadfulScraper():
             # 0 meaning 8 colors, 1 meaning 64 colors (the default), 2 meaning 256 colors
             #"-LowColourLevel", "0",
             #"-PreferredEncoding", "tight",
-            f"::{self.xvnc_port}",
+            # FIXME Can't open display: :0 -> wait longer for Xvnc?
+            #f"::{self.xvnc_port}",
+            f":{self.xvnc_display}",
         ]
         print("vnc client args:", shlex.join(args))
         self.vnc_client_process = subprocess.Popen(args)
@@ -1563,7 +1582,9 @@ class ChromiumHeadfulScraper():
         def __del__(self):
             # open(file_path, "rb") -> _io.BufferedReader
             # open(file_path, "r") -> _io.TextIOWrapper
-            if self.content_is_file:
+            #if self.content_is_file:
+            content_is_file = type(self.content) in {_io.BufferedReader, _io.TextIOWrapper}
+            if content_is_file:
                 # close file handle and delete file
                 # TODO check if self.content is open
                 self.content.close()
@@ -1613,6 +1634,7 @@ class ChromiumHeadfulScraper():
             self.xvnc_env = dict(os.environ)
         else:
             # only copy the PATH env, to make env consistent
+            self.tempdir = tempdir
             self.temp_home = f"{tempdir}/home"
             os.makedirs(self.temp_home)
             if False:
@@ -1766,11 +1788,150 @@ class ChromiumHeadfulScraper():
         self.downloads_path = self.temp_home + "/Downloads"
         os.makedirs(self.downloads_path)
 
-        self.done_downloads_path = self.temp_home + "/done_downloads"
+        self.done_downloads_path = self.tempdir + "/done_downloads"
         os.makedirs(self.done_downloads_path)
 
         self.screenshots_path = f"{tempdir}/screenshots"
         os.makedirs(self.screenshots_path)
+
+        # add the "buster" extension for captcha solving
+        # https://github.com/dessant/buster
+
+        # FIXME chromium says "Manifest version 2 is deprecated" for buster version 2.0.1
+        # https://github.com/dessant/buster/issues/399
+
+        # FIXME looks like solving captchas does not help
+        # once i hit the rate-limit, i cant unblock it
+        # also, the scripted chromium browser is blocked faster
+        # than my normal desktop chromium browser
+        # maybe because the scripted browser has no state
+        # no tracking cookies, etc
+        # or because the scripted browser loops directly over "download sub" urls
+        # while the desktop browser interacts with the website
+        # for example via the "new subs" page
+        # https://www.opensubtitles.org/en/search/sublanguageid-all
+
+        # FIXME the captcha solving is not automatic
+        # i still have to click "solve this captcha with buster"
+        # but okay, this can be scripted
+
+        # FIXME the desktop browser throws ERR_TOO_MANY_REDIRECTS instead of "too many requests"
+        #
+        # This page isn't working
+        # www.opensubtitles.org redirected you too many times.
+        # Try clearing your cookies.
+        # ERR_TOO_MANY_REDIRECTS
+        #
+        # but there is no cyclic redirect
+        #
+        # $ curl -I https://www.opensubtitles.org/en/subtitleserve/sub/9797679
+        # HTTP/2 301
+        # content-type: text/html; charset=UTF-8
+        # location: http://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
+        #
+        # $ curl -I http://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
+        # HTTP/1.1 301 Moved Permanently
+        # Content-Type: text/html; charset=UTF-8
+        # Location: https://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
+        #
+        # $ curl -I https://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
+        # HTTP/2 302
+        # content-type: text/html; charset=UTF-8
+        # location: /en/captcha/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
+        #
+        # $ curl -I https://www.opensubtitles.org/en/captcha/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
+        # HTTP/2 429 
+        # content-type: text/html; charset=UTF-8
+        #
+        # note the first redirect from https to http protocol
+        # when i replace http with https
+        # then i need 1 request less to get to "http 429"
+        #
+        # $ curl -I https://www.opensubtitles.org/en/subtitleserve/sub/9797679
+        # HTTP/2 301 
+        # content-type: text/html; charset=UTF-8
+        # location: http://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
+        #
+        # $ curl -I https://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679 
+        # HTTP/2 302 
+        # content-type: text/html; charset=UTF-8
+        # location: /en/captcha/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
+        #
+        # $ curl -I https://www.opensubtitles.org/en/captcha/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
+        # HTTP/2 429 
+        # content-type: text/html; charset=UTF-8
+        #
+        # the desktop browser seems to work better in "incognito mode"
+        # so its a problem with some extension
+        # after solving the captcha, i am redirected to
+        # https://www.opensubtitles.org/en/subtitles/9797679/fighting-spirit-new-challenger-en
+        # where i must click "Download"
+        # with the url https://www.opensubtitles.org/en/subtitleserve/sub/9797679
+        # after solving the captcha, i can continue downloading about 30 subs :)
+
+        # $HOME/.local/opt/buster/buster-client
+        self.buster_client_path = f"{self.temp_home}/.local/opt/buster/buster-client"
+
+        # TODO expose via cli of fetch-subs.py
+        self.buster_client_path = "/nix/store/da5spa9hvs8gbx7pwr3fzalyq8mpvabn-buster-client-0.3.0/opt/buster/buster-client"
+
+        # $HOME/.local/opt/buster/buster-extension
+        # this is a non-standard location for the unpacked buster extension
+        # unpacked buster_*-chrome.zip from
+        # https://github.com/dessant/buster/releases/latest
+        self.buster_chrome_extension_src_path = f"{self.temp_home}/.local/opt/buster/buster-extension"
+
+        # TODO expose via cli of fetch-subs.py
+        # TODO allow passing a zip file
+        self.buster_chrome_extension_src_path = "/home/user/src/milahu/opensubtitles-scraper/captcha-solver/buster-chrome-2.0.1"
+
+        # copy the unpacked extension to tempdir
+        self.buster_chrome_extension_path = self.tempdir + "/buster-chrome-extension"
+        shutil.copytree(self.buster_chrome_extension_src_path, self.buster_chrome_extension_path)
+
+        # patch the unpacked extension
+        shutil.copy(
+            self.buster_chrome_extension_path + "/src/background/script.js",
+            self.buster_chrome_extension_path + "/src/background/script.js.bak"
+        )
+        background_script_js = None
+        with open(self.buster_chrome_extension_path + "/src/background/script.js", "r") as f:
+            background_script_js = f.read()
+        # autoUpdateClientApp: true -> false
+        background_script_js = background_script_js.replace("autoUpdateClientApp:!0", "autoUpdateClientApp:!1")
+        # navigateWithKeyboard: false -> true
+        background_script_js = background_script_js.replace("navigateWithKeyboard:!1", "navigateWithKeyboard:!0")
+        # simulateUserInput: false -> true
+        background_script_js = background_script_js.replace("simulateUserInput:!1", "simulateUserInput:!0")
+        with open(self.buster_chrome_extension_path + "/src/background/script.js", "w") as f:
+            f.write(background_script_js)
+        del background_script_js
+
+        self.buster_chrome_extension_id = chrome_extension_id_of_path(self.buster_chrome_extension_path)
+
+        # $HOME/.config/chromium/NativeMessagingHosts/org.buster.client.json
+        self.buster_native_messaging_host_config = {
+            "name": "org.buster.client",
+            "description": "Buster",
+            "path": self.buster_client_path,
+            "type": "stdio",
+            "allowed_origins": [
+                # fix: Unchecked runtime.lastError: Access to the specified native messaging host is forbidden.
+                f"chrome-extension://{self.buster_chrome_extension_id}/"
+            ]
+        }
+
+        # write buster config file
+        self.buster_native_messaging_host_path = self.chromium_user_data_dir + "/NativeMessagingHosts/org.buster.client.json"
+        logger_print(f"writing buster config file:", self.buster_native_messaging_host_path)
+        os.makedirs(self.chromium_user_data_dir + "/NativeMessagingHosts")
+        with open(self.buster_native_messaging_host_path, "w") as f:
+            json.dump(self.buster_native_messaging_host_config, f, indent=2)
+
+        with open(self.buster_chrome_extension_path + "/manifest.json", "r") as f:
+            self.buster_chrome_extension_manifest = json.load(f)
+
+        assert self.buster_chrome_extension_manifest["manifest_version"] == 2
 
         # set some config here
         # so later, we need less clicks and commands
@@ -1798,6 +1959,56 @@ class ChromiumHeadfulScraper():
                 # default download location
                 "last_directory": self.downloads_path,
             },
+            "extensions": {
+                "ui": {
+                    # needed to load unpacked extensions
+                    "developer_mode": True,
+                },
+                "pinned_extensions": [
+                    self.buster_chrome_extension_id,
+                ],
+                "settings": {
+                    self.buster_chrome_extension_id: {
+                        "active_permissions": {
+                            "api": list(filter(lambda x: x != "<all_urls>", self.buster_chrome_extension_manifest["permissions"])),
+                            "explicit_host": [
+                                "chrome://favicon/*"
+                            ] + list(filter(lambda x: x == "<all_urls>", self.buster_chrome_extension_manifest["permissions"])),
+                            "manifest_permissions": [],
+                            "scriptable_host": list(itertools.chain.from_iterable(map(lambda s: s["matches"], self.buster_chrome_extension_manifest["content_scripts"]))),
+                        },
+                        "commands": {},
+                        "content_settings": [],
+                        # TODO?
+                        "creation_flags": 38,
+                        "events": [],
+                        "first_install_time": "0",
+                        "from_webstore": False,
+                        "granted_permissions": {
+                            "api": list(filter(lambda x: x != "<all_urls>", self.buster_chrome_extension_manifest["permissions"])),
+                            "explicit_host": [
+                                "chrome://favicon/*"
+                            ] + list(filter(lambda x: x == "<all_urls>", self.buster_chrome_extension_manifest["permissions"])),
+                            "manifest_permissions": [],
+                            "scriptable_host": list(itertools.chain.from_iterable(map(lambda s: s["matches"], self.buster_chrome_extension_manifest["content_scripts"]))),
+                        },
+                        "incognito_content_settings": [],
+                        "incognito_preferences": {},
+                        "last_update_time": "0",
+                        # TODO?
+                        "location": 4,
+                        "newAllowFileAccess": True,
+                        "path": self.buster_chrome_extension_path,
+                        "preferences": {},
+                        "regular_only_preferences": {},
+                        # TODO?
+                        "state": 1,
+                        "was_installed_by_default": False,
+                        "was_installed_by_oem": False,
+                        "withholding_permissions": False
+                    },
+                },
+            },
         }
 
         # write chromium config file
@@ -1824,30 +2035,6 @@ class ChromiumHeadfulScraper():
 
         self.notify_send_message("creating a new chromium window")
 
-        # TODO remove. fancy but useless
-        self.scraper_tab_html = (
-            "<html>\n"
-            "<head>\n"
-            "<title>scraper tab</title>\n"
-            "<style>\n"
-            # darkreader fails on data urls, so we enable darkmode here
-            #"@media (prefers-color-scheme: dark) {\n"
-            #"body { background: black; color: white; }\n"
-            #"}\n"
-            "</style>\n"
-            "</head>\n"
-            "<body>\n"
-            "<h1>scraper tab</h1>\n"
-            "<p>this is an empty tab for web scraping</p>\n"
-            "<p>please do nothing here while the scraper is running</p>\n"
-            "<p>close this tab when the scraper is done</p>\n"
-            "</body>\n"
-            "</html>\n"
-        )
-
-        self.scraper_tab_url = "data:text/html;charset=utf-8," + urllib.parse.quote(self.scraper_tab_html)
-
-        # simple
         self.scraper_tab_url = "data:text/plain,scraping ..."
 
         # create a new chromium window
@@ -1884,8 +2071,10 @@ class ChromiumHeadfulScraper():
             #check=True,
             env=self.xvnc_env,
         )
-        time.sleep(5) # TODO dynamic
+        time.sleep(10) # TODO dynamic
         logger_print("creating a new chromium window: waiting done")
+
+        #time.sleep(99999) # debug chromium
 
         # TODO xprop | grep WM_CLASS
         # WM_CLASS(STRING) = "chromium-browser (/run/user/1000/tmp3er0bm23)", "Chromium-browser"
