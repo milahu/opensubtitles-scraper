@@ -594,6 +594,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
         # for the "chromium" scraper, we want https to make our requests look normal
         #url = f"http://dl.opensubtitles.org/en/download/sub/{num}"
         url = f"https://dl.opensubtitles.org/en/download/sub/{num}"
+
         proxies = {}
         requests_get_kwargs = {}
         content_type = None
@@ -1265,6 +1266,7 @@ class ChromiumHeadfulScraper():
         # "O" = done loading, click to reload
         "done_loading": set([
             bytes.fromhex("0258982600b873d822665e520de4573ac62d4f08"),
+            bytes.fromhex("2977105e7e6a9aeb6bbf5dfa7ec4b17dede50da1"),
         ]),
         "done_saving_har_file": set([
             # this is just black (background in darkmode)
@@ -1279,6 +1281,10 @@ class ChromiumHeadfulScraper():
         "chromium_address_bar_icon_has_popup": set([
             #bytes.fromhex("cc9d2009ad00574cfc7c7885e4dc99a6153f1b5f"), # TODO remove?
             bytes.fromhex("60dc87cda1947c632d4d1634bbeff953738d059e"),
+        ]),
+        # warning symbol for insecure connection
+        "chromium_address_bar_icon_has_warning": set([
+            bytes.fromhex("fafdb5bf6c18fb75c7a702eae0ee970641bcdf92"),
         ]),
         "chromium_devtools_sources_breakpoints_on": set([
             #bytes.fromhex("f25ccb7db0f786dd69cbe6fcb0338847eda3866c"), # TODO remove?
@@ -1533,6 +1539,17 @@ class ChromiumHeadfulScraper():
             #"-PreferredEncoding", "tight",
             # FIXME Can't open display: :0 -> wait longer for Xvnc?
             #f"::{self.xvnc_port}",
+            # disable clipboard-sharing by default
+            # sending random text to the server's clipboard
+            # can break the scraper
+            # Accept clipboard changes from the server.
+            "-AcceptClipboard=off",
+            # Set the primary selection as well as the clipboard selection.
+            "-SetPrimary=off",
+            # Send clipboard changes to the server.
+            "-SendClipboard=off",
+            # Send the primary selection to the server as well as the clipboard selection.
+            "-SendPrimary=off",
             f":{self.xvnc_display}",
         ]
         print("vnc client args:", shlex.join(args))
@@ -1799,75 +1816,6 @@ class ChromiumHeadfulScraper():
 
         # FIXME chromium says "Manifest version 2 is deprecated" for buster version 2.0.1
         # https://github.com/dessant/buster/issues/399
-
-        # FIXME looks like solving captchas does not help
-        # once i hit the rate-limit, i cant unblock it
-        # also, the scripted chromium browser is blocked faster
-        # than my normal desktop chromium browser
-        # maybe because the scripted browser has no state
-        # no tracking cookies, etc
-        # or because the scripted browser loops directly over "download sub" urls
-        # while the desktop browser interacts with the website
-        # for example via the "new subs" page
-        # https://www.opensubtitles.org/en/search/sublanguageid-all
-
-        # FIXME the captcha solving is not automatic
-        # i still have to click "solve this captcha with buster"
-        # but okay, this can be scripted
-
-        # FIXME the desktop browser throws ERR_TOO_MANY_REDIRECTS instead of "too many requests"
-        #
-        # This page isn't working
-        # www.opensubtitles.org redirected you too many times.
-        # Try clearing your cookies.
-        # ERR_TOO_MANY_REDIRECTS
-        #
-        # but there is no cyclic redirect
-        #
-        # $ curl -I https://www.opensubtitles.org/en/subtitleserve/sub/9797679
-        # HTTP/2 301
-        # content-type: text/html; charset=UTF-8
-        # location: http://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
-        #
-        # $ curl -I http://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
-        # HTTP/1.1 301 Moved Permanently
-        # Content-Type: text/html; charset=UTF-8
-        # Location: https://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
-        #
-        # $ curl -I https://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
-        # HTTP/2 302
-        # content-type: text/html; charset=UTF-8
-        # location: /en/captcha/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
-        #
-        # $ curl -I https://www.opensubtitles.org/en/captcha/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
-        # HTTP/2 429 
-        # content-type: text/html; charset=UTF-8
-        #
-        # note the first redirect from https to http protocol
-        # when i replace http with https
-        # then i need 1 request less to get to "http 429"
-        #
-        # $ curl -I https://www.opensubtitles.org/en/subtitleserve/sub/9797679
-        # HTTP/2 301 
-        # content-type: text/html; charset=UTF-8
-        # location: http://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
-        #
-        # $ curl -I https://www.opensubtitles.org/en/captcha2/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679 
-        # HTTP/2 302 
-        # content-type: text/html; charset=UTF-8
-        # location: /en/captcha/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
-        #
-        # $ curl -I https://www.opensubtitles.org/en/captcha/redirect-%7Cen%7Csubtitleserve%7Csub%7C9797679
-        # HTTP/2 429 
-        # content-type: text/html; charset=UTF-8
-        #
-        # the desktop browser seems to work better in "incognito mode"
-        # so its a problem with some extension
-        # after solving the captcha, i am redirected to
-        # https://www.opensubtitles.org/en/subtitles/9797679/fighting-spirit-new-challenger-en
-        # where i must click "Download"
-        # with the url https://www.opensubtitles.org/en/subtitleserve/sub/9797679
-        # after solving the captcha, i can continue downloading about 30 subs :)
 
         # $HOME/.local/opt/buster/buster-client
         self.buster_client_path = f"{self.temp_home}/.local/opt/buster/buster-client"
@@ -3106,58 +3054,159 @@ async def main():
                 # first request
                 # this can already be blocked by captcha
                 logger_print(f"getting options.last_num from remote")
-                url = "https://www.opensubtitles.org/en/search/subs"
+                #url = "https://www.opensubtitles.org/en/search/subs"
+                # "new subtitles" page
+                # TODO screen parsing:
+                # find position of the "downloads" column
+                # and download all missing subs from urls like
+                # https://www.opensubtitles.org/en/subtitleserve/sub/12345
+                #url_path = "/en/search/subs"
+                url_path = "/en/search/sublanguageid-all"
+                url = "https://www.opensubtitles.org" + url_path
 
+                response = None
                 response_status = None
+                response_type = None
                 response_text = None
+                response_done = False
 
-                if options.proxy_provider == None:
-                    response = await aiohttp_session.get(url)
-                    response_status = response.status
-                    response_type = response.headers.get("Content-Type")
-                    # TODO response_headers?
-                    # TODO handle binary response
-                    response_text = await response.text()
+                num_retries = 10
+                retry_sleep_seconds = 15
 
-                elif options.proxy_provider == "chromium":
-                    response = await chromium_headful_scraper.get_response(
-                        url,
-                        return_har_path=True, # debug
-                    )
-                    response_status = response.status
-                    response_type = response.headers.get("Content-Type")
-                    # TODO handle binary response
-                    # FIXME handle redirects to captcha page
-                    # see also docs/captchas.md
-                    if response.status == 200:
+                def do_retry(response, response_status, response_type, response_text):
+                    if response_status in {503}:
+                        return True
+                    return False
+
+                # retry loop
+                for retry_step in range(1, 1 + num_retries):
+
+                    if options.proxy_provider == None:
+                        response = await aiohttp_session.get(url)
+                        response_status = response.status
+                        response_type = response.headers.get("Content-Type")
+                        # TODO response_headers?
+                        # TODO handle binary response
                         response_text = await response.text()
-                    elif response.status == 301:
-                        # first response is a redirect
-                        # probably the result is a captcha page
-                        raise NotImplementedError("FIXME ideally solve this in chromium_headful_scraper.get_response")
 
-                else:
-                    raise NotImplementedError(f"options.proxy_provider {options.proxy_provider}")
+                    elif options.proxy_provider == "chromium":
+                        response = await chromium_headful_scraper.get_response(
+                            url,
+                            return_har_path=True, # debug
+                        )
+                        response_status = response.status
+                        response_type = response.headers.get("Content-Type")
+                        # TODO handle binary response
+                        # FIXME handle redirects to captcha page
+                        # see also docs/captchas.md
+                        if response.status == 200:
+                            response_text = await response.text()
+                        elif response.status == 301:
+                            # first response is a redirect
+                            # probably the result is a captcha page
+                            raise NotImplementedError("FIXME ideally solve this in chromium_headful_scraper.get_response")
+
+                    else:
+                        raise NotImplementedError(f"options.proxy_provider {options.proxy_provider}")
+
+                    if do_retry(response, response_status, response_type, response_text):
+                        logger_print(f"{url_path} {response_status} -> request failed. retrying in {retry_sleep_seconds} seconds")
+                        time.sleep(retry_sleep_seconds)
+                        continue
+
+                    response_done = True
+                    break
+
+                if response_done == False:
+                    logger_print(f"{url_path} {response_status} -> fatal error. giving up after {num_retries} retries")
+                    sys.exit(1)
 
                 # response_status can be 429 Too Many Requests -> fatal error
                 if response_status == 403:
                     if response_text.startswith("""<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="/cdn-cgi/styles/challenges.css" rel="stylesheet"></head><body class="no-js"><div class="main-wrapper" role="main"><div class="main-content"><noscript><div id="challenge-error-title"><div class="h2"><span class="icon-wrapper"><div class="heading-icon warning-icon"></div></span><span id="challenge-error-text">Enable JavaScript and cookies to continue</span></div></div></noscript></div></div><script>(function(){window._cf_chl_opt="""):
-                        logger_print(f"/en/search/subs 403 Access Denied [blocked by cloudflare] -> fatal error")
+                        logger_print(f"{url_path} 403 Access Denied [blocked by cloudflare] -> fatal error")
                         sys.exit(1)
-                    logger_print(f"/en/search/subs 403 Access Denied -> fatal error")
+                    logger_print(f"{url_path} 403 Access Denied -> fatal error")
                     sys.exit(1)
                 if response_status == 429:
-                    logger_print(f"/en/search/subs 429 Too Many Requests -> fatal error")
+                    logger_print(f"{url_path} 429 Too Many Requests -> fatal error")
                     sys.exit(1)
                 if response_status == 503:
-                    logger_print(f"/en/search/subs 503 Service Unavailable -> fatal error")
+                    # FIXME retry some times
+                    logger_print(f"{url_path} 503 Service Unavailable -> fatal error")
                     sys.exit(1)
-                assert response_status == 200, f"unexpected response_status {response_status}"
-                assert response_type == "text/html; charset=UTF-8", f"unexpected content_type {repr(content_type)}"
+                assert response_status == 200, f"{url_path} unexpected response_status {response_status}"
+                assert response_type == "text/html; charset=UTF-8", f"{url_path} unexpected content_type {repr(content_type)}"
+                """
+                # parse /en/search/subs
                 remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', await response.text())
-                logger.debug(f"remote_nums {repr(remote_nums)}")
+                logger.debug(f"{url_path} remote_nums {repr(remote_nums)}")
                 options.last_num = max(map(int, remote_nums))
-                logger_print("options.last_num", options.last_num)
+                logger_print(f"{url_path} options.last_num", options.last_num)
+                """
+                # parse /en/search/sublanguageid-all
+                # href="/en/subtitleserve/sub/12345"
+                print("re.findall /en/subtitleserve/sub/nnnn", re.findall(r'href="/en/subtitleserve/sub/(\d+)"', await response.text()))
+                remote_nums = list(map(int, re.findall(r'href="/en/subtitleserve/sub/(\d+)"', await response.text())))
+                logger.debug(f"{url_path} remote_nums {repr(remote_nums)}")
+                # TODO? rename to options.latest_num
+                options.last_num = remote_nums[0]
+                logger_print(f"{url_path} options.last_num", options.last_num)
+                # TODO? use all remote_nums as queue
+                # then go to next pages:
+                # https://www.opensubtitles.org/en/search/sublanguageid-all/offset-40
+                # https://www.opensubtitles.org/en/search/sublanguageid-all/offset-80
+                # https://www.opensubtitles.org/en/search/sublanguageid-all/offset-120
+                # ...
+                # note: the offset is relative to the latest subtitle (options.last_num)
+                # so when new subs are ADDED while we are scraping
+                # then we see some duplicate sub ids
+                # but: when subs are REMOVED while we are scraping (yes that is possible)
+                # then we miss some sub ids
+                # so instead of using the default offsets (0, 40, 80, 120, 160, ...)
+                # we use smaller offsets (example: 0, 30, 60, 90, 120, 150, ...)
+                # so we get some overlap, so we always get at least one duplicate ID
+                # to ensure continuitiy of the sub ids
+                # if we dont get even one duplicate id between previous page and this page
+                # then we have to seek back to get the missing sub ids
+                # all this is stupid, complex, expensive...
+                # and maybe we should cache the parsed sub ids somewhere
+                # i can only repeat: opensubtitles is run by idiots.
+                # these people are too stupid to implement proper pagination
+                # based on a stable offset = the subtitle ID
+                #
+                # https://www.w3.org/TR/selectors-3/#selectors
+                # E[foo^="bar"]	an E element whose "foo" attribute value begins exactly with the string "bar"
+                # E[foo$="bar"]	an E element whose "foo" attribute value ends exactly with the string "bar"
+                # E[foo*="bar"]	an E element whose "foo" attribute value contains the substring "bar"
+                # ->
+                # sub download links:
+                #   a[href^="/en/subtitleserve/sub/"]
+                # next page link:
+                #   .pager-list strong+a
+                #
+                # use javascript console to click link
+                # example: click the first download link
+                #   Array.from(document.querySelectorAll('a[href^="/en/subtitleserve/sub/"]'))[0].click()
+                #
+                # click multiple links
+                """
+                function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); };
+                var done_sub_nums = new Set([9801862, 9801857, 9801820, 9801821]);
+                var done_links = 0;
+                for (const a of Array.from(document.querySelectorAll('a[href^="/en/subtitleserve/sub/"]'))) {
+                    const num = Number(a.href.split("/").slice(-1)[0]);
+                    if (done_sub_nums.has(num) == true) { continue; }
+                    console.log(`clicking ${num}`);
+                    a.click();
+                    await sleep(3000);
+                    done_links++;
+                    done_sub_nums.add(num);
+                    if (done_links > 3) { break; } // debug
+                }
+                """
+                # working. chrome popup: page wants to download multiple files -> allow
+                # TODO download 20 subs, then try next download, solve captcha, download 20 subs, ...
 
             if options.show_ip_address:
                 url = "https://httpbin.org/ip"
@@ -3222,7 +3271,7 @@ async def main():
                         #random.sample(range(num_stack_first, options.last_num + 1), options.sample_size)
                     )
                 )
-                logger_print(f"num_stack_expand: {repr(num_stack_expand)}")
+                logger.debug(f"num_stack_expand: {repr(num_stack_expand[:10])} ...")
                 #if len(num_stack_expand) == 0:
                 #    logger_print(f"num_stack_expand is empty at num_stack size {len(num_stack)}")
                 #    break
@@ -3240,7 +3289,7 @@ async def main():
                 logger_print(f"done all nums until {options.last_num}")
                 raise SystemExit
 
-            logger.debug(f"num_stack: {num_stack}")
+            logger.debug(f"num_stack: {num_stack[:10]} ...")
             random.shuffle(num_stack)
 
             if options.num_downloads:
@@ -3255,12 +3304,14 @@ async def main():
             logger_print(f"batch size: {len(num_stack)}")
             logger_print(f"batch: {num_stack}")
 
+            # fetch subs
             tasks = []
             while num_stack:
                 num = num_stack.pop()
                 task = asyncio.create_task(fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_download_list, html_errors, config))
                 tasks.append(task)
             return_values = await asyncio.gather(*tasks)
+
             # TODO show progress
             #logger_print("return_values", return_values)
             pause_scraper = False
