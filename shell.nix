@@ -18,6 +18,9 @@ let
     browser-debugger-tools = pkgs.python3.pkgs.callPackage ./nix/browser-debugger-tools.nix {};
     pychrome = pkgs.python3.pkgs.callPackage ./nix/pychrome.nix {};
     pychromedevtools = pkgs.python3.pkgs.callPackage ./nix/pychromedevtools.nix {};
+    selenium-driverless = pkgs.python3.pkgs.callPackage ./nix/selenium-driverless.nix {
+      cdp-socket = pkgs.python3.pkgs.callPackage ./nix/cdp-socket.nix {};
+    };
   };
 
   #sqlite-bench = pkgs.callPackage ./nix/sqlite-bench.nix {};
@@ -58,6 +61,7 @@ let
     extraPythonPackages.browser-debugger-tools
     extraPythonPackages.pychrome
     extraPythonPackages.pychromedevtools
+    extraPythonPackages.selenium-driverless
   ]);
 
   # building sqlite took about 15 minutes on my laptop
