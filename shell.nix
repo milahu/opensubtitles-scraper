@@ -37,6 +37,7 @@ let
     requests
     magic # libmagic
     chardet
+    charset-normalizer
     guessit # parse video filenames
     #extraPythonPackages.pygnuutils # GNU version sort
     #playwright
