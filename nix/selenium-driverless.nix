@@ -1,6 +1,7 @@
 { lib
 , python3
 , fetchFromGitHub
+, cdp-socket
 }:
 
 python3.pkgs.buildPythonApplication rec {
