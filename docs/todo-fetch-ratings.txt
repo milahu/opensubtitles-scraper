@@ -1,0 +1,3 @@
+fetch user ratings for all subs
+
+user ratings are important to rank different subs between "good" and "bad"
