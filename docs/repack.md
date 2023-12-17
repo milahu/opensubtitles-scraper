@@ -264,7 +264,21 @@ worst case: extracting the last file requires processing ALL files
 28307   original zip files
 ```
 
+### brotli
+
+TODO
+
+### zstd
+
+faster than xz
+
+but larger compressed size (60% versus 30% of original zipfiles)
+
 ### PPMd
+
+compression is 3x faster than xz
+
+decompression is 20x slower than xz
 
 https://softwarerecs.stackexchange.com/questions/49019/which-compression-utility-should-i-use-for-an-extremely-large-plain-text-file
 
@@ -318,3 +332,55 @@ rings 2.5         -m8 -t1                     20,873,959  178,747,360    240,523
 
 https://stackoverflow.com/questions/429987/compression-formats-with-good-support-for-random-access-within-archives
 
+## repack.py
+
+```
+group imdb-103644-len-383:
+    4000    33%   C:53.70sec   D:1.12sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level8.tar.lzma
+    4000    33%   C:51.65sec   D:1.02sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level9.tar.lzma
+    4001    33%   C:66.05sec   D:1.28sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level8.tar.xz
+    4001    33%   C:49.77sec   D:1.16sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level9.tar.xz
+    4077    34%   C:60.95sec   D:1.10sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level7.tar.lzma
+    4078    34%   C:60.05sec   D:1.27sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level7.tar.xz
+    4579    38%   C:53.61sec   D:1.43sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level6.tar.lzma
+    4580    38%   C:47.44sec   D:1.38sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level6.tar.xz
+    4649    38%   C:45.59sec   D:1.26sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level5.tar.lzma
+    4650    38%   C:40.66sec   D:1.14sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level5.tar.xz
+    5263    43%   C:18.76sec   D:19.37sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.s=on.yx=9.x=9.f=off.0=PPMd:mem2g:o32.7z
+    7326    60%   C:3.32sec   D:0.29sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level9.tar.zstd
+    8281    68%   C:3.30sec   D:0.19sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level8.tar.zstd
+    8346    69%   C:7.60sec   D:4.07sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level9.tar.bz2
+    8467    70%   C:13.41sec   D:5.95sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level7.tar.bz2
+    8474    70%   C:10.21sec   D:4.19sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level8.tar.bz2
+    8567    70%   C:12.32sec   D:7.47sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level6.tar.bz2
+    8608    71%   C:2.58sec   D:0.19sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level7.tar.zstd
+    8705    72%   C:15.25sec   D:3.45sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level5.tar.bz2
+    8871    73%   C:2.19sec   D:0.26sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level6.tar.zstd
+    9208    76%   C:1.67sec   D:0.35sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level5.tar.zstd
+    9376    77%   C:11.78sec   D:0.00sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.lzma.sqfs
+    9388    77%   C:11.05sec   D:0.00sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.xz.sqfs
+   10724    88%   C:6.06sec   D:0.00sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.zstd.sqfs
+   11734    96%   C:17.34sec   D:1.22sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level9.tar.gz
+   11734    96%   C:13.57sec   D:1.49sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level8.tar.gz
+   11741    97%   C:7.32sec   D:0.63sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level7.tar.gz
+   11752    97%   C:4.11sec   D:0.00sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.gzip.sqfs
+   11757    97%   C:5.91sec   D:0.81sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level6.tar.gz
+   11854    97%   C:4.06sec   D:0.78sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level5.tar.gz
+   13620   112%   C:8.01sec   D:0.00sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.lzo.sqfs
+   18476   152%   C:0.28sec   D:0.00sec   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.lz4.sqfs
+```
+
+```
+benchmark results for group imdb-103644-len-383:
+    4001    33%   C:048.08sec=00.081258MiB/s   D:001.21sec=03.221830MiB/s   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level8.tar.xz
+    4001    33%   C:048.65sec=00.080311MiB/s   D:001.21sec=03.234996MiB/s   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level9.tar.xz
+    4078    34%   C:048.08sec=00.082831MiB/s   D:001.11sec=03.595724MiB/s   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.level7.tar.xz
+   12160   100%   C:000.00sec=00.000000MiB/s   D:010.65sec=01.115157MiB/s   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.original-zipfiles
+   12448   102%   C:000.00sec=00.000000MiB/s   D:000.00sec=00.000000MiB/s   repack-grouped/eng/by-imdb-id/imdb-103644-len-383.original-zipfiles.db
+   30630   252%   C:000.00sec=00.000000MiB/s   D:000.00sec=00.000000MiB/s   /run/user/1000/opensubs-repack/imdb-103644-len-383
+```
+
+50 seconds for 383 subs = 0.130 sec/sub
+
+0.130 sec * 6.3M subs
+0.130 * 6.3E6 / 3600 / 24 = 10 days

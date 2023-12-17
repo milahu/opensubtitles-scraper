@@ -1,4 +1,4 @@
-# headfull web scraper
+# headful web scraper
 
 opposite of: headless web scraper
 
@@ -39,6 +39,11 @@ which is running some server with a public port.
     - https://serverfault.com/questions/1011000/open-source-remote-access-using-vnc-and-reverse-ssh
   - make my computer reachable via https://www.duckdns.org/
     - alternative: https://ngrok.com/docs/how-ngrok-works/
+- use some web-scraping browser extension for chrome
+  so i can use my desktop chrome browser to train the web scraper
+  and then use the trained scraper in fetch-subs.py
+  - https://www.webscraper.io/
+    - https://www.crx4chrome.com/extensions/jnhgnonknehpejjnehehllkliplmbmhn/
 
 
 

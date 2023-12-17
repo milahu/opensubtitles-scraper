@@ -2,7 +2,7 @@
 
 now its getting interesting...
 
-after about 20 requests from my IP address
+after 20 requests from my IP address
 opensubtitles.org starts to block my requests with captchas
 
 there are multiple entries in har.log.entries
