@@ -82,6 +82,46 @@ but when i do sequential downloads, i get a captcha after 30 requests
 
 
 
+### update 2023-23-20
+
+for my scraper, i parse the last subtitle ID
+from the section "New subtitles" at
+https://www.opensubtitles.org/en/search/subs
+see also options.last_num in fetch-subs.py
+
+currently the last subtitle is
+https://www.opensubtitles.org/en/subtitles/9828872/silent-night-nl
+
+so in my unreleased dump
+about 9828872 - 9756545 = 72327 subs are missing
+
+> average size is 23KByte
+
+72327 * 23 / 1024 / 1024 = 1.6GByte
+
+note: this does not include the scraped html pages
+
+
+
+### expected monthly traffic
+
+subs-added-by-year.txt: 2022|421348
+
+421348 / 12 = 35112 new subs per month
+
+35112 * 23 / 1024 = 789MByte per month
+
+35112 / 30.5 = 1151 new subs per day
+
+scraper is blocked by cloudflare after 20 requests
+
+1151 / 20 = 58 scraping sessions per day
+
+200 requests per ip per day?
+so we would need only 6 different ip addresses
+
+
+
 ## scraping proxies
 
 scrapingdog.com: returns broken zip files, http headers are missing
