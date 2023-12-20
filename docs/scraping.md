@@ -122,6 +122,22 @@ so we would need only 6 different ip addresses
 
 
 
+## github CI
+
+the cheapest scraping service ...
+
+https://github.com/pricing
+
+> free: 2,000 CI/CD minutes/month
+>
+> team: 3,000 CI/CD minutes/month, $3.67 per user/month
+>
+> enterprise: 50,000 CI/CD minutes/month, $19.25 per user/month
+
+2000 minutes/month = 65 minutes/day
+
+
+
 ## scraping proxies
 
 scrapingdog.com: returns broken zip files, http headers are missing
