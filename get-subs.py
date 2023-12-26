@@ -10,7 +10,7 @@
 # for ads, reduce frame length to zero, so the ads are still visible in the txt files
 # FIXME use fuzzy search. example: Borat 2 Subsequent Moviefilm -> Borat Subsequent Moviefilm
 # FIXME chardet.detect is slow - TODO try https://pypi.org/project/faust-cchardet/
-# FIXME subtitles_all.db is slow
+# FIXME opensubs-metadata.db is slow
 # FIXME escape % in title. example: 97% Owned (2012)
 
 
@@ -60,11 +60,13 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
     video_path_base, video_path_extension = os.path.splitext(video_path)
     # one database for metadata: 1.6GB
     #print(f"""metadata: getting connection""")
-    # FIXME subtitles_all.db is slow
+    # FIXME opensubs-metadata.db is slow
     # add index for (MovieName, MovieYear)
     # add full-text-search index for MovieName
     # add index for MovieYear
-    meta_con = sqlite3.connect(f"{data_dir}/subtitles_all.db")
+    meta_path = f"{data_dir}/opensubs-metadata.db"
+    print(f"opening database {meta_path}")
+    meta_con = sqlite3.connect(meta_path)
     meta_cur = meta_con.cursor()
     # multiple databases for zipfiles: 24GB for english subs
     sql_query = None
@@ -103,7 +105,7 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
         series_imdb_parent = 8772296
         sql_query = (
             "SELECT IDSubtitle "
-            "FROM metadata "
+            "FROM subz_metadata "
             "WHERE "
             #"MovieName LIKE ? "
             "SeriesIMDBParent = ? "
