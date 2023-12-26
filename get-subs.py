@@ -23,8 +23,7 @@ import json
 
 # requirements
 import guessit
-import magic
-import chardet
+import charset_normalizer
 
 
 # TODO better
@@ -199,6 +198,8 @@ def extract_sub(zip_content, video_path_base, num, lang_ISO639):
             filename = zipinfo.filename
             #print(f"extracting sub {num}: filename: {repr(filename)}")
             # zip metadata is often encoded with cp437
+            # TODO guess filename_encoding for each file
+            #filename_encoding = charset_normalizer.from_bytes(sub_content).best().encoding
             for encoding in ["cp437", "iso-8859-1"]:
                 try:
                     # '├⌐'.encode("cp437").decode("utf8") == 'é'
@@ -230,37 +231,14 @@ def extract_sub(zip_content, video_path_base, num, lang_ISO639):
             num_padded = str(num).rjust(num_width, "0")
             sub_path = f"{video_path_base}.{lang_ISO639}.{num_padded}{ext}"
             sub_content = zip_file.read(zipinfo)
-            # recode sub_content to utf8
-            #print(f"extracting sub {num}: magic.detect_from_content")
-            magic_result = magic.detect_from_content(sub_content)
-            encoding = magic_result.encoding
-            def recode_content(sub_content, encoding):
+            sub_encoding = charset_normalizer.from_bytes(sub_content).best().encoding
+            if sub_encoding not in {"ascii", "utf_8"}:
+                # recode sub_content to utf8
                 try:
                     # bytes -> str -> bytes
-                    sub_content = sub_content.decode(encoding).encode("utf8")
+                    sub_content = sub_content.decode(sub_encoding).encode("utf8")
                 except UnicodeDecodeError as error:
-                    print(f"output {repr(sub_path)} warning: failed to convert to utf8 from {encoding}: {error}")
-                return sub_content
-            if encoding not in {"us-ascii", "utf-8", "unknown-8bit", "binary"}:
-                #print(f"output {repr(sub_path)} encoding {encoding} from libmagic")
-                sub_content = recode_content(sub_content, encoding)
-            elif encoding == "unknown-8bit":
-                # libmagic failed to find encoding -> try chardet
-                # bug? 0000445: file/libmagic fails to detect cp1252 encoding
-                # https://bugs.astron.com/view.php?id=445
-                # note: chardet can return wrong encodings
-                # https://github.com/chardet/chardet/issues/279
-                # FIXME chardet.detect is slow
-                # see also: subliminal/subtitle.py
-                # example subs: 4248010 4590955
-                # result: cp1252 == Windows-1252
-                #print(f"extracting sub {num}: chardet.detect ...")
-                chardet_result = chardet.detect(sub_content)
-                #print(f"extracting sub {num}: chardet.detect done")
-                encoding = chardet_result["encoding"]
-                if not encoding in {"ascii", "utf-8"}:
-                    #print(f"output {repr(sub_path)} encoding {encoding} from chardet")
-                    sub_content = recode_content(sub_content, encoding)
+                    print(f"output {repr(sub_path)} warning: failed to convert to utf8 from {sub_encoding}: {error}")
             sub_filename = os.path.basename(sub_path)
             print(f"output {repr(sub_filename)} from {repr(filename)} ({encoding})")
             with open(sub_path, "wb") as sub_file:
