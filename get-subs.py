@@ -12,6 +12,9 @@
 # FIXME chardet.detect is slow - TODO try https://pypi.org/project/faust-cchardet/
 # FIXME opensubs-metadata.db is slow
 # FIXME escape % in title. example: 97% Owned (2012)
+# TODO allow multiple video files per call
+# TODO optimize queries for multiple similar video files
+# usually: all episodes of a tv show season
 
 
 import sys
@@ -148,6 +151,8 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
     for num, in meta_cur.execute(sql_query, sql_args):
         nums.append(num)
     for provider in config["providers"]:
+        if provider.get("enabled") == False:
+            continue
         def filter_num(num):
             return provider["num_range_from"] <= num and num <= provider["num_range_to"]
         provider_nums = []
@@ -168,7 +173,7 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
                 db_path = os.environ["HOME"] + db_path[1:]
             elif db_path.startswith("$HOME/"):
                 db_path = os.environ["HOME"] + db_path[5:]
-            #print(f"""local provider {provider["id"]}: getting connection""")
+            print(f"""local provider {provider["id"]}: opening database {db_path}""")
             provider["db_con"] = sqlite3.connect(db_path)
         if not "db_cur" in provider:
             # cache the cursor for faster lookup of similar nums
