@@ -1,7 +1,11 @@
 #! /usr/bin/env python3
 
+
+
 # get subtitles for a video file
 # from local subtitle providers
+
+# to expose this over an http server, see docs/lighttpd.conf
 
 # TODO search for episode
 # TODO allow passing name/year/season/episode/imdb-id as extra arguments
@@ -17,6 +21,7 @@
 # usually: all episodes of a tv show season
 
 
+
 import sys
 import os
 import sqlite3
@@ -24,15 +29,67 @@ import zipfile
 import io
 import json
 import glob
+import pathlib
+import types
 
 # requirements
-import platformdirs
 import guessit
 import charset_normalizer
 
 
+
+# with recode, this is 2x slower
+# ideally recode once and cache the result
+recode_sub_content_to_utf8 = False
+
+
+
 # global state
 data_dir = None
+is_cgi = False
+
+
+
+def show_help_cgi():
+    request_url = (
+        os.environ.get("REQUEST_SCHEME") + "://" +
+        os.environ.get("HTTP_HOST") +
+        os.environ.get("REQUEST_URI")
+    )
+    print("Status: 200")
+    print("Content-Type: text/plain")
+    print()
+    print("subtitles-server")
+    print()
+    print("returns a zip archive with subtitles for a movie")
+    print()
+    print("if you pass a movie filename like movie=Scary.Movie.2000.720p.mp4")
+    print("then the subtitle files will be named Scary.Movie.2000.720p.12345.srt etc")
+    print("so when you extract them to the folder of the movie file")
+    print("then your video player should find the subtitles")
+    print()
+    print()
+    print()
+    print("usage")
+    print()
+    print(f"{request_url}?movie=Scary.Movie.2000.720p.mp4")
+    # TODO
+    """
+    print()
+    print(f"{request_url}?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=es")
+    print()
+    print(f"{request_url}?imdb=tt2580382")
+    print()
+    print(f"{request_url}?imdb=tt0705920")
+    """
+    print()
+    print()
+    print()
+    print("source")
+    print()
+    print("https://github.com/milahu/opensubtitles-scraper/blob/main/get-subs.py")
+    sys.exit()
+
 
 
 def expand_path(path):
@@ -46,33 +103,121 @@ def expand_path(path):
     return os.path.join(data_dir, path)
 
 
-def main():
-    global data_dir
-    # relative paths are relative to data_dir
-    # on linux: $HOME/.config/subtitles
-    data_dir = platformdirs.user_config_dir("subtitles")
-    if not os.path.exists(data_dir):
-        raise Exception(f"missing data_dir: {repr(data_dir)}")
-    config_path = f"{data_dir}/local-subtitle-providers.json"
-    if not os.path.exists(config_path):
-        raise Exception(f"missing config_path: {repr(config_path)}")
-    with open(config_path) as f:
-        config = json.load(f)
-    # TODO use default from locale in os.environ["LANG"]
-    lang_ISO639 = "en"
-    if len(sys.argv) != 2 or not os.path.exists(sys.argv[1]):
-        print_usage()
-        return
-    video_path = sys.argv[1]
-    print("video_path", video_path)
-    # note: video_path does not need to exist
-    os.makedirs(os.path.dirname(video_path), exist_ok=True)
-    video_filename = os.path.basename(video_path)
-    #print("video_filename", video_filename)
-    video_parsed = guessit.guessit(video_filename)
-    str_list = []
-    print("video_parsed", video_parsed)
 
+def error(msg):
+    raise Exception(msg)
+
+
+
+def error_cgi(msg):
+    print("Status: 200")
+    print("Content-Type: text/plain")
+    print()
+    print("error: " + msg)
+    sys.exit()
+
+
+
+def parse_args():
+    #if len(sys.argv) != 2 or not os.path.exists(sys.argv[1]):
+    if len(sys.argv) != 2:
+        print_usage()
+        sys.exit(1)
+    args = types.SimpleNamespace(
+        movie = sys.argv[1],
+        #imdb = imdb,
+        # lang_ISO639
+        lang = "en",
+    )
+    #error(repr(args)) # debug
+    return args
+
+
+
+def parse_args_cgi():
+
+    import urllib.parse
+
+    query_string = os.environ.get("QUERY_STRING")
+    #assert query_string != None
+    if query_string == None:
+        error("no query string")
+
+    if query_string == "":
+        show_help_cgi()
+
+    #query_list = urllib.parse.parse_qsl(query_string, keep_blank_values=True)
+    query_dict = urllib.parse.parse_qs(query_string, keep_blank_values=True)
+
+    movie = query_dict.get("movie", [None])[0]
+    imdb = query_dict.get("imdb", [None])[0]
+
+    # check required arguments
+    """
+    if movie == None and imdb == None:
+        error_cgi("missing argument: movie or imdb")
+    """
+    if movie == None:
+        error_cgi("missing argument: movie")
+    else:
+        movie = os.path.basename(movie)
+
+    lang = query_dict.get("lang", ["en"])[0]
+
+    args = types.SimpleNamespace(
+        movie = movie,
+        imdb = imdb,
+        lang = lang,
+    )
+    #error_cgi(repr(args)) # debug
+    return args
+
+
+
+def send_zipfile_cgi(args, member_files):
+
+    basename, _extension = os.path.splitext(args.movie)
+
+    print("Status: 200")
+
+    print("Content-Type: application/zip")
+
+    # Content-Dispositon
+    # by default, curl and wget will ignore the filename. fix:
+    #   curl -OJ
+    #   wget --content-disposition
+    # https://stackoverflow.com/questions/1361604/how-to-encode-utf8-filename-for-http-headers-python-django
+    filename = basename + ".zip"
+    from urllib.parse import quote
+    disposition = 'attachment'
+    try:
+        filename.encode('ascii')
+        # TODO better? escape filename
+        #file_expr = 'filename="{}"'.format(filename)
+        file_expr = 'filename="{}"'.format(quote(filename))
+    except UnicodeEncodeError:
+        file_expr = "filename*=utf-8''{}".format(quote(filename))
+    print('Content-Disposition: {}; {}'.format(disposition, file_expr))
+
+    # end of http header
+    print()
+
+    # fix: lighttpd error: response headers too large
+    # if we dont flush sys.stdout here, then sys.stdout.buffer is written first
+    sys.stdout.flush()
+
+    from stream_zip import stream_zip
+
+    for zipped_chunk in stream_zip(member_files):
+        sys.stdout.buffer.write(zipped_chunk)
+
+    sys.stdout.buffer.flush()
+
+    sys.exit()
+
+
+
+def config_get_providers(config):
     providers = []
     for provider in config["providers"]:
         if provider.get("enabled") == False:
@@ -93,9 +238,9 @@ def main():
             if db_path_format.endswith("/{shard_id}xxx.db"):
                 get_shard_id = lambda db_path: int(os.path.basename(db_path)[:-6])
             else:
-                raise NotImplementedError
+                error("not implemented")
         else:
-            raise NotImplementedError
+            error("not implemented")
         for db_path in glob.glob(db_path_glob):
             shard_id = get_shard_id(db_path)
             num_range_from = shard_id * shard_size
@@ -107,19 +252,91 @@ def main():
             providers.append(provider_2)
     config["providers"] = providers
 
-    return get_movie_subs(video_path, video_parsed, lang_ISO639, config)
+
+
+def main():
+
+    global data_dir
+    global is_cgi
+    global error
+
+    # see also https://github.com/technetium/cgli/blob/main/cgli/cgli.py
+
+    if os.environ.get("GATEWAY_INTERFACE") == "CGI/1.1":
+        if os.environ.get("REQUEST_METHOD") != "GET":
+            error("only GET requests are supported")
+        is_cgi = True
+        error = error_cgi
+
+    # relative paths are relative to data_dir
+    # on linux: $HOME/.config/subtitles
+    if is_cgi:
+        data_dir = str(pathlib.Path(sys.argv[0]).parent.parent.parent / "subtitles")
+    else:
+        import platformdirs
+        data_dir = platformdirs.user_config_dir("subtitles")
+    if not os.path.exists(data_dir):
+        error(f"missing data_dir: {repr(data_dir)}")
+
+    config_path = f"{data_dir}/local-subtitle-providers.json"
+    if not os.path.exists(config_path):
+        error(f"missing config_path: {repr(config_path)}")
+    with open(config_path) as f:
+        config = json.load(f)
+
+    # TODO use default from locale in os.environ["LANG"]
+    # lang_ISO639
+    lang = "en"
+
+    # parse arguments
+    if is_cgi:
+        args = parse_args_cgi()
+    else:
+        args = parse_args()
+
+    """
+    video_path = sys.argv[1]
+    print("video_path", video_path)
+    # note: video_path does not need to exist
+    os.makedirs(os.path.dirname(video_path), exist_ok=True)
+    """
+
+    video_filename = os.path.basename(args.movie)
+    #print("video_filename", video_filename)
+
+    video_parsed = guessit.guessit(video_filename)
+    #print("video_parsed", video_parsed)
+
+    config_get_providers(config)
+
+    if is_cgi:
+        try:
+            send_zipfile_cgi(args, get_movie_subs(config, args, video_parsed))
+        except Exception as e:
+            error(f"Exception {type(e)} {e}")
+    else:
+        #return get_movie_subs(video_path, video_parsed, lang, config)
+        for item in get_movie_subs(config, args, video_parsed):
+            (sub_path, modified_at, mode, ZIP_32, (sub_content,)) = item
+            sub_filename = os.path.basename(sub_path)
+            print(f"writing {repr(sub_filename)}") # from {repr(filename)} ({encoding})")
+            with open(sub_path, "wb") as sub_file:
+                sub_file.write(sub_content)
+
 
 
 def print_usage():
     print("usage:", file=sys.stderr)
     #argv0 = "get-subs.py"
     argv0 = os.path.basename(sys.argv[0])
-    print(f"{argv0} Some.Movie.2000.720p.mp4", file=sys.stderr)
+    print(f"{argv0} Scary.Movie.2000.720p.mp4", file=sys.stderr)
 
 
-def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
+
+def get_movie_subs(config, args, video_parsed):
     global data_dir
-    video_path_base, video_path_extension = os.path.splitext(video_path)
+    global is_cgi
+    video_path_base, video_path_extension = os.path.splitext(args.movie)
     # one database for metadata: 1.6GB
     #print(f"""metadata: getting connection""")
     # FIXME opensubs-metadata.db is slow
@@ -127,13 +344,17 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
     # add full-text-search index for MovieName
     # add index for MovieYear
     metadata_db_path = expand_path(config["subtitles_metadata_db_path"])
-    assert os.path.exists(metadata_db_path), f"no such file: {metadata_db_path}"
-    print(f"opening database {metadata_db_path}")
+    if not os.path.exists(metadata_db_path):
+        error(f"no such file: {metadata_db_path}")
+    #print(f"opening database {metadata_db_path}")
     metadata_con = sqlite3.connect(metadata_db_path)
     metadata_cur = metadata_con.cursor()
     # multiple databases for zipfiles: 24GB for english subs
     sql_query = None
     sql_args = None
+
+    #print("video_parsed", video_parsed)
+
     if video_parsed.get("type") == "movie":
         sql_query = (
             "SELECT IDSubtitle "
@@ -148,9 +369,10 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
         sql_args = (
             video_parsed.get("title"),
             video_parsed.get("year"),
-            lang_ISO639,
+            args.lang,
         )
     elif video_parsed.get("type") == "episode":
+        error("not implemented: type episode")
         # TODO lookup via IMDB
         # solve ambiguity: movie covers? plots?
         # covers/plots are not in https://www.kaggle.com/datasets/ashirwadsangwan/imdb-dataset
@@ -191,12 +413,13 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
             #video_parsed.get("episode_title"),
             video_parsed.get("season"),
             video_parsed.get("episode"),
-            lang_ISO639,
+            args.lang,
         )
     else:
-        raise Exception(f"""unknown video type: {repr(video_parsed.get("type"))}""")
+        error(f"""unknown video type: {repr(video_parsed.get("type"))}""")
 
     nums = []
+
     def format_query(sql_query, sql_args=None):
         if not sql_args:
             return sql_query
@@ -208,9 +431,13 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
             if idx < len(sql_args):
                 result += f" {repr(sql_args[idx])} "
         return result
-    print(f"""metadata: getting results for query:""", format_query(sql_query, sql_args))
+
+    #print(f"""metadata: getting results for query:""", format_query(sql_query, sql_args))
+
     for num, in metadata_cur.execute(sql_query, sql_args):
         nums.append(num)
+
+    from stream_zip import ZIP_32
 
     for provider in config["providers"]:
         #if provider.get("enabled") == False:
@@ -218,8 +445,9 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
         provider_lang = provider.get("lang", "*")
         if provider_lang != "*":
             # TODO allow multiple languages for one provider
-            if provider_lang != lang_ISO639:
+            if provider_lang != args.lang:
                 continue
+
         def filter_num(num):
             num_range_from = provider.get("num_range_from", 0)
             if num_range_from == 0:
@@ -228,6 +456,7 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
             if num_range_to == 0:
                 return True
             return num_range_from <= num and num <= num_range_to
+
         provider_nums = []
         rest_nums = []
         for num in nums:
@@ -248,7 +477,8 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
             # https://stackoverflow.com/questions/30292367/sqlite-append-two-tables-from-two-databases-that-have-the-exact-same-schema
             # https://sqlite.org/cgi/src/doc/reuse-schema/doc/shared_schema.md
 
-            assert os.path.exists(db_path), f"no such file: {db_path}"
+            if not os.path.exists(db_path):
+                error(f"no such file: {db_path}")
 
             provider["db_con"] = sqlite3.connect(db_path)
 
@@ -258,7 +488,7 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
             # pysqlite3.connect is always readonly
             #provider["db_con"] = pysqlite3.connect(db_path)
 
-            print(f"""local provider {provider["id"]}: opening database {db_path}""")
+            #print(f"""local provider {provider["id"]}: opening database {db_path}""")
 
             # no: sqlite3.OperationalError: no such access mode: readonly
             # TODO encode path to URI
@@ -278,15 +508,26 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
         )
         #print("sql_query", sql_query)
         #print(f"""local provider {provider["id"]}: getting results for query:""", sql_query)
+
+        #modified_at = 0
+        #modified_at = datetime.fromtimestamp(0)
+        # zip epoch is 1980-01-01?
+        from datetime import datetime
+        modified_at = datetime(1980, 1, 1)
+        #mode = S_IFREG | 0o600
+        mode = 0o100600
+
         for num, zip_content in provider["db_cur"].execute(sql_query):
             # found
             #print(f"""found sub {num} in local provider {provider["id"]}""")
-            extract_sub(zip_content, video_path_base, num, lang_ISO639)
+            (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, args.lang)
+            yield (sub_path, modified_at, mode, ZIP_32, (sub_content,))
             # found zipfile -> dont search other providers
         #print(f"""local provider {provider["id"]}: done""")
 
 
-def extract_sub(zip_content, video_path_base, num, lang_ISO639):
+
+def extract_sub(zip_content, video_path_base, num, lang):
     #print(f"extracting sub {num}")
     with zipfile.ZipFile(io.BytesIO(zip_content)) as zip_file:
         #print(f"extracting sub {num}: done opening zip file")
@@ -327,22 +568,30 @@ def extract_sub(zip_content, video_path_base, num, lang_ISO639):
             # (99999999 - 9521948) / 1000 / 365 = 250
             num_width = 8
             num_padded = str(num).rjust(num_width, "0")
-            sub_path = f"{video_path_base}.{lang_ISO639}.{num_padded}{ext}"
+            sub_path = f"{video_path_base}.{lang}.{num_padded}{ext}"
             sub_content = zip_file.read(zipinfo)
-            sub_encoding = charset_normalizer.from_bytes(sub_content).best().encoding
-            if sub_encoding not in {"ascii", "utf_8"}:
-                # recode sub_content to utf8
-                try:
-                    # bytes -> str -> bytes
-                    sub_content = sub_content.decode(sub_encoding).encode("utf8")
-                except UnicodeDecodeError as error:
-                    print(f"output {repr(sub_path)} warning: failed to convert to utf8 from {sub_encoding}: {error}")
+            if recode_sub_content_to_utf8:
+                sub_encoding = charset_normalizer.from_bytes(sub_content).best().encoding
+                if sub_encoding not in {"ascii", "utf_8"}:
+                    # recode sub_content to utf8
+                    try:
+                        # bytes -> str -> bytes
+                        sub_content = sub_content.decode(sub_encoding).encode("utf8")
+                    except UnicodeDecodeError as error:
+                        pass
+                        #print(f"output {repr(sub_path)} warning: failed to convert to utf8 from {sub_encoding}: {error}")
+            """
             sub_filename = os.path.basename(sub_path)
-            print(f"output {repr(sub_filename)} from {repr(filename)} ({encoding})")
+            #print(f"output {repr(sub_filename)} from {repr(filename)} ({encoding})")
             with open(sub_path, "wb") as sub_file:
                 sub_file.write(sub_content)
+            """
+            #yield (sub_path, sub_content)
+            return (sub_path, sub_content)
             break # stop after first file
             # TODO write multiple files
 
 
-main()
+if __name__ == "__main__":
+    main()
+    sys.exit()
