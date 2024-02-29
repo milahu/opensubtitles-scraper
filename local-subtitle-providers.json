@@ -1,8 +1,25 @@
 {
   "type": "local-subtitle-providers",
-  "version": 0.1,
+  "version": 0.2,
+  "subtitles_metadata_db_path": "subtitles_metadata.db",
   "providers": [
     {
+      "comment": [
+        "all subs from opensubtitles.org.Actually.Open.Edition.2022.07.25 (130GB)"
+      ],
+      "id": "opensubtitles_org_1_9180517",
+      "source": "opensubtitles.org",
+      "url": "magnet:?xt=urn:btih:c2f0b5d26a886ba12f7f667d69c0459056dcda9b&dn=opensubtitles.org.Actually.Open.Edition.2022.07.25",
+      "num_range_from": 1,
+      "num_range_to": 9180517,
+      "type": "sqlite",
+      "db_path": "$HOME/down/torrent/done/opensubtitles.org.Actually.Open.Edition.2022.07.25/opensubs.db",
+      "zipfiles_table": "subz",
+      "zipfiles_num_column": "num",
+      "zipfiles_zipfile_column": "file"
+    },
+    {
+      "enabled": false,
       "comment": [
         "english subs from opensubtitles.org.Actually.Open.Edition.2022.07.25 (130GB)",
         "eng.db generated with opensubs-db-split-by-lang.py",
@@ -11,11 +28,11 @@
       "id": "opensubtitles_org_1_9180517_eng",
       "source": "opensubtitles.org",
       "url": "magnet:?xt=urn:btih:c2f0b5d26a886ba12f7f667d69c0459056dcda9b&dn=opensubtitles.org.Actually.Open.Edition.2022.07.25",
-      "lang": "eng",
+      "lang": "en",
       "num_range_from": 1,
       "num_range_to": 9180517,
       "type": "sqlite",
-      "db_path": "~/.config/subtitles/opensubtitles_org_1_9180517_eng.db",
+      "db_path": "opensubtitles_org_1_9180517_eng.db",
       "zipfiles_table": "subz",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "file"
@@ -28,11 +45,69 @@
       "id": "opensubtitles_org_9180518_9521948_eng",
       "source": "opensubtitles.org",
       "url": "magnet:?xt=urn:btih:30b8b5120f4b881927d81ab9f071a60004a7183a&xt=urn:btmh:122019eb63683baf6d61f33a9e34039fd9879f042d8d52c8aa9410f29d8d83a804e2&dn=opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26",
-      "lang": "eng",
+      "lang": "en",
       "num_range_from": 9180518,
       "num_range_to": 9521948,
       "type": "sqlite",
-      "db_path": "$HOME/.config/subtitles/opensubtitles_org_9180518_9521948_eng.db",
+      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26/langs/eng.db",
+      "zipfiles_table": "zipfiles",
+      "zipfiles_num_column": "num",
+      "zipfiles_zipfile_column": "content"
+    },
+    {
+      "enabled": false,
+      "comment": [
+        "TODO enable"
+      ],
+      "id": "opensubtitles_org_9500000_9599999",
+      "source": "opensubtitles.org",
+      "url": "",
+      "num_range_from": 9500000,
+      "num_range_to": 9599999,
+      "type": "sqlite",
+      "db_path_base": "$HOME/down/torrent/done/opensubtitles.org.dump.9500000.to.9599999",
+      "db_path_format": "/{shard_id}xxx.db",
+      "shard_size": 1000,
+      "zipfiles_table": "zipfiles",
+      "zipfiles_num_column": "num",
+      "zipfiles_zipfile_column": "content"
+    },
+    {
+      "id": "opensubtitles_org_9600000_9699999",
+      "source": "opensubtitles.org",
+      "url": "magnet:?xt=urn:btih:a76396daa3262f6d908b7e8ee47ab0958f8c7451&dn=opensubtitles.org.dump.9600000.to.9699999",
+      "num_range_from": 9600000,
+      "num_range_to": 9699999,
+      "type": "sqlite",
+      "db_path_base": "$HOME/down/torrent/done/opensubtitles.org.dump.9600000.to.9699999",
+      "db_path_format": "/{shard_id}xxx.db",
+      "shard_size": 1000,
+      "zipfiles_table": "zipfiles",
+      "zipfiles_num_column": "num",
+      "zipfiles_zipfile_column": "content"
+    },
+    {
+      "id": "opensubtitles_org_9700000_9799999",
+      "source": "opensubtitles.org",
+      "url": "magnet:?xt=urn:btih:de1c9696bfa0e6e4e65d5ed9e1bdf81b910cc7ef&dn=opensubtitles.org.dump.9700000.to.9799999",
+      "num_range_from": 9700000,
+      "num_range_to": 9799999,
+      "type": "sqlite",
+      "db_path_base": "$HOME/down/torrent/done/opensubtitles.org.dump.9700000.to.9799999",
+      "db_path_format": "/{shard_id}xxx.db",
+      "shard_size": 1000,
+      "zipfiles_table": "zipfiles",
+      "zipfiles_num_column": "num",
+      "zipfiles_zipfile_column": "content"
+    },
+    {
+      "id": "opensubtitles_org_new_subs",
+      "source": "opensubtitles.org",
+      "url": "https://github.com/milahu/opensubtitles-scraper-new-subs.git",
+      "type": "sqlite",
+      "db_path_base": "$HOME/src/milahu/opensubtitles-scraper-new-subs/shards",
+      "db_path_format": "/*/{shard_id}xxx.db",
+      "shard_size": 1000,
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"

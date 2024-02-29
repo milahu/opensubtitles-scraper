@@ -23,32 +23,90 @@ import sqlite3
 import zipfile
 import io
 import json
+import glob
 
 # requirements
+import platformdirs
 import guessit
 import charset_normalizer
 
 
-# TODO better
-#data_dir = os.path.dirname(__file__)
-data_dir = os.environ["HOME"] + "/.config/subtitles"
+# global state
+data_dir = None
+
+
+def expand_path(path):
+    global data_dir
+    if path == None:
+        return path
+    if path.startswith("~/"):
+        path = os.environ["HOME"] + path[1:]
+    elif path.startswith("$HOME/"):
+        path = os.environ["HOME"] + path[5:]
+    return os.path.join(data_dir, path)
 
 
 def main():
+    global data_dir
+    # relative paths are relative to data_dir
+    # on linux: $HOME/.config/subtitles
+    data_dir = platformdirs.user_config_dir("subtitles")
+    if not os.path.exists(data_dir):
+        raise Exception(f"missing data_dir: {repr(data_dir)}")
     config_path = f"{data_dir}/local-subtitle-providers.json"
+    if not os.path.exists(config_path):
+        raise Exception(f"missing config_path: {repr(config_path)}")
     with open(config_path) as f:
         config = json.load(f)
+    # TODO use default from locale in os.environ["LANG"]
     lang_ISO639 = "en"
     if len(sys.argv) != 2 or not os.path.exists(sys.argv[1]):
         print_usage()
         return
     video_path = sys.argv[1]
     print("video_path", video_path)
+    # note: video_path does not need to exist
+    os.makedirs(os.path.dirname(video_path), exist_ok=True)
     video_filename = os.path.basename(video_path)
     #print("video_filename", video_filename)
     video_parsed = guessit.guessit(video_filename)
     str_list = []
     print("video_parsed", video_parsed)
+
+    providers = []
+    for provider in config["providers"]:
+        if provider.get("enabled") == False:
+            continue
+        if "db_path" in provider:
+            providers.append(provider)
+            continue
+        # expand "shard" provider
+        shard_size = provider.get("shard_size")
+        db_path_base = expand_path(provider.get("db_path_base"))
+        db_path_format = provider.get("db_path_format")
+        # TODO? use regex to parse shard_id
+        #db_path_glob = provider.get("db_path_glob")
+        #db_path_shard_id_regex = provider.get("db_path_shard_id_regex")
+        get_shard_id = None
+        if db_path_base and db_path_format:
+            db_path_glob = db_path_base + db_path_format.replace("{shard_id}", "*")
+            if db_path_format.endswith("/{shard_id}xxx.db"):
+                get_shard_id = lambda db_path: int(os.path.basename(db_path)[:-6])
+            else:
+                raise NotImplementedError
+        else:
+            raise NotImplementedError
+        for db_path in glob.glob(db_path_glob):
+            shard_id = get_shard_id(db_path)
+            num_range_from = shard_id * shard_size
+            provider_2 = dict(provider)
+            provider_2["id"] = provider["id"] + f"/shard-{shard_id}"
+            provider_2["db_path"] = db_path
+            provider_2["num_range_from"] = num_range_from
+            provider_2["num_range_to"] = num_range_from + shard_size - 1
+            providers.append(provider_2)
+    config["providers"] = providers
+
     return get_movie_subs(video_path, video_parsed, lang_ISO639, config)
 
 
@@ -60,6 +118,7 @@ def print_usage():
 
 
 def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
+    global data_dir
     video_path_base, video_path_extension = os.path.splitext(video_path)
     # one database for metadata: 1.6GB
     #print(f"""metadata: getting connection""")
@@ -67,17 +126,18 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
     # add index for (MovieName, MovieYear)
     # add full-text-search index for MovieName
     # add index for MovieYear
-    meta_path = f"{data_dir}/opensubs-metadata.db"
-    print(f"opening database {meta_path}")
-    meta_con = sqlite3.connect(meta_path)
-    meta_cur = meta_con.cursor()
+    metadata_db_path = expand_path(config["subtitles_metadata_db_path"])
+    assert os.path.exists(metadata_db_path), f"no such file: {metadata_db_path}"
+    print(f"opening database {metadata_db_path}")
+    metadata_con = sqlite3.connect(metadata_db_path)
+    metadata_cur = metadata_con.cursor()
     # multiple databases for zipfiles: 24GB for english subs
     sql_query = None
     sql_args = None
     if video_parsed.get("type") == "movie":
         sql_query = (
             "SELECT IDSubtitle "
-            "FROM metadata "
+            "FROM subz_metadata "
             "WHERE MovieName LIKE ? "
             "AND MovieYear = ? "
             "AND ISO639 = ? "
@@ -135,6 +195,7 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
         )
     else:
         raise Exception(f"""unknown video type: {repr(video_parsed.get("type"))}""")
+
     nums = []
     def format_query(sql_query, sql_args=None):
         if not sql_args:
@@ -148,13 +209,25 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
                 result += f" {repr(sql_args[idx])} "
         return result
     print(f"""metadata: getting results for query:""", format_query(sql_query, sql_args))
-    for num, in meta_cur.execute(sql_query, sql_args):
+    for num, in metadata_cur.execute(sql_query, sql_args):
         nums.append(num)
+
     for provider in config["providers"]:
-        if provider.get("enabled") == False:
-            continue
+        #if provider.get("enabled") == False:
+        #    continue
+        provider_lang = provider.get("lang", "*")
+        if provider_lang != "*":
+            # TODO allow multiple languages for one provider
+            if provider_lang != lang_ISO639:
+                continue
         def filter_num(num):
-            return provider["num_range_from"] <= num and num <= provider["num_range_to"]
+            num_range_from = provider.get("num_range_from", 0)
+            if num_range_from == 0:
+                return True
+            num_range_to = provider.get("num_range_to", 0)
+            if num_range_to == 0:
+                return True
+            return num_range_from <= num and num <= num_range_to
         provider_nums = []
         rest_nums = []
         for num in nums:
@@ -167,17 +240,35 @@ def get_movie_subs(video_path, video_parsed, lang_ISO639, config):
             #print(f"""local provider {provider["id"]}: num is out of range""")
             continue
         #print(f"""local provider {provider["id"]}: getting {len(provider_nums)} nums""")
+
         if not "db_con" in provider:
-            db_path = provider["db_path"]
-            if db_path.startswith("~/"):
-                db_path = os.environ["HOME"] + db_path[1:]
-            elif db_path.startswith("$HOME/"):
-                db_path = os.environ["HOME"] + db_path[5:]
-            print(f"""local provider {provider["id"]}: opening database {db_path}""")
+            db_path = expand_path(provider.get("db_path"))
+
+            # use sqlite ATTACH? - no. number is limited to 10 files
+            # https://stackoverflow.com/questions/30292367/sqlite-append-two-tables-from-two-databases-that-have-the-exact-same-schema
+            # https://sqlite.org/cgi/src/doc/reuse-schema/doc/shared_schema.md
+
+            assert os.path.exists(db_path), f"no such file: {db_path}"
+
             provider["db_con"] = sqlite3.connect(db_path)
+
+            # TODO? build external index
+            # https://sqlite.org/forum/forumpost/0ed07b9626
+            # https://stackoverflow.com/questions/19379761/how-to-setup-index-for-virtual-table-in-sqlite
+            # pysqlite3.connect is always readonly
+            #provider["db_con"] = pysqlite3.connect(db_path)
+
+            print(f"""local provider {provider["id"]}: opening database {db_path}""")
+
+            # no: sqlite3.OperationalError: no such access mode: readonly
+            # TODO encode path to URI
+            #db_uri = f"file:{db_path}?mode=readonly"
+            #provider["db_con"] = sqlite3.connect(db_uri, uri=True)
+
         if not "db_cur" in provider:
             # cache the cursor for faster lookup of similar nums
             provider["db_cur"] = provider["db_con"].cursor()
+
         sql_query = (
             f"""SELECT {provider["zipfiles_num_column"]}, """
             f"""{provider["zipfiles_zipfile_column"]} """
