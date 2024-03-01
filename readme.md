@@ -4,11 +4,13 @@ scrape subtitles from [opensubtitles.org](https://www.opensubtitles.org/)
 
 ## result
 
-[opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26.torrent](release/opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26.torrent)
+- [opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26.torrent](release/opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26.torrent)
+- [opensubtitles.org.dump.9600000.to.9699999.torrent](release/opensubtitles.org.dump.9600000.to.9699999.torrent)
+- [opensubtitles.org.dump.9700000.to.9799999.torrent](release/opensubtitles.org.dump.9700000.to.9799999.torrent)
 
 ## usage
 
-- download the 2 torrents in [release/](release/)
+- download the torrents in [release/](release/)
 - run [opensubs-db-split-by-lang.py](opensubs-db-split-by-lang.py) to extract english subs
 - download `subtitles_all.txt.gz` from https://dl.opensubtitles.org/addons/export/
 - run [subtitles_all.txt.gz-parse.py](subtitles_all.txt.gz-parse.py) to build `subtitles_all.db`
