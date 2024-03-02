@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 
+# parse subtitles_all.txt.gz to opensubs-metadata.db
+
+# this runs about 1 hour
+# on a 300MB input file
+# and creates a 2GB output file
+
+
+
 import os
 import sys
 import time
@@ -10,7 +18,27 @@ import math
 import sqlite3
 
 
+
 create_tmp_table = False
+
+
+
+# $ sqlite3 subtitles_all.txt.gz.20240223T095232Z.db "select count(1) from subz_metadata"
+# 6360319
+# $ stat -c%s subtitles_all.txt.gz.20240223T095232Z
+# 339079488
+# $ python -c "print(339079488/6360319)"
+# 53.311710937769
+
+# subtitles_all.txt.gz size per subtitle
+estimate_bytes_per_sub = 53.3
+
+
+
+# full text search
+# https://sqlite.org/fts5.html
+create_fts_index = True
+
 
 
 debug_sub_number = 0 # invalid
@@ -26,6 +54,7 @@ debug_sub_number = 85844 # MovieReleaseName is "\tAppurush" # FIXME
 #debug_sub_number = 7587300 # MovieName has "\t" (only for this sub)
 #debug_sub_number = 9211279 # empty SubFormat
 #debug_sub_number = 9211278 # empty SubFormat
+
 
 
 def has_table(db_path, table_name):
@@ -53,6 +82,10 @@ if create_tmp_table:
     table_name_tmp = f"{table_name}_tmp"
 
 assert os.path.exists(subtitles_all_txt_gz_path), "error: missing input file"
+
+assert os.path.exists(metadata_db_path) == False, "error: existing output file"
+
+estimate_num_subs = round(os.path.getsize(subtitles_all_txt_gz_path) / estimate_bytes_per_sub)
 
 assert has_table(metadata_db_path, table_name) == False, f"error: output table exists: {table_name}"
 
@@ -105,6 +138,44 @@ len_col_names = len(col_names)
 idx_IDSubtitle = col_names.index("IDSubtitle")
 idx_MovieName = col_names.index("MovieName")
 idx_MovieReleaseName = col_names.index("MovieReleaseName")
+
+# use only these columns
+# remove some columns to make the db smaller
+#use_col_names = None # use all columns
+#use_col_names = col_names # use all columns
+use_col_names = [
+    "IDSubtitle", # 1
+    "MovieName", # 2
+    "MovieYear", # 3
+    #"LanguageName", # 4
+    "ISO639", # 5
+    #"SubAddDate", # 6
+    "ImdbID", # 7
+    #"SubFormat", # 8
+    #"SubSumCD", # 9
+    #"MovieReleaseName", # 10
+    #"MovieFPS", # 11
+    "SeriesSeason", # 12
+    "SeriesEpisode", # 13
+    "SeriesIMDBParent", # 14
+    "MovieKind", # 15
+    #"URL", # 16
+]
+
+use_col_ids = None
+if use_col_names and use_col_names != col_names:
+    use_col_ids = []
+    # use order of use_col_names
+    for name in use_col_names:
+        id = col_names.index(name)
+        use_col_ids.append(id)
+
+def filter_cols(parsed_cols, use_col_ids):
+    res = []
+    # use order of use_col_names
+    for id in use_col_ids:
+        res.append(parsed_cols[id])
+    return res
 
 # done?
 # TODO list -> dict
@@ -183,7 +254,7 @@ col_types = {
 }
 
 col_names_types = []
-for idx, col_name in enumerate(col_names):
+for idx, col_name in enumerate(use_col_names):
     #col_type = col_types[idx]
     col_type = col_types[col_name]
     sql_type = ""
@@ -194,12 +265,12 @@ for idx, col_name in enumerate(col_names):
     elif col_type == str:
         sql_type = "TEXT"
     sql_extra = ""
-    if idx == 0:
+    if col_name == "IDSubtitle":
         sql_extra = " PRIMARY KEY"
     col_names_types.append(f"{col_name} {sql_type}{sql_extra}")
 
 
-create_query = f"CREATE TABLE IF NOT EXISTS {table_name_tmp} (\n  "
+create_query = f"CREATE TABLE {table_name_tmp} (\n  "
 create_query += ",\n  ".join(col_names_types)
 create_query += "\n)"
 #print(create_query); raise NotImplementedError("todo")
@@ -231,7 +302,9 @@ with (
     )
     buf = []
     #buf_cols = {}
-    insert_query = f"""replace into {table_name_tmp}({",".join(col_names)}) values({",".join(["?"] * len_col_names)})"""
+    # TODO why replace? why not insert?
+    #insert_query = f"""replace into {table_name_tmp}({",".join(col_names)}) values({",".join(["?"] * len_col_names)})"""
+    insert_query = f"""replace into {table_name_tmp}({",".join(use_col_names)}) values({",".join(["?"] * len(use_col_names))})"""
     deadloop_counter_max = 20
     deadloop_counter_raise = 30
     deadloop_counter = 0
@@ -341,7 +414,11 @@ with (
             continue
 
         # parse ok -> store in db
-        sqlite_cursor.execute(insert_query, parsed_cols)
+        if use_col_ids:
+            sqlite_cursor.execute(insert_query, filter_cols(parsed_cols, use_col_ids))
+        else:
+            # dont filter
+            sqlite_cursor.execute(insert_query, parsed_cols)
 
         #print(parsed_cols[idx_IDSubtitle], repr(parsed_cols[idx_MovieReleaseName]))
         #print("parsed_cols", parsed_cols)
@@ -349,25 +426,72 @@ with (
         #if num_done >= 10: break # debug
 
         # show progress
+        # TODO show ETA
         if num_done % 100000 == 0:
-            print(f"done {num_done}")
+            done_percent = num_done / estimate_num_subs * 100
+            print(f"done {num_done} = {done_percent:.1f}%")
 
-sqlite_cursor.execute(f"""
-    CREATE INDEX idx_{table_name}_movie_name_year_lang
-    ON {table_name_tmp} (MovieName, MovieYear, ISO639)
-""")
+# ^ this takes long, so commit the result
+sqlite_connection.commit()
+
+t2 = time.time()
+print(f"done {num_done} rows in {t2 - t1:.2f} seconds")
+print("output files:")
+print(metadata_db_path)
+print(errfile)
+
+print("creating indexes ...")
+
+# surprise: with this index "select by movie name" queries stay slow
+# so we need both fts-table and index for MovieName
+# CREATE INDEX idx_{table_name}_movie_year_lang
+#   ON {table_name_tmp} (MovieYear, ISO639);
+
+# make "select by movie name" queries 5x faster
+sql_query = f"""
+CREATE INDEX idx_{table_name_tmp}_movie_name_year_lang
+  ON {table_name_tmp} (MovieName, MovieYear, ISO639)
+"""
+print(sql_query)
+sqlite_cursor.execute(sql_query)
+
+sqlite_connection.commit()
+
+# needed in repack.py to group subs by imdb id and language
+sql_query = f"""
+CREATE INDEX idx_{table_name}_imdb_lang
+  ON {table_name_tmp} (ImdbID, ISO639);
+"""
+print(sql_query)
+sqlite_cursor.execute(sql_query)
+
+sqlite_connection.commit()
 
 if create_tmp_table:
     sqlite_cursor.execute(f"ALTER TABLE {table_name_tmp} RENAME TO {table_name}")
+    sqlite_connection.commit()
+
+if create_fts_index:
+    sql_query = (
+        f"CREATE VIRTUAL TABLE {table_name}_fts_MovieName " +
+        f"USING fts5 (MovieName, content='{table_name}')"
+    )
+    print(sql_query)
+    sqlite_cursor.execute(sql_query)
+    # actually populate the index
+    # this takes 10 minutes for a 2GB database
+    # this makes the db 10% larger (when using all columns)
+    sql_query = (
+        f"INSERT INTO {table_name}_fts_MovieName ({table_name}_fts_MovieName) VALUES ('rebuild')"
+    )
+    print(sql_query)
+    sqlite_cursor.execute(sql_query)
+    # to delete the fts index:
+    # DROP TABLE subz_metadata_fts_MovieName
+    sqlite_connection.commit()
 
 # BEGIN TRANSACTION -> ... -> COMMIT
 #sqlite_cursor.execute("COMMIT")
 
 sqlite_connection.commit()
 sqlite_connection.close()
-
-t2 = time.time()
-print(f"done {num_done} lines in {t2 - t1:.2f} seconds")
-print("output files:")
-print(metadata_db_path)
-print(errfile)
