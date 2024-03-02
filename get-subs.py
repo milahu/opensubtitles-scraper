@@ -42,6 +42,9 @@ import charset_normalizer
 # ideally recode once and cache the result
 recode_sub_content_to_utf8 = False
 
+# if is_cgi: unpack_zipfiles = False
+unpack_zipfiles = True
+
 
 
 # global state
@@ -59,20 +62,18 @@ def show_help_cgi():
     print("Status: 200")
     print("Content-Type: text/plain")
     print()
-    print("subtitles-server")
+
+    print("get-subtitles")
     print()
     print("returns a zip archive with subtitles for a movie")
-    print()
-    print("if you pass a movie filename like movie=Scary.Movie.2000.720p.mp4")
-    print("then the subtitle files will be named Scary.Movie.2000.720p.12345.srt etc")
-    print("so when you extract them to the folder of the movie file")
-    print("then your video player should find the subtitles")
     print()
     print()
     print()
     print("usage")
     print()
-    print(f"{request_url}?movie=Scary.Movie.2000.720p.mp4")
+    print(f'curl -OJ "{request_url}?movie=Scary.Movie.2000.720p.mp4"')
+    print()
+    print(f'curl "{request_url}?movie=Scary.Movie.2000.720p.mp4" -o - | bsdtar -xvf -')
     # TODO
     """
     print()
@@ -87,7 +88,28 @@ def show_help_cgi():
     print()
     print("source")
     print()
-    print("https://github.com/milahu/opensubtitles-scraper/blob/main/get-subs.py")
+    print("https://github.com/milahu/opensubtitles-scraper/raw/main/get-subs.py")
+    print()
+    print()
+    print()
+    print("filenames")
+    print()
+    print("when you pass a movie filename like movie=Scary.Movie.2000.720p.mp4")
+    print("then the subtitle files will be named Scary.Movie.2000.720p.12345.srt etc")
+    print("so when you extract them to the folder of the movie file")
+    print("then your video player should find the subtitles")
+    print()
+    print()
+    print()
+    print("encoding")
+    print()
+    print("the subtitles are not recoded to utf8")
+    print("because im too lazy to finish this postprocessing")
+    print("most subtitles should have utf8 encoding")
+    print("but some subtitles can have single-byte encodings like latin1")
+    print("see also")
+    print("https://github.com/milahu/opensubtitles-scraper/raw/main/repack.py")
+
     sys.exit()
 
 
@@ -259,6 +281,7 @@ def main():
     global data_dir
     global is_cgi
     global error
+    global unpack_zipfiles
 
     # see also https://github.com/technetium/cgli/blob/main/cgli/cgli.py
 
@@ -267,6 +290,10 @@ def main():
             error("only GET requests are supported")
         is_cgi = True
         error = error_cgi
+        # no. this has almost no effect on speed
+        # the slowest part is "search by movie name" in database
+        # -> use sqlite fts (full text search) -> 5x faster
+        #unpack_zipfiles = False
 
     # relative paths are relative to data_dir
     # on linux: $HOME/.config/subtitles
@@ -304,20 +331,29 @@ def main():
     video_filename = os.path.basename(args.movie)
     #print("video_filename", video_filename)
 
+    # TODO allow to set title and year
+    # guessit can fail in rare cases
+
     video_parsed = guessit.guessit(video_filename)
     #print("video_parsed", video_parsed)
 
     config_get_providers(config)
 
     if is_cgi:
+        from stream_zip import ZIP_32
+        # set the zip_fn here so the non-cgi code works without stream_zip
+        def fix_args(args):
+            #yield (sub_path, modified_at, mode, ZIP_32, (sub_content,))
+            (a, b, c, _, e) = args
+            return (a, b, c, ZIP_32, e)
         try:
-            send_zipfile_cgi(args, get_movie_subs(config, args, video_parsed))
+            send_zipfile_cgi(args, map(fix_args, get_movie_subs(config, args, video_parsed)))
         except Exception as e:
             error(f"Exception {type(e)} {e}")
     else:
         #return get_movie_subs(video_path, video_parsed, lang, config)
         for item in get_movie_subs(config, args, video_parsed):
-            (sub_path, modified_at, mode, ZIP_32, (sub_content,)) = item
+            (sub_path, modified_at, mode, zip_fn, (sub_content,)) = item
             sub_filename = os.path.basename(sub_path)
             print(f"writing {repr(sub_filename)}") # from {repr(filename)} ({encoding})")
             with open(sub_path, "wb") as sub_file:
@@ -353,17 +389,28 @@ def get_movie_subs(config, args, video_parsed):
     sql_query = None
     sql_args = None
 
-    #print("video_parsed", video_parsed)
+    if not is_cgi:
+        print("video_parsed", video_parsed)
 
     if video_parsed.get("type") == "movie":
         sql_query = (
-            "SELECT IDSubtitle "
-            "FROM subz_metadata "
-            "WHERE MovieName LIKE ? "
-            "AND MovieYear = ? "
-            "AND ISO639 = ? "
-            "AND SubSumCD = 1 "
-            "AND MovieKind = 'movie' "
+            #"SELECT IDSubtitle "
+            #"SELECT subz_metadata.IDSubtitle "
+            "SELECT subz_metadata.rowid "
+            #"FROM subz_metadata "
+            "FROM subz_metadata, subz_metadata_fts_MovieName "
+            #"WHERE MovieName LIKE ? "
+            "WHERE "
+            "subz_metadata.rowid = subz_metadata_fts_MovieName.rowid "
+            "AND "
+            "subz_metadata_fts_MovieName.MovieName MATCH ? "
+            "AND "
+            "subz_metadata.MovieYear = ? "
+            "AND "
+            "subz_metadata.ISO639 = ? "
+            #"AND subz_metadata.SubSumCD = 1 "
+            "AND "
+            "subz_metadata.MovieKind = 'movie' "
             #"AND ImdbID = 12345"
         )
         sql_args = (
@@ -388,6 +435,7 @@ def get_movie_subs(config, args, video_parsed):
         # sqlite3 imdb/title.basics.db "select * from imdb_title_basics where tconst = 8135530;" -line
         # TODO
         series_imdb_parent = 8772296
+
         sql_query = (
             "SELECT IDSubtitle "
             "FROM subz_metadata "
@@ -400,8 +448,8 @@ def get_movie_subs(config, args, video_parsed):
             "SeriesEpisode = ? "
             "AND "
             "ISO639 = ? "
-            "AND "
-            "SubSumCD = 1 "
+            #"AND "
+            #"SubSumCD = 1 "
             "AND "
             "MovieKind = 'tv' "
             #"AND SeriesIMDBParent = 12345"
@@ -418,8 +466,6 @@ def get_movie_subs(config, args, video_parsed):
     else:
         error(f"""unknown video type: {repr(video_parsed.get("type"))}""")
 
-    nums = []
-
     def format_query(sql_query, sql_args=None):
         if not sql_args:
             return sql_query
@@ -432,12 +478,13 @@ def get_movie_subs(config, args, video_parsed):
                 result += f" {repr(sql_args[idx])} "
         return result
 
-    #print(f"""metadata: getting results for query:""", format_query(sql_query, sql_args))
+    if not is_cgi:
+        print(f"""metadata: getting results for query:""", format_query(sql_query, sql_args))
 
-    for num, in metadata_cur.execute(sql_query, sql_args):
-        nums.append(num)
+    nums = list(map(lambda row: row[0], metadata_cur.execute(sql_query, sql_args).fetchall()))
 
-    from stream_zip import ZIP_32
+    #if not is_cgi:
+    #    print("metadata: nums:", nums)
 
     for provider in config["providers"]:
         #if provider.get("enabled") == False:
@@ -506,8 +553,9 @@ def get_movie_subs(config, args, video_parsed):
             f"""WHERE {provider["zipfiles_num_column"]} IN """
             f"""({", ".join(map(str, provider_nums))})"""
         )
-        #print("sql_query", sql_query)
-        #print(f"""local provider {provider["id"]}: getting results for query:""", sql_query)
+        if not is_cgi:
+            #print("sql_query", sql_query)
+            print(f"""local provider {provider["id"]}: getting results for query:""", sql_query)
 
         #modified_at = 0
         #modified_at = datetime.fromtimestamp(0)
@@ -520,8 +568,15 @@ def get_movie_subs(config, args, video_parsed):
         for num, zip_content in provider["db_cur"].execute(sql_query):
             # found
             #print(f"""found sub {num} in local provider {provider["id"]}""")
-            (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, args.lang)
-            yield (sub_path, modified_at, mode, ZIP_32, (sub_content,))
+            if unpack_zipfiles:
+                (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, args.lang)
+            else:
+                (sub_path, sub_content) = (f"{num}.zip", zip_content)
+            # no. dont require stream_zip here
+            #from stream_zip import ZIP_32
+            #yield (sub_path, modified_at, mode, ZIP_32, (sub_content,))
+            zip_fn = None
+            yield (sub_path, modified_at, mode, zip_fn, (sub_content,))
             # found zipfile -> dont search other providers
         #print(f"""local provider {provider["id"]}: done""")
 
