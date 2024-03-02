@@ -362,6 +362,10 @@ def main():
     # TODO allow to set title and year
     # guessit can fail in rare cases
 
+    # len("abc 2000.mp4") == 12
+    if len(video_filename) < 12:
+        error("video_filename is too short")
+
     video_parsed = guessit.guessit(video_filename)
     #print("video_parsed", video_parsed)
 
@@ -441,6 +445,8 @@ def get_movie_subs(config, args, video_parsed):
             "AND "
             "subz_metadata.MovieKind = 'movie' "
             #"AND ImdbID = 12345"
+            # rate-limiting for abuse-queries like movie=the.mp4
+            "LIMIT 500 "
         )
         sql_args = []
         sql_args.append(movie_title)
