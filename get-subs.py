@@ -209,7 +209,7 @@ def send_zipfile_cgi(args, member_files):
     #   curl -OJ
     #   wget --content-disposition
     # https://stackoverflow.com/questions/1361604/how-to-encode-utf8-filename-for-http-headers-python-django
-    filename = basename + ".zip"
+    filename = basename + ".subs.zip"
     from urllib.parse import quote
     disposition = 'attachment'
     try:
