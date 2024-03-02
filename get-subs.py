@@ -421,6 +421,8 @@ def get_movie_subs(config, args, video_parsed):
         print("video_parsed", video_parsed)
 
     if video_parsed.get("type") == "movie":
+        movie_title = video_parsed.get("title")
+        movie_year = video_parsed.get("year")
         sql_query = (
             #"SELECT IDSubtitle "
             #"SELECT subz_metadata.IDSubtitle "
@@ -431,9 +433,8 @@ def get_movie_subs(config, args, video_parsed):
             "WHERE "
             "subz_metadata.rowid = subz_metadata_fts_MovieName.rowid "
             "AND "
-            "subz_metadata_fts_MovieName.MovieName MATCH ? "
-            "AND "
-            "subz_metadata.MovieYear = ? "
+            "subz_metadata_fts_MovieName.MovieName MATCH ? " +
+            ("AND subz_metadata.MovieYear = ? " if movie_year else "") +
             "AND "
             "subz_metadata.ISO639 = ? "
             #"AND subz_metadata.SubSumCD = 1 "
@@ -441,11 +442,11 @@ def get_movie_subs(config, args, video_parsed):
             "subz_metadata.MovieKind = 'movie' "
             #"AND ImdbID = 12345"
         )
-        sql_args = (
-            video_parsed.get("title"),
-            video_parsed.get("year"),
-            args.lang,
-        )
+        sql_args = []
+        sql_args.append(movie_title)
+        if movie_year:
+            sql_args.append(movie_year)
+        sql_args.append(args.lang)
     elif video_parsed.get("type") == "episode":
         error("not implemented: type episode")
         # TODO lookup via IMDB
