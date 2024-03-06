@@ -366,6 +366,9 @@ def main():
     if len(video_filename) < 12:
         error("video_filename is too short")
 
+    if len(video_filename) > 255:
+        error("video_filename is too long")
+
     video_parsed = guessit.guessit(video_filename)
     #print("video_parsed", video_parsed)
 
