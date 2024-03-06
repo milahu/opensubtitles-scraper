@@ -55,19 +55,13 @@
       "zipfiles_zipfile_column": "content"
     },
     {
-      "enabled": false,
-      "comment": [
-        "TODO enable"
-      ],
       "id": "opensubtitles_org_9500000_9599999",
       "source": "opensubtitles.org",
-      "url": "",
+      "url": "magnet:?xt=urn:btih:287508f8acc0a5a060b940a83fbba68455ef2207&dn=opensubtitles.org.dump.9500000.to.9599999.v20240306",
       "num_range_from": 9500000,
       "num_range_to": 9599999,
       "type": "sqlite",
-      "db_path_base": "$HOME/down/torrent/done/opensubtitles.org.dump.9500000.to.9599999",
-      "db_path_format": "/{shard_id}xxx.db",
-      "shard_size": 1000,
+      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.9500000.to.9599999.v20240306/95xxxxx.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
