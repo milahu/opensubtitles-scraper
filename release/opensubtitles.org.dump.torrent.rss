@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>opensubtitles.org dump</title>
+    <description>subtitles from opensubtitles.org</description>
+    <link>https://github.com/milahu/opensubtitles-scraper</link>
+    <copyright>public domain</copyright>
+    <category>subtitles</category>
+    <ttl>7200</ttl>
+    <lastBuildDate>Wed, 06 Mar 2024 20:19:52 +0000</lastBuildDate>
+    <item>
+      <title>opensubtitles.org.dump.9500000.to.9599999.v20240306</title>
+      <pubDate>Wed, 06 Mar 2024 20:19:52 +0000</pubDate>
+      <guid isPermaLink="false">287508f8acc0a5a060b940a83fbba68455ef2207</guid>
+      <enclosure type="application/x-bittorrent" url="magnet:?xt=urn:btih:287508f8acc0a5a060b940a83fbba68455ef2207&amp;dn=opensubtitles.org.dump.9500000.to.9599999.v20240306"/>
+    </item>
+    <item>
+      <title>opensubtitles.org.dump.9700000.to.9799999</title>
+      <pubDate>Sun, 25 Feb 2024 15:02:07 +0000</pubDate>
+      <guid isPermaLink="false">de1c9696bfa0e6e4e65d5ed9e1bdf81b910cc7ef</guid>
+      <enclosure type="application/x-bittorrent" url="magnet:?xt=urn:btih:de1c9696bfa0e6e4e65d5ed9e1bdf81b910cc7ef&amp;dn=opensubtitles.org.dump.9700000.to.9799999"/>
+    </item>
+    <item>
+      <title>opensubtitles.org.dump.9600000.to.9699999</title>
+      <pubDate>Sun, 25 Feb 2024 14:37:01 +0000</pubDate>
+      <guid isPermaLink="false">a76396daa3262f6d908b7e8ee47ab0958f8c7451</guid>
+      <enclosure type="application/x-bittorrent" url="magnet:?xt=urn:btih:a76396daa3262f6d908b7e8ee47ab0958f8c7451&amp;dn=opensubtitles.org.dump.9600000.to.9699999"/>
+    </item>
+    <item>
+      <title>opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26</title>
+      <pubDate>Thu, 27 Apr 2023 20:26:49 +0000</pubDate>
+      <guid isPermaLink="false">30b8b5120f4b881927d81ab9f071a60004a7183a</guid>
+      <enclosure type="application/x-bittorrent" url="magnet:?xt=urn:btih:30b8b5120f4b881927d81ab9f071a60004a7183a&amp;xt=urn:btmh:122019eb63683baf6d61f33a9e34039fd9879f042d8d52c8aa9410f29d8d83a804e2&amp;dn=opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26"/>
+    </item>
+    <item>
+      <title>opensubtitles.org.Actually.Open.Edition.2022.07.25</title>
+      <pubDate>Mon, 25 Jul 2022 06:51:57 +0000</pubDate>
+      <guid isPermaLink="false">c2f0b5d26a886ba12f7f667d69c0459056dcda9b</guid>
+      <enclosure type="application/x-bittorrent" url="magnet:?xt=urn:btih:c2f0b5d26a886ba12f7f667d69c0459056dcda9b&amp;dn=opensubtitles.org.Actually.Open.Edition.2022.07.25"/>
+    </item>
+  </channel>
+</rss>
