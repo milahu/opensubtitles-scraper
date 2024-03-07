@@ -4,6 +4,8 @@ scrape subtitles from [opensubtitles.org](https://www.opensubtitles.org/)
 
 ## result
 
+torrent RSS feed: [opensubtitles.org.dump.torrent.rss](release/opensubtitles.org.dump.torrent.rss)
+
 - [opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26.torrent](release/opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26.torrent)
 - [opensubtitles.org.dump.9500000.to.9599999.v20240306.torrent](release/opensubtitles.org.dump.9500000.to.9599999.v20240306.torrent)
 - [opensubtitles.org.dump.9600000.to.9699999.torrent](release/opensubtitles.org.dump.9600000.to.9699999.torrent)
