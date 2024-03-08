@@ -152,7 +152,7 @@ use_col_names = [
     #"SubAddDate", # 6
     "ImdbID", # 7
     #"SubFormat", # 8
-    #"SubSumCD", # 9
+    "SubSumCD", # 9
     #"MovieReleaseName", # 10
     #"MovieFPS", # 11
     "SeriesSeason", # 12
