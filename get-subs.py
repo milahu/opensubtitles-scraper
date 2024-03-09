@@ -75,9 +75,9 @@ def show_help_cgi():
     print()
     print("usage")
     print()
-    print(f'{curl} -G -O -J -d "movie=Scary.Movie.2000.720p.mp4" {request_url} && unzip Scary.Movie.2000.720p.subs.zip')
+    print(f'{curl} -G -O -J --data-urlencode "movie=Scary.Movie.2000.720p.mp4" {request_url} && unzip Scary.Movie.2000.720p.subs.zip')
     print()
-    print(f'{curl} -G -o - -d "movie=Scary.Movie.2000.720p.mp4" {request_url} | bsdtar -xvf -')
+    print(f'{curl} -G -o - --data-urlencode "movie=Scary.Movie.2000.720p.mp4" {request_url} | bsdtar -xvf -')
     print()
     print()
     print()
@@ -102,11 +102,11 @@ def show_help_cgi():
     print('movie="$(basename "$1")"')
     # TODO escape request_url for bash string
     print('if command -v bsdtar >/dev/null; then')
-    print('  "${curl[@]}" -G -o - -d "movie=$movie" "$server_url" | bsdtar -xvf -')
+    print('  "${curl[@]}" -G -o - --data-urlencode "movie=$movie" "$server_url" | bsdtar -xvf -')
     print('else')
     print('  zip="${movie%.*}.subs.zip"')
     print('  ! [ -e "$zip" ] || { echo "error: tempfile exists: ${zip@Q}"; exit 1; }')
-    print('  "${curl[@]}" -G -o "$zip" -d "movie=$movie" "$server_url" && unzip "$zip" && rm "$zip"')
+    print('  "${curl[@]}" -G -o "$zip" --data-urlencode "movie=$movie" "$server_url" && unzip "$zip" && rm "$zip"')
     print('fi')
     # TODO
     """
