@@ -75,9 +75,9 @@ def show_help_cgi():
     print()
     print("usage")
     print()
-    print(f'{curl} -G -O -J --data-urlencode "movie=Scary.Movie.2000.720p.mp4" {request_url} && unzip Scary.Movie.2000.720p.subs.zip')
+    print(f'{curl} -G --fail-with-body -O -J --data-urlencode "movie=Scary.Movie.2000.720p.mp4" {request_url} && unzip Scary.Movie.2000.720p.subs.zip')
     print()
-    print(f'{curl} -G -o - --data-urlencode "movie=Scary.Movie.2000.720p.mp4" {request_url} | bsdtar -xvf -')
+    print(f'{curl} -G --fail-with-body -o - --data-urlencode "movie=Scary.Movie.2000.720p.mp4" {request_url} | bsdtar -xvf -')
     print()
     print()
     print()
@@ -102,11 +102,19 @@ def show_help_cgi():
     print('movie="$(basename "$1")"')
     # TODO escape request_url for bash string
     print('if command -v bsdtar >/dev/null; then')
-    print('  "${curl[@]}" -G -o - --data-urlencode "movie=$movie" "$server_url" | bsdtar -xvf -')
+    print('  # https://superuser.com/a/1834410/951886 # write error body to stderr')
+    print('  "${curl[@]}" -G --fail-with-body -D - -o - --data-urlencode "movie=$movie" "$server_url" | {')
+    print('    s=; while read -r h; do h="${h:0: -1}"; if [ -z "$s" ]; then s=${h#* }; s=${s%% *}; fi; [ -z "$h" ] && break; done')
+    print('    if [ "${s:0:1}" = 2 ]; then cat; else cat >&2; fi') # write error body to stderr
+    print('  } | bsdtar -xvf -')
     print('else')
     print('  zip="${movie%.*}.subs.zip"')
     print('  ! [ -e "$zip" ] || { echo "error: tempfile exists: ${zip@Q}"; exit 1; }')
-    print('  "${curl[@]}" -G -o "$zip" --data-urlencode "movie=$movie" "$server_url" && unzip "$zip" && rm "$zip"')
+    print('  if ! "${curl[@]}" -G --fail-with-body -o "$zip" --data-urlencode "movie=$movie" "$server_url"; then')
+    print('    cat "$zip" && rm "$zip" # zip contains the error message')
+    print('  else')
+    print('    unzip "$zip" && rm "$zip"')
+    print('  fi')
     print('fi')
     # TODO
     """
