@@ -159,8 +159,8 @@ def error(msg):
 
 
 
-def error_cgi(msg):
-    print("Status: 200")
+def error_cgi(msg, status=400):
+    print(f"Status: {status}")
     print("Content-Type: text/plain")
     print()
     print("error: " + msg)
@@ -228,9 +228,11 @@ def send_zipfile_cgi(args, member_files):
 
     basename, _extension = os.path.splitext(args.movie)
 
-    print("Status: 200")
+    headers = []
 
-    print("Content-Type: application/zip")
+    headers.append("Status: 200")
+
+    headers.append("Content-Type: application/zip")
 
     # Content-Dispositon
     # by default, curl and wget will ignore the filename. fix:
@@ -247,19 +249,48 @@ def send_zipfile_cgi(args, member_files):
         file_expr = 'filename="{}"'.format(quote(filename))
     except UnicodeEncodeError:
         file_expr = "filename*=utf-8''{}".format(quote(filename))
-    print('Content-Disposition: {}; {}'.format(disposition, file_expr))
+    headers.append('Content-Disposition: {}; {}'.format(disposition, file_expr))
 
-    # end of http header
-    print()
-
-    # fix: lighttpd error: response headers too large
-    # if we dont flush sys.stdout here, then sys.stdout.buffer is written first
-    sys.stdout.flush()
+    sent_headers = False
 
     from stream_zip import stream_zip
 
+    zip_header = None
+
+    empty_zip_header = b"PK\x05\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+
+    is_first_chunk = True
+
     for zipped_chunk in stream_zip(member_files):
+
+        if is_first_chunk and zipped_chunk == empty_zip_header:
+            # buffer headers and this chunk
+            # https://github.com/uktrade/stream-zip/issues/116
+            # return nothing on empty input
+            zip_header = zipped_chunk
+            is_first_chunk = False
+            continue
+
+        if not sent_headers:
+            # note: print adds a "\n"
+            print("\n".join(headers) + "\n")
+            sent_headers = True
+            # fix: lighttpd error: response headers too large
+            # if we dont flush sys.stdout here, then sys.stdout.buffer is written first
+            sys.stdout.flush()
+
+        if zip_header:
+            # zip_header was set in the previous iteration
+            sys.stdout.buffer.write(zip_header)
+            zip_header = None
+
         sys.stdout.buffer.write(zipped_chunk)
+
+        is_first_chunk = False
+
+    if not sent_headers:
+        # stream_zip(member_files) did not return any data
+        error("not found", 404)
 
     sys.stdout.buffer.flush()
 
