@@ -92,6 +92,8 @@ def show_help_cgi():
     print('#!/usr/bin/env bash')
     print('# get-subs.sh - get subtitles from subtitles server')
     print(f'server_url="{request_url}"')
+    if os.environ.get("SERVER_NAME", "").endswith(".onion"):
+        print("# note: this requires a running tor proxy on 127.0.0.1:9050 - hint: sudo systemctl start tor")
     print(f'curl=({curl})')
     print('command -v curl >/dev/null || { echo "error: curl was not found"; exit 1; }')
     print('command -v unzip >/dev/null || { echo "error: unzip was not found"; exit 1; }')
