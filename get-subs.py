@@ -499,46 +499,32 @@ def get_movie_subs(config, args, video_parsed):
             sql_args.append(movie_year)
         sql_args.append(args.lang)
     elif video_parsed.get("type") == "episode":
-        error("not implemented: type episode")
-        # TODO lookup via IMDB
-        # solve ambiguity: movie covers? plots?
-        # covers/plots are not in https://www.kaggle.com/datasets/ashirwadsangwan/imdb-dataset
-        # -> online ambiguity soliver? = compare some urls
-        # titleType = 'tvSeries'
-        # sqlite3 imdb/title.basics.db "select * from imdb_title_basics where primaryTitle like 'Euphoria' and titleType = 'tvSeries' AND genres LIKE '%Drama%';" -line
-        # https://www.imdb.com/title/tt23863502/
-        # https://www.imdb.com/title/tt8772296/ # this is it: 8772296
-        # titleType = 'tvEpisode'
-        # sqlite3 imdb/title.episode.db "select * from imdb_title_basics where parentTconst = 8772296 and seasonNumber = 1 and episodeNumber = 1 limit 1;" -line
-        # parentTconst = 8772296
-        # tconst = 8135530
-        # sqlite3 imdb/title.basics.db "select * from imdb_title_basics where tconst = 8135530;" -line
-        # TODO
-        series_imdb_parent = 8772296
-
         sql_query = (
-            "SELECT IDSubtitle "
-            "FROM subz_metadata "
+            "SELECT subz_metadata.rowid "
+            "FROM subz_metadata, subz_metadata_fts_MovieName "
             "WHERE "
-            #"MovieName LIKE ? "
-            "SeriesIMDBParent = ? "
+            "subz_metadata.rowid = subz_metadata_fts_MovieName.rowid "
+            "AND "
+            "subz_metadata_fts_MovieName.MovieName MATCH ? "
             "AND "
             "SeriesSeason = ? "
             "AND "
             "SeriesEpisode = ? "
             "AND "
-            "ISO639 = ? "
+            "subz_metadata.ISO639 = ? "
             "AND "
-            "SubSumCD = 1 "
+            "subz_metadata.SubSumCD = 1 "
             "AND "
-            "MovieKind = 'tv' "
-            #"AND SeriesIMDBParent = 12345"
-            #"AND ImdbID = 12345"
+            "subz_metadata.MovieKind = 'tv' "
+            # rate-limiting for abuse-queries like movie=the.mp4
+            "LIMIT 500 "
         )
+        title = video_parsed.get("title")
+        episode_title = video_parsed.get("episode_title")
+        if episode_title:
+            title += " " + episode_title
         sql_args = (
-            #video_parsed.get("title"),
-            series_imdb_parent,
-            #video_parsed.get("episode_title"),
+            title,
             video_parsed.get("season"),
             video_parsed.get("episode"),
             args.lang,
