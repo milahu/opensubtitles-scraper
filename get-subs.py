@@ -31,6 +31,7 @@ import json
 import glob
 import pathlib
 import types
+import re
 
 # requirements
 import guessit
@@ -445,6 +446,23 @@ def print_usage():
 
 
 
+def fts_string(str):
+    # escape string for SQLite FTS query
+    # note: this enforces the order of words
+    return '"' + str.replace('"', ' ') + '"'
+
+
+
+def fts_words(str):
+    # escape words for SQLite FTS query
+    # fix: sqlite3.OperationalError: fts5: syntax error near ","
+    # https://github.com/hideaki-t/sqlite-fts-python
+    # https://stackoverflow.com/a/78135123/10440128
+    pat = re.compile(r'\w+', re.UNICODE)
+    return " ".join(map(lambda word: word.lower(), pat.findall(str)))
+
+
+
 def get_movie_subs(config, args, video_parsed):
     global data_dir
     global is_cgi
@@ -494,7 +512,7 @@ def get_movie_subs(config, args, video_parsed):
             "LIMIT 500 "
         )
         sql_args = []
-        sql_args.append(movie_title)
+        sql_args.append(fts_words(movie_title))
         if movie_year:
             sql_args.append(movie_year)
         sql_args.append(args.lang)
@@ -524,7 +542,7 @@ def get_movie_subs(config, args, video_parsed):
         if episode_title:
             title += " " + episode_title
         sql_args = (
-            title,
+            fts_words(title),
             video_parsed.get("season"),
             video_parsed.get("episode"),
             args.lang,
