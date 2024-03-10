@@ -99,9 +99,10 @@ def show_help_cgi():
     print('command -v curl >/dev/null || { echo "error: curl was not found"; exit 1; }')
     print('command -v unzip >/dev/null || { echo "error: unzip was not found"; exit 1; }')
     print('[ -n "$1" ] || { echo "usage: $0 path/to/Scary.Movie.2000.720p.mp4"; exit 1; }')
+    print('while (( $# > 0 )); do')
     print('dir="$(dirname "$1")"')
     print('[ -e "$dir" ] || { echo "error: no such directory: ${dir@Q}"; exit 1; }')
-    print('cd "$dir"')
+    print('pushd "$dir" >/dev/null')
     print('movie="$(basename "$1")"')
     # TODO escape request_url for bash string
     print('if command -v bsdtar >/dev/null; then')
@@ -119,6 +120,9 @@ def show_help_cgi():
     print('    unzip "$zip" && rm "$zip"')
     print('  fi')
     print('fi')
+    print('popd >/dev/null')
+    print('shift')
+    print('done')
     # TODO
     """
     print()
