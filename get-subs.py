@@ -152,6 +152,18 @@ def show_help_cgi():
     print("but some subtitles can have single-byte encodings like latin1")
     print("see also")
     print("https://github.com/milahu/opensubtitles-scraper/raw/main/repack.py")
+    print()
+    print()
+    print()
+    print("adblocker")
+    print()
+    print("this is not done on the server side to save cpu time")
+    print()
+    print("to remove ads, see")
+    print("https://github.com/milahu/opensubtitles-scraper/raw/main/opensubtitles_adblocker.py")
+    print()
+    print("to add more ads to the blocklist, see")
+    print("https://github.com/milahu/opensubtitles-scraper/raw/main/opensubtitles_adblocker_add.py")
 
     sys.exit()
 
