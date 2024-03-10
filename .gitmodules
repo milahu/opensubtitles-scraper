@@ -1,0 +1,3 @@
+[submodule "lib/thirdparty/pysubs2bytes"]
+	path = lib/thirdparty/pysubs2bytes
+	url = https://github.com/milahu/pysubs2bytes
