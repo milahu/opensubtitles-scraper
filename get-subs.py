@@ -372,10 +372,10 @@ def main():
     # see also https://github.com/technetium/cgli/blob/main/cgli/cgli.py
 
     if os.environ.get("GATEWAY_INTERFACE") == "CGI/1.1":
-        if os.environ.get("REQUEST_METHOD") != "GET":
-            error("only GET requests are supported")
         is_cgi = True
         error = error_cgi
+        if os.environ.get("REQUEST_METHOD") != "GET":
+            error("only GET requests are supported")
         # no. this has almost no effect on speed
         # the slowest part is "search by movie name" in database
         # -> use sqlite fts (full text search) -> 5x faster
