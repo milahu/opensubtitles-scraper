@@ -39,6 +39,8 @@ import charset_normalizer
 
 
 
+default_lang = "en"
+
 # with recode, this is 2x slower
 # ideally recode once and cache the result
 recode_sub_content_to_utf8 = False
@@ -123,15 +125,6 @@ def show_help_cgi():
     print('popd >/dev/null')
     print('shift')
     print('done')
-    # TODO
-    """
-    print()
-    print(f"{request_url}?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=es")
-    print()
-    print(f"{request_url}?imdb=tt2580382")
-    print()
-    print(f"{request_url}?imdb=tt0705920")
-    """
     print()
     print()
     print()
@@ -141,6 +134,23 @@ def show_help_cgi():
     print("then the subtitle files will be named Scary.Movie.2000.720p.12345.srt etc")
     print("so when you extract them to the folder of the movie file")
     print("then your video player should find the subtitles")
+    print()
+    print()
+    print()
+    print("language")
+    print()
+    print("you can pass one or more languages as 2 letter codes per ISO 639-1")
+    print()
+    print("?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=es")
+    print()
+    print("?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=en,es,fr,de,cz,cn")
+    # TODO
+    """
+    print()
+    print("?imdb=tt2580382")
+    print()
+    print("?imdb=tt0705920")
+    """
     print()
     print()
     print()
@@ -239,12 +249,14 @@ def parse_args_cgi():
     else:
         movie = os.path.basename(movie)
 
-    lang = query_dict.get("lang", ["en"])[0]
+    lang_str = query_dict.get("lang", [""])[0]
+    # parse list of 2 letter language codes
+    lang_list = re.findall(r"\b[a-z]{2}\b", lang_str) or [default_lang]
 
     args = types.SimpleNamespace(
         movie = movie,
         imdb = imdb,
-        lang = lang,
+        lang_list = lang_list,
     )
     #error_cgi(repr(args)) # debug
     return args
@@ -508,7 +520,7 @@ def get_movie_subs(config, args, video_parsed):
         sql_query = (
             #"SELECT IDSubtitle "
             #"SELECT subz_metadata.IDSubtitle "
-            "SELECT subz_metadata.rowid "
+            "SELECT subz_metadata.rowid, subz_metadata.ISO639 "
             #"FROM subz_metadata "
             "FROM subz_metadata, subz_metadata_fts_MovieName "
             #"WHERE MovieName LIKE ? "
@@ -518,7 +530,7 @@ def get_movie_subs(config, args, video_parsed):
             "subz_metadata_fts_MovieName.MovieName MATCH ? " +
             ("AND subz_metadata.MovieYear = ? " if movie_year else "") +
             "AND "
-            "subz_metadata.ISO639 = ? "
+            f"subz_metadata.ISO639 IN ({','.join('?' * len(args.lang_list))}) "
             "AND "
             "subz_metadata.SubSumCD = 1 "
             "AND "
@@ -531,10 +543,10 @@ def get_movie_subs(config, args, video_parsed):
         sql_args.append(fts_words(movie_title))
         if movie_year:
             sql_args.append(movie_year)
-        sql_args.append(args.lang)
+        sql_args.extend(args.lang_list)
     elif video_parsed.get("type") == "episode":
         sql_query = (
-            "SELECT subz_metadata.rowid "
+            "SELECT subz_metadata.rowid, subz_metadata.ISO639 "
             "FROM subz_metadata, subz_metadata_fts_MovieName "
             "WHERE "
             "subz_metadata.rowid = subz_metadata_fts_MovieName.rowid "
@@ -545,7 +557,7 @@ def get_movie_subs(config, args, video_parsed):
             "AND "
             "SeriesEpisode = ? "
             "AND "
-            "subz_metadata.ISO639 = ? "
+            f"subz_metadata.ISO639 IN ({','.join('?' * len(args.lang_list))}) "
             "AND "
             "subz_metadata.SubSumCD = 1 "
             "AND "
@@ -561,7 +573,7 @@ def get_movie_subs(config, args, video_parsed):
             fts_words(title),
             video_parsed.get("season"),
             video_parsed.get("episode"),
-            args.lang,
+            *args.lang_list,
         )
     else:
         error(f"""unknown video type: {repr(video_parsed.get("type"))}""")
@@ -581,10 +593,10 @@ def get_movie_subs(config, args, video_parsed):
     if not is_cgi:
         print(f"""metadata: getting results for query:""", format_query(sql_query, sql_args))
 
-    nums = list(map(lambda row: row[0], metadata_cur.execute(sql_query, sql_args).fetchall()))
+    num_lang_list = metadata_cur.execute(sql_query, sql_args).fetchall()
 
     #if not is_cgi:
-    #    print("metadata: nums:", nums)
+    #    print("metadata: num_lang_list:", num_lang_list)
 
     for provider in config["providers"]:
         #if provider.get("enabled") == False:
@@ -592,8 +604,10 @@ def get_movie_subs(config, args, video_parsed):
         provider_lang = provider.get("lang", "*")
         if provider_lang != "*":
             # TODO allow multiple languages for one provider
-            if provider_lang != args.lang:
-                continue
+            # TODO use args.lang_list
+            #if provider_lang != args.lang:
+            #    continue
+            pass
 
         def filter_num(num):
             num_range_from = provider.get("num_range_from", 0)
@@ -604,18 +618,19 @@ def get_movie_subs(config, args, video_parsed):
                 return True
             return num_range_from <= num and num <= num_range_to
 
-        provider_nums = []
-        rest_nums = []
-        for num in nums:
+        provider_num_lang_list = []
+        rest_num_lang_list = []
+        for num_lang in num_lang_list:
+            num = num_lang[0]
             if filter_num(num):
-                provider_nums.append(num)
+                provider_num_lang_list.append(num_lang)
             else:
-                rest_nums.append(num)
-        nums = rest_nums
-        if not provider_nums:
+                rest_num_lang_list.append(num_lang)
+        num_lang_list = rest_num_lang_list
+        if not provider_num_lang_list:
             #print(f"""local provider {provider["id"]}: num is out of range""")
             continue
-        #print(f"""local provider {provider["id"]}: getting {len(provider_nums)} nums""")
+        #print(f"""local provider {provider["id"]}: getting {len(provider_num_lang_list)} nums""")
 
         if not "db_con" in provider:
             db_path = expand_path(provider.get("db_path"))
@@ -646,12 +661,18 @@ def get_movie_subs(config, args, video_parsed):
             # cache the cursor for faster lookup of similar nums
             provider["db_cur"] = provider["db_con"].cursor()
 
+        provider_num_list = list(map(lambda x: x[0], provider_num_lang_list))
+
+        lang_by_num = None
+        if unpack_zipfiles:
+            lang_by_num = {num: lang for num, lang in provider_num_lang_list}
+
         sql_query = (
             f"""SELECT {provider["zipfiles_num_column"]}, """
             f"""{provider["zipfiles_zipfile_column"]} """
             f"""FROM {provider["zipfiles_table"]} """
             f"""WHERE {provider["zipfiles_num_column"]} IN """
-            f"""({", ".join(map(str, provider_nums))})"""
+            f"""({", ".join(map(str, provider_num_list))})"""
         )
         if not is_cgi:
             #print("sql_query", sql_query)
@@ -669,7 +690,8 @@ def get_movie_subs(config, args, video_parsed):
             # found
             #print(f"""found sub {num} in local provider {provider["id"]}""")
             if unpack_zipfiles:
-                (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, args.lang)
+                lang = lang_by_num[num]
+                (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, lang)
             else:
                 (sub_path, sub_content) = (f"{num}.zip", zip_content)
             # no. dont require stream_zip here
