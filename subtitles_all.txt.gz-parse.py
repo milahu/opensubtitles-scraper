@@ -17,6 +17,8 @@ import re
 import math
 import sqlite3
 
+import guessit
+
 
 
 create_tmp_table = False
@@ -146,6 +148,7 @@ idx_MovieReleaseName = col_names.index("MovieReleaseName")
 use_col_names = [
     "IDSubtitle", # 1
     "MovieName", # 2
+    "_MovieNameClean", # derived from MovieName. see get_clean_movie_name
     "MovieYear", # 3
     #"LanguageName", # 4
     "ISO639", # 5
@@ -153,7 +156,7 @@ use_col_names = [
     "ImdbID", # 7
     #"SubFormat", # 8
     "SubSumCD", # 9
-    #"MovieReleaseName", # 10
+    "MovieReleaseName", # 10
     #"MovieFPS", # 11
     "SeriesSeason", # 12
     "SeriesEpisode", # 13
@@ -162,19 +165,67 @@ use_col_names = [
     #"URL", # 16
 ]
 
+def get_clean_movie_name(parsed_cols):
+    movie_name = parsed_cols[idx_MovieName]
+    return movie_name.replace(
+        "'", "" # Don't -> Dont
+    )
+
+def get_clean_release_name(col_value):
+    """
+    reduce release name to title and year
+    example:
+    a: Dont.Look.Up.2009.BDRip.XviD-FRAGMENT
+    b: Dont Look Up 2009
+    """
+    if col_value == None:
+        return None
+    parsed = guessit.guessit(col_value)
+    if not "title" in parsed:
+        return None
+    new_value = parsed["title"]
+    if "year" in parsed:
+        new_value += " " + str(parsed["year"])
+    return new_value
+
+derived_col_getters = {
+    # derived from MovieName, alternative to MovieReleaseName
+    "_MovieNameClean": get_clean_movie_name,
+}
+
+# create full text search index for these columns
+fts_col_names = [
+    "MovieName",
+    "_MovieNameClean",
+    "MovieReleaseName",
+]
+
 use_col_ids = None
 if use_col_names and use_col_names != col_names:
     use_col_ids = []
     # use order of use_col_names
     for name in use_col_names:
-        id = col_names.index(name)
+        try:
+            id = col_names.index(name)
+        except ValueError:
+            # derived column
+            id = name
         use_col_ids.append(id)
 
 def filter_cols(parsed_cols, use_col_ids):
     res = []
     # use order of use_col_names
     for id in use_col_ids:
-        res.append(parsed_cols[id])
+        if isinstance(id, str):
+            # id is str -> derived column
+            col_value = derived_col_getters[id](parsed_cols)
+            res.append(col_value)
+            continue
+        # id is int
+        col_value = parsed_cols[id]
+        if id == idx_MovieReleaseName:
+            col_value = get_clean_release_name(col_value)
+        res.append(col_value)
     return res
 
 # done?
@@ -237,6 +288,7 @@ line_end_expr = r"\t" + r"\t".join(col_exprs_list[-1:]) + r"\n$"
 col_types = {
     "IDSubtitle": int,
     "MovieName": str,
+    "_MovieNameClean": str,
     "MovieYear": int,
     "LanguageName": str,
     "ISO639": str,
@@ -254,8 +306,7 @@ col_types = {
 }
 
 col_names_types = []
-for idx, col_name in enumerate(use_col_names):
-    #col_type = col_types[idx]
+for col_name in use_col_names:
     col_type = col_types[col_name]
     sql_type = ""
     if col_type == int:
@@ -268,7 +319,6 @@ for idx, col_name in enumerate(use_col_names):
     if col_name == "IDSubtitle":
         sql_extra = " PRIMARY KEY"
     col_names_types.append(f"{col_name} {sql_type}{sql_extra}")
-
 
 create_query = f"CREATE TABLE {table_name_tmp} (\n  "
 create_query += ",\n  ".join(col_names_types)
@@ -471,10 +521,10 @@ if create_tmp_table:
     sqlite_cursor.execute(f"ALTER TABLE {table_name_tmp} RENAME TO {table_name}")
     sqlite_connection.commit()
 
-if create_fts_index:
+def create_fts_index_for_column(column_name):
     sql_query = (
-        f"CREATE VIRTUAL TABLE {table_name}_fts_MovieName " +
-        f"USING fts5 (MovieName, content='{table_name}')"
+        f"CREATE VIRTUAL TABLE {table_name}_fts_{column_name} " +
+        f"USING fts5 ({column_name}, content='{table_name}')"
     )
     print(sql_query)
     sqlite_cursor.execute(sql_query)
@@ -482,13 +532,16 @@ if create_fts_index:
     # this takes 10 minutes for a 2GB database
     # this makes the db 10% larger (when using all columns)
     sql_query = (
-        f"INSERT INTO {table_name}_fts_MovieName ({table_name}_fts_MovieName) VALUES ('rebuild')"
+        f"INSERT INTO {table_name}_fts_{column_name} ({table_name}_fts_{column_name}) VALUES ('rebuild')"
     )
     print(sql_query)
     sqlite_cursor.execute(sql_query)
     # to delete the fts index:
     # DROP TABLE subz_metadata_fts_MovieName
     sqlite_connection.commit()
+
+for col_name in fts_col_names:
+    create_fts_index_for_column(col_name)
 
 # BEGIN TRANSACTION -> ... -> COMMIT
 #sqlite_cursor.execute("COMMIT")
