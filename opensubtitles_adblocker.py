@@ -432,6 +432,24 @@ class OpensubtitlesAdblocker:
         # Mr.Robot.S01E09.720p.BluRay.x264.ShAaNiG.en.1954858493.srt
         (b'- Synced and corrected by martythecrazy -', b'- Resync by <font color="#80ffff">GoldenBeard</font> -', b'- www\\.addic7ed\\.com -'),
 
+        # kkbb.eng.03178097.srt
+        (b'Subtitles By Rajanee',),
+
+        # kkbb.eng.04622272.srt
+        (b'\\[Ripped by AGiX\\]',),
+
+        # kkbb.eng.00237777.sub
+        (b'new subtitle',),
+        (b'New subtitle',),
+        (b'FPS 23\\.94',),
+        (b'timing and correction by deric 2006',),
+
+        # kkbb.eng.00237603.srt
+        (b'Adapted by:',),
+
+        # kkbb.eng.08609747.srt
+        (b'Encoded by Ashish Thakur',),
+
     )
 
 
