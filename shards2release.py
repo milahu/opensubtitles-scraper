@@ -9,10 +9,15 @@ import time
 total_t1 = time.time()
 
 release_id = 95; release_version = "20240306"
+release_id = 98; release_version = "20240420"
 
-output_db_path = "release/opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v{release_version}/{release_id}xxxxx.db"
+output_db_path = f"release/opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v{release_version}/{release_id}xxxxx.db"
+
+print("output_db_path", repr(output_db_path))
 
 assert os.path.exists(output_db_path) == False, f"error: output exists: {output_db_path}"
+
+os.makedirs(os.path.dirname(output_db_path))
 
 connection = sqlite3.connect(output_db_path)
 
