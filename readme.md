@@ -46,6 +46,16 @@ output 'Scary.Movie.2000.en.05115082.srt' from 'Scary Movie 1.[2000].UNRATED.DVD
 ...
 ```
 
+
+
+### subtitles server
+
+to run your own subtitles server,
+see [docs/lighttpd.conf](docs/lighttpd.conf)
+to expose [get-subs.py](get-subs.py) as a CGI script on an HTTP server
+
+
+
 ## based on
 
 - [5719123 subtitles from opensubtitles.org](https://www.reddit.com/r/DataHoarder/comments/w7sgcz/5719123_subtitles_from_opensubtitlesorg/) by `-marked-4life`
@@ -70,7 +80,3 @@ videos:
 
 - https://asciinema.org/a/6fG6TXEkF3UOOL0qu8tivViXF
 - [docs/fetch-subs.py.cast](docs/fetch-subs.py.cast)
-
-## todo
-
-- write an API server as a replacement for opensubtitles.org, so in a local network, one computer (with large hard drives) can store the subtitles database and the IMDB movies database, and serve queries from other "thin clients" on the network
