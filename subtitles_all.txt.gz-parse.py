@@ -17,7 +17,7 @@ import re
 import math
 import sqlite3
 
-import guessit
+#import guessit
 
 
 
@@ -140,6 +140,7 @@ len_col_names = len(col_names)
 idx_IDSubtitle = col_names.index("IDSubtitle")
 idx_MovieName = col_names.index("MovieName")
 idx_MovieReleaseName = col_names.index("MovieReleaseName")
+idx_MovieYear = col_names.index("MovieYear")
 
 # use only these columns
 # remove some columns to make the db smaller
@@ -171,15 +172,31 @@ def get_clean_movie_name(parsed_cols):
         "'", "" # Don't -> Dont
     )
 
-def get_clean_release_name(col_value):
+
+def get_clean_release_name(parsed_cols):
     """
     reduce release name to title and year
     example:
     a: Dont.Look.Up.2009.BDRip.XviD-FRAGMENT
     b: Dont Look Up 2009
     """
-    if col_value == None:
+    # shortcut. faster than guessit
+    """
+    release = "Dont.Look.Up.2009.BDRip.XviD-FRAGMENT"
+    year = 2009
+    release_title = release.split(str(year), 1)[0] # Dont.Look.Up.
+    """
+    release = parsed_cols[idx_MovieReleaseName]
+    if release == None:
         return None
+    year = parsed_cols[idx_MovieYear]
+    if year != None:
+        release = release.split(str(year), 1)[0]
+    return release
+    # guessit is waaay too slow
+    # guessit makes this script about 100x slower...
+    # https://github.com/guessit-io/guessit/issues/389
+    """
     parsed = guessit.guessit(col_value)
     if not "title" in parsed:
         return None
@@ -187,6 +204,7 @@ def get_clean_release_name(col_value):
     if "year" in parsed:
         new_value += " " + str(parsed["year"])
     return new_value
+    """
 
 derived_col_getters = {
     # derived from MovieName, alternative to MovieReleaseName
@@ -224,7 +242,7 @@ def filter_cols(parsed_cols, use_col_ids):
         # id is int
         col_value = parsed_cols[id]
         if id == idx_MovieReleaseName:
-            col_value = get_clean_release_name(col_value)
+            col_value = get_clean_release_name(parsed_cols)
         res.append(col_value)
     return res
 
