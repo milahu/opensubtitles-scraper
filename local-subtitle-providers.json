@@ -1,7 +1,7 @@
 {
   "type": "local-subtitle-providers",
   "version": 0.2,
-  "subtitles_metadata_db_path": "subtitles_metadata.db",
+  "subtitles_metadata_db_path": "subtitles_all.db",
   "providers": [
     {
       "comment": [

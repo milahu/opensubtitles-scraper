@@ -15,10 +15,10 @@ torrent RSS feed: [opensubtitles.org.dump.torrent.rss](release/opensubtitles.org
 
 ## usage
 
-- download the torrents in [release/](release/)
-- run [opensubs-db-split-by-lang.py](opensubs-db-split-by-lang.py) to extract english subs
+- download the torrents from section [result](#result)
 - download `subtitles_all.txt.gz` from https://dl.opensubtitles.org/addons/export/
 - run [subtitles_all.txt.gz-parse.py](subtitles_all.txt.gz-parse.py) to build `subtitles_all.db`
+  - `python3 subtitles_all.txt.gz-parse.py subtitles_all.db subz_metadata subtitles_all.txt.gz subtitles_all.txt.gz-parse-errors.txt subtitles_all.txt.gz-parse-debug.txt`
 - fix the values for `db_path` in [local-subtitle-providers.json](local-subtitle-providers.json)
 
 run [get-subs.py](get-subs.py) to get subtitles for a movie:
