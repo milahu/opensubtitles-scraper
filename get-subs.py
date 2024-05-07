@@ -206,6 +206,7 @@ def error_cgi(msg, status=400):
 
 
 def parse_args():
+    # TODO argparse
     #if len(sys.argv) != 2 or not os.path.exists(sys.argv[1]):
     if len(sys.argv) != 2:
         print_usage()
@@ -214,7 +215,8 @@ def parse_args():
         movie = sys.argv[1],
         #imdb = imdb,
         # lang_ISO639
-        lang = "en",
+        lang_list = ["en"],
+        #lang_list = ["en", "de"],
     )
     #error(repr(args)) # debug
     return args
@@ -237,7 +239,7 @@ def parse_args_cgi():
     query_dict = urllib.parse.parse_qs(query_string, keep_blank_values=True)
 
     movie = query_dict.get("movie", [None])[0]
-    imdb = query_dict.get("imdb", [None])[0]
+    imdb = query_dict.get("imdb", [None])[0] # TODO
 
     # check required arguments
     """
@@ -252,6 +254,12 @@ def parse_args_cgi():
     lang_str = query_dict.get("lang", [""])[0]
     # parse list of 2 letter language codes
     lang_list = re.findall(r"\b[a-z]{2}\b", lang_str) or [default_lang]
+
+    # TODO autofix lang: cz -> cs
+    # TODO translate 3 letter codes to 2 letter codes: ger -> de, eng -> en
+    # TODO return subtitle files with 3 letter codes: eng, ger, cze, ...
+
+    #error_cgi("lang_list: " + repr(lang_list)) # debug
 
     args = types.SimpleNamespace(
         movie = movie,
@@ -517,6 +525,23 @@ def get_movie_subs(config, args, video_parsed):
     if video_parsed.get("type") == "movie":
         movie_title = video_parsed.get("title")
         movie_year = video_parsed.get("year")
+
+        if not movie_title and not movie_year:
+            error(f"failed to parse movie_title and movie_year from filename {repr(args.movie)}")
+
+        def basename(path):
+            # os.path.basename does not split on both / and \
+            return re.split(r"[/\\]", path)[-1]
+
+        if not movie_title:
+            # workaround for xXx.2002.mp4
+            # https://github.com/guessit-io/guessit/issues/773
+            # xxx should be parsed as movie title
+            movie_title = basename(args.movie).split(str(movie_year))[0][:-1]
+
+        if not movie_title:
+            error(f"failed to parse movie_title from filename {repr(args.movie)}")
+
         sql_query = (
             #"SELECT IDSubtitle "
             #"SELECT subz_metadata.IDSubtitle "
