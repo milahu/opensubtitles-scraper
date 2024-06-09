@@ -1,0 +1,6 @@
+magnet:?xt=urn:btih:81ea96466100e982dcacfd9068c4eaba8ff587a8&dn=opensubtitles.org.dump.9800000.to.9899999.v20240420
+magnet:?xt=urn:btih:287508f8acc0a5a060b940a83fbba68455ef2207&dn=opensubtitles.org.dump.9500000.to.9599999.v20240306
+magnet:?xt=urn:btih:de1c9696bfa0e6e4e65d5ed9e1bdf81b910cc7ef&dn=opensubtitles.org.dump.9700000.to.9799999
+magnet:?xt=urn:btih:a76396daa3262f6d908b7e8ee47ab0958f8c7451&dn=opensubtitles.org.dump.9600000.to.9699999
+magnet:?xt=urn:btih:30b8b5120f4b881927d81ab9f071a60004a7183a&xt=urn:btmh:122019eb63683baf6d61f33a9e34039fd9879f042d8d52c8aa9410f29d8d83a804e2&dn=opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26
+magnet:?xt=urn:btih:c2f0b5d26a886ba12f7f667d69c0459056dcda9b&dn=opensubtitles.org.Actually.Open.Edition.2022.07.25
