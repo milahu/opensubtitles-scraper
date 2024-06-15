@@ -56,11 +56,44 @@ is_cgi = False
 
 
 
+def get_env(keys, default=None):
+    if isinstance(keys, str):
+        keys = [keys]
+    for key in keys:
+        val = os.environ.get(key)
+        if not val is None:
+            return val
+    return default
+
+def get_request_scheme():
+    return get_env((
+        "HTTP_X_FORWARDED_PROTO",
+        "REQUEST_SCHEME",
+    ), "http")
+
+def get_request_host():
+    return get_env((
+        "HTTP_X_HOST",
+        "HTTP_HOST",
+    ), "localhost")
+
+def get_request_path():
+    val = get_env((
+        #"", # FIXME get original path
+        "REQUEST_URI",
+    ), "/bin/get-subtitles")
+    # workaround: nginx does not pass $request_uri as request header
+    if get_request_host() == "erebus.feralhosting.com":
+        return "/milahu" + val
+    return val
+
+
+
 def show_help_cgi():
     request_url = (
-        os.environ.get("REQUEST_SCHEME") + "://" +
-        os.environ.get("HTTP_HOST") +
-        os.environ.get("REQUEST_URI")
+        get_request_scheme() + "://" +
+        get_request_host() +
+        get_request_path()
     )
     print("Status: 200")
     print("Content-Type: text/plain")
