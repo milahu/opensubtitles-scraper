@@ -82,9 +82,6 @@ let
     pyparsing
     cryptography
     nest-asyncio
-    mitmproxy
-    proxy-py
-    pproxy
     # FIXME passlib.exc.InternalBackendError: crypt.crypt() failed for unknown reason; passlib recommends running `pip install bcrypt` for general bcrypt support.(config=<hash <class 'str'> value omitted>, secret=<hash <class 'bytes'> value omitted>)
     #bcrypt
     # no. use patched version in lib/thirdparty/pysubs2
