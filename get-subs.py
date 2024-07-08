@@ -35,6 +35,7 @@ import re
 
 # requirements
 import guessit
+import langcodes
 import charset_normalizer
 
 
@@ -173,10 +174,17 @@ def show_help_cgi():
     print("language")
     print()
     print("you can pass one or more languages as 2 letter codes per ISO 639-1")
+    print("or as 3 letter codes per ISO 639-2")
+    print("https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes")
+    print()
+    print('the output filenames have the format "Some.Movie.2000.{num}.{lang}.srt"')
+    print("where lang is a 3 letter code compatible with video players")
     print()
     print("?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=es")
     print()
     print("?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=en,es,fr,de,cz,cn")
+    print()
+    print("?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=eng,spa,fre,ger,cze,chi")
     # TODO
     """
     print()
@@ -221,6 +229,57 @@ def expand_path(path):
     elif path.startswith("$HOME/"):
         path = os.environ["HOME"] + path[5:]
     return os.path.join(data_dir, path)
+
+
+
+# map country codes (ISO 3166) to language codes (ISO 639)
+# https://github.com/georgkrause/langcodes/issues/16
+
+map_lang4country = {
+    "ad": "ca", "ag": "en", "ai": "en", "al": "sq", "ao": "pt", "at": "de",
+    "au": "en", "aw": "nl", "ax": "sv", "bb": "en", "bd": "bn", "bf": "fr",
+    "bj": "fr", "bl": "fr", "bq": "nl", "bt": "dz", "bw": "en", "by": "be",
+    "bz": "en", "cc": "ms", "cd": "fr", "cf": "fr", "cg": "fr", "ci": "fr",
+    "ck": "en", "cl": "es", "cm": "en", "cn": "zh", "cw": "nl", "cx": "en",
+    "cz": "cs", "dj": "fr", "dk": "da", "dm": "en", "do": "es", "ec": "es",
+    "eg": "ar", "eh": "ar", "er": "aa", "fk": "en", "fm": "en", "gb": "en",
+    "ge": "ka", "gf": "fr", "gg": "en", "gh": "en", "gi": "en", "gm": "en",
+    "gp": "fr", "gq": "es", "gr": "el", "gs": "en", "gt": "es", "gw": "pt",
+    "gy": "en", "hk": "zh", "hn": "es", "il": "he", "im": "en", "iq": "ar",
+    "ir": "fa", "je": "en", "jm": "en", "jo": "ar", "jp": "ja", "ke": "en",
+    "kh": "km", "kp": "ko", "kz": "kk", "lc": "en", "lk": "si", "lr": "en",
+    "ls": "en", "ly": "ar", "ma": "ar", "mc": "fr", "md": "ro", "me": "sr",
+    "mf": "fr", "mm": "my", "mp": "fil", "mq": "fr", "mu": "en", "mv": "dv",
+    "mw": "ny", "mx": "es", "mz": "pt", "nc": "fr", "nf": "en", "ni": "es",
+    "np": "ne", "nu": "niu", "nz": "en", "pe": "es", "pf": "fr", "pg": "en",
+    "ph": "tl", "pk": "ur", "pm": "fr", "pn": "en", "pr": "en", "pw": "pau",
+    "py": "es", "qa": "ar", "re": "fr", "rs": "sr", "sb": "en", "sj": "no",
+    "sx": "nl", "sy": "ar", "sz": "en", "tc": "en", "td": "fr", "tf": "fr",
+    "tj": "tg", "tm": "tk", "tv": "tvl", "tz": "sw", "ua": "uk", "um": "en",
+    "us": "en", "uy": "es", "va": "la", "vc": "en", "vg": "en", "vn": "vi",
+    "vu": "bi", "wf": "wls", "ws": "sm", "xk": "sq", "ye": "ar", "yt": "fr",
+    "zm": "en", "zw": "en"
+}
+
+def lang4country(country):
+    try:
+        return map_lang4country[country]
+    except KeyError:
+        return country
+
+def lang2letter(lang):
+    "convert to 2 letter language code"
+    try:
+        return langcodes.Language.get(lang).language
+    except langcodes.tag_parser.LanguageTagError:
+        return lang
+
+def lang3letter(lang):
+    "convert to 3 letter language code"
+    try:
+        return langcodes.Language.get(lang).to_alpha3(variant='B')
+    except langcodes.tag_parser.LanguageTagError:
+        return lang
 
 
 
@@ -284,13 +343,9 @@ def parse_args_cgi():
     else:
         movie = os.path.basename(movie)
 
-    lang_str = query_dict.get("lang", [""])[0]
-    # parse list of 2 letter language codes
-    lang_list = re.findall(r"\b[a-z]{2}\b", lang_str) or [default_lang]
-
-    # TODO autofix lang: cz -> cs
-    # TODO translate 3 letter codes to 2 letter codes: ger -> de, eng -> en
-    # TODO return subtitle files with 3 letter codes: eng, ger, cze, ...
+    lang_str = query_dict.get("lang", [""])[0].lower()
+    # parse list of 2 or 3 letter language codes
+    lang_list = re.findall(r"\b[a-z]{2,3}\b", lang_str) or [default_lang]
 
     #error_cgi("lang_list: " + repr(lang_list)) # debug
 
@@ -552,6 +607,16 @@ def get_movie_subs(config, args, video_parsed):
     sql_query = None
     sql_args = None
 
+    # map from country codes (ISO 3166) to language codes (ISO 639)
+    # cz -> cs, jp -> ja, ...
+    args.lang_list = map(lang4country, args.lang_list)
+
+    # convert to 2 letter language codes for the database query
+    # ger -> de, eng -> en, ...
+    args.lang_list = map(lang2letter, args.lang_list)
+
+    args.lang_list = list(args.lang_list)
+
     if not is_cgi:
         print("video_parsed", video_parsed)
 
@@ -749,6 +814,8 @@ def get_movie_subs(config, args, video_parsed):
             #print(f"""found sub {num} in local provider {provider["id"]}""")
             if unpack_zipfiles:
                 lang = lang_by_num[num]
+                # return subtitle files with 3 letter codes: eng, ger, cze, ...
+                lang = lang3letter(lang)
                 (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, lang)
             else:
                 (sub_path, sub_content) = (f"{num}.zip", zip_content)
@@ -803,7 +870,8 @@ def extract_sub(zip_content, video_path_base, num, lang):
             # (99999999 - 9521948) / 1000 / 365 = 250
             num_width = 8
             num_padded = str(num).rjust(num_width, "0")
-            sub_path = f"{video_path_base}.{lang}.{num_padded}{ext}"
+            # put language code before extension like ".eng.srt" so mpv can parse it
+            sub_path = f"{video_path_base}.{num_padded}.{lang}{ext}"
             sub_content = zip_file.read(zipinfo)
             if recode_sub_content_to_utf8:
                 sub_encoding = charset_normalizer.from_bytes(sub_content).best().encoding

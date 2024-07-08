@@ -61,6 +61,7 @@ let
     chardet
     charset-normalizer
     guessit # parse video filenames
+    langcodes
     #playwright
     setuptools # pkg_resources for playwright-stealth
     #pyppeteer pyppeteer-stealth # puppeteer # old
