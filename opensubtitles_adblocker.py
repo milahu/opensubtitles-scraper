@@ -112,15 +112,36 @@ class OpensubtitlesAdblocker:
     regex_lines_list = (
 
         # opensubtitles.org
-        ('Support us and become VIP member ?', 'to remove all ads from www\\.OpenSubtitles\\.org'),
-        ('Support us and become VIP member ?', 'to remove all ads from OpenSubtitles\\.org'),
-        ('Advertise your product or brand here', 'contact www\\.OpenSubtitles\\.org today'),
-        ('Please rate this subtitle at www\\.osdb\\.link/[0-9a-zA-Z]{1,6}', 'Help other users to choose the best subtitles'),
         ('-== \\[ www\\.OpenSubtitles\\.com \\] ==-',),
         ('-== \\[ www\\.OpenSubtitles\\.org \\] ==-',),
         ('-= www\\.OpenSubtitles\\.org =-',),
-        ('想在此处添加您的广告信息？立即联系 www\\.OpenSubtitles\\.org',),
+
+        # opensubtitles.org
+        ('Support us and become VIP member ?', 'to remove all ads from www\\.OpenSubtitles\\.org'),
+        ('Support us and become VIP member ?', 'to remove all ads from OpenSubtitles\\.org'),
+
+        # opensubtitles.org
+        ('Advertise your product or brand here', 'contact www\\.OpenSubtitles\\.org today'),
+        ('想在此处添加您的广告信息？立即联系 www\\.OpenSubtitles\\.org',), # chinese
+        (b'Inzerujte zde sv\xc5\xafj produkt nebo zna\xc4\x8dku ', b'kontaktujte www\\.OpenSubtitles\\.org ji\xc5\xbe dnes'), # czech
+
+        # opensubtitles.org
+        ('Please rate this subtitle at www\\.osdb\\.link/[0-9a-zA-Z]{1,6}', 'Help other users to choose the best subtitles'),
+        (b'Pros\xc3\xadm ohodno\xc4\x8fte tyto titulky na www\\.osdb\\.link/[0-9a-zA-Z]{1,6}', b'a pomozte tak druh\xc3\xbdm vybrat si tu nejlep\xc5\xa1\xc3\xad verzi'), # czech
+        (b'Bitte bewerte diese Untertitel bei www\\.osdb\\.link/[0-9a-zA-Z]{1,6}', b'Helfe anderen Usern die besten Untertitel auszuw\xe4hlen\\.'), # german
+        (b'Bitte bewerte diese Untertitel bei www\\.osdb\\.link/[0-9a-zA-Z]{1,6}', b'Helfe anderen Usern die besten Untertitel auszuw\xc3\xa4hlen\\.'),
+
+        # opensubtitles.org
         ('api\\.OpenSubtitles\\.org is deprecated, please', 'implement REST API from OpenSubtitles\\.com'),
+
+        # Mr.Robot.S01E05.720p.BluRay.x264.ShAaNiG.1954869789.eng.srt
+        # garbage char: \xe2\x80\x8e
+        (b'Advertise your product or brand here', b'contact www\xe2\x80\x8e\\.OpenSubtitles\xe2\x80\x8e\\.org today'),
+        (b'Support us and become VIP member ', b'to remove all ads from OpenSubtitles\xe2\x80\x8e\\.org'),
+
+        # The.Last.Samurai.2003.720p.BrRip.x264.YIFY.en.06218558.srt
+        # typo: wwwwww
+        (b'Support us and become VIP member ', b'to remove all ads from wwwwww\\.OpenSubtitles\\.org'),
 
         # addic7ed.com
         # TODO refactor
@@ -137,15 +158,23 @@ class OpensubtitlesAdblocker:
         ('Sync and corrections by explosiveskull', 'www\\.addic7ed\\.com'),
 
         ('Who are the real-world Illuminati \\?', 'Find out @ saveanilluminati\\.com'),
-        ('2万円賭けて、5千円分の無料チップをゲット。', ' 賭けのルールはありません-世界の bitcasino\\.io/ja'),
+        ('2万円賭けて、5千円分の無料チップをゲット。', ' 賭けのルールはありません-世界の bitcasino\\.io/ja'), # japanese
+
         ('5 days of Hacking / Camping / Lectures', 'Join May Contain Hackers: MCH2022\\.org'),
+        (b'5 Tage Hacking / Camping / Vortr\xc3\xa4ge', b'Komm zu May Contain Hackers: MCH2022\\.org'), # german
+
         ('Closed-Captioned By', 'Captions, Inc\\., Los Angeles'),
         ('CLOSED CAPTIONED BY', 'CAPTIONS, INC\\., LOS ANGELES'),
         ('COPYRIGHTED BY ALIEN', 'PRODUCTIONS ALL RIGHTS RESERVED\\.'),
+
         ('\\[ENGLISH\\]',),
         ('\\[ENGLISH SDH\\]',),
         ('\\[English - US - SDH\\]',),
         ('English -SDH',),
+
+        (b'\\[German\\]',),
+        (b'\\[German - SDH\\]',),
+
         ('qatinefilms',),
         ('qatinefilms4k@gmail\\.com',),
         ('Special thanks to all the people oi the School oi Traditional Arts, PARK Song-hee, a human', 'cultural asset and the members and teachers oi Duresori\\. English subtitled by LEE Jee-heng\\.'),
@@ -175,7 +204,7 @@ class OpensubtitlesAdblocker:
         (b'Subtitle by silentF\xd8X',),
         ('Subtitles: Arigon',),
         (b'Odwied\x9f www\\.NAPiSY\\.info',),
-        ('Legendado por: lilicca,', 'Virtualnet and Bozano\\.'),
+        ('Legendado por: lilicca,', 'Virtualnet and Bozano\\.'), # spanish
         ('Ressinc R5: Rafael UPD', 'Group GetSeries'),
         ('www\\.cpturbo\\.org', 'www\\.cpturbo2\\.org'),
         ('<font color="#ffff00">Provided by explosiveskull</font>', 'https://twitter\\.com/kaboomskull'),
@@ -364,10 +393,6 @@ class OpensubtitlesAdblocker:
         (b'Created and Encoded by --  Bokutox -- of  www\\.YIFY-TORRENTS\\.com\\. The Best 720p/1080p/3d movies with the lowest file size on the internet\\.',),
         (b'Created and Encoded by --  Bokutox -- of  www\\.YIFY-TORRENTS\\.com\\. The Best 720p/1080p/3d movies with the lowest file size on the internet\\. World of Warcraft - Outland PVP \\(EU\\) - Torporr \\(name\\)',),
 
-        # The.Last.Samurai.2003.720p.BrRip.x264.YIFY.en.06218558.srt
-        # typo: wwwwww
-        (b'Support us and become VIP member ', b'to remove all ads from wwwwww\\.OpenSubtitles\\.org'),
-
         # The.Last.Samurai.2003.720p.BrRip.x264.YIFY.en.06569701.srt
         (b'This was a roNy re-encode for', b'300MBUNiTED\\.com'),
 
@@ -419,10 +444,6 @@ class OpensubtitlesAdblocker:
         # Mr.Robot.S01E02.720p.BluRay.x264.ShAaNiG.en.1954809953.srt
         (b'- Synced and corrected by sk\xc3\xb8ad -', b'www\\.addic7ed\\.com'),
 
-        # Mr.Robot.S01E05.720p.BluRay.x264.ShAaNiG.en.1954869789.srt
-        (b'Advertise your product or brand here', b'contact www\xe2\x80\x8e\\.OpenSubtitles\xe2\x80\x8e\\.org today'),
-        (b'Support us and become VIP member ', b'to remove all ads from OpenSubtitles\xe2\x80\x8e\\.org'),
-
         # Mr.Robot.S01E05.720p.BluRay.x264.ShAaNiG.en.1955035356.srt
         (b'<font color="#8D38C9\\fnArial"><i><b>Fixed & Synced By MoUsTaFa ZaKi </b></i></font>',),
 
@@ -449,6 +470,57 @@ class OpensubtitlesAdblocker:
 
         # kkbb.eng.08609747.srt
         (b'Encoded by Ashish Thakur',),
+
+        # Dont.Look.Up.2021.cze.08924838.srt
+        (b'NETFLIX UV\xc3\x81D\xc3\x8d',),
+        (b'P\xc5\x99eklad titulk\xc5\xaf: V\xc3\xadt Bezd\xc3\xad\xc4\x8dek',),
+
+        # 28.Days.Later.2002.720p.BrRip.264.YIFY.de.00149488.sub
+        (b'Unterst\xfctze uns und werde VIP-Mitglied,', b'wodurch s\xe4mtliche Werbung von www\\.OpenSubtitles\\.org entfernt wird'),
+        (b'Untertitel: Visiontext', b'Renata Henkes'),
+        (b'GERMAN',),
+
+        # 28.Days.Later.2002.720p.BrRip.264.YIFY.de.05247019.srt
+        (b'Hier k\xc3\xb6nnte deine Werbung stehen!', b'Kontaktiere noch heute www\\.OpenSubtitles\\.org'),
+        (b'German',),
+
+        # 28.Days.Later.2002.720p.BrRip.264.YIFY.de.08250815.srt
+        (b'Unterst\xfctze uns und werde VIP-Mitglied,', b'wodurch s\xe4mtliche Werbung von www\\.OpenSubtitles\\.org entfernt wird'),
+        (b'Untertitel: OMNIMAGO GmbH 2020',),
+
+        # 28.Days.Later.2002.720p.BrRip.264.YIFY.de.09753551.srt
+        (b'<i>Encoded By "Pirata-Tuga"', b'\\.\\.\\.TuGAZx,Enjoy!</i>'),
+
+        # 28.Days.Later.2002.720p.BrRip.264.YIFY.en.06708157.srt
+        (b'<font color="#ff80ff">L</font><font color="#ff6aff">E</font><font color="#ff5bff">S</font><font color="#ff3cff">A</font><font color="#ff15ff">I</font><font color="#f200f2">G</font><font color="#e100e1">N</font><font color="#cc00cc">E</font><font color="#bb00bb">U</font><font color="#ae00ae">R</font>', b'<i>Sync & corrections August 2016</i>', b'<font color="#ffff00">lesaigneur@hotmail\\.com</font>'),
+
+        # The Shock Doctrine (2009) 720p Documentary.en.04543135.srt
+        (b'Subtitles checked corrected', b"and resync'd by PaleAle"),
+
+        # Silentium.2004.de.07632145.srt
+        (b'Unterst\xc3\xbctze uns und werde VIP-Mitglied,', b'wodurch s\xc3\xa4mtliche Werbung von www\\.OpenSubtitles\\.org entfernt wird'),
+
+        # Silentium.2004.en.04502276.srt
+        (b'Translation: Kimi Lum',),
+
+        # Silentium.2004.en.05057740.srt
+        (b'Subtitles created using AHD Subtitles Maker Professional', b'E-mail: ahdsoftwares@hotmail\\.com'),
+        (b'Subtitles created by  Basti ',),
+
+        # Fight.Club.1999.en.08664736.srt
+        (b'English - US - SDH',),
+
+        # Utopia.2020.S01E01.German.DL.720p.WEB.h264-WvF.mkv.s1.srt
+        (b'Untertitel: Ulrike Nolte', b'FFS-Subtitling GmbH'),
+        (b'Creative Supervisor: Stephan Josse',),
+
+        # Utopia.2020.S01E02.German.DL.720p.WEB.h264-WvF.mkv.s1.srt
+        (b'Untertitel: Lena Pem\xc3\xb6ller', b'FFS-Subtitling GmbH'),
+
+        # utopia-s02e01-720p.de.06238975.srt
+        (b'<font color="#fde401">Sdvvzruw-hlqv-odxwhw-Jhoehu-Jodqc</font>',),
+        (b'<font color="#fde401">\\.\\.:: \xdcbersetzt von Jazzhead und Vassago ::\\.\\.', b'\\.\\.:: www\\.SubCentral\\.de ::\\.\\.</font>'),
+        (b'<font color="#fde401">Utopia S[0-9]{2}E[0-9]{2}', b'Jazzhead & Vassago @SubCentral\\.de</font>'),
 
     )
 
