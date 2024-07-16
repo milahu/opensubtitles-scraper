@@ -23,6 +23,8 @@ import sqlite3
 
 create_tmp_table = False
 
+debug = False
+
 
 
 # $ sqlite3 subtitles_all.txt.gz.20240223T095232Z.db "select count(1) from subz_metadata"
@@ -286,7 +288,7 @@ col_exprs_list = list(col_exprs.values())
 # 5729486 # too much? more than 5719123
 # $ diff -u <(grep -P '^\d{1,7}\t.+\t\d{4}\t.+' subtitles_all.txt) <(grep -P '^\d{1,7}\t.+\t\d{4}' subtitles_all.txt) >count.diff
 #line_start_expr = r"\t".join(col_exprs_list[0:6])
-line_start_expr = r"^" + r"\t".join(col_exprs_list[0:5]) + r"\t"
+#line_start_expr = r"^" + r"\t".join(col_exprs_list[0:5]) + r"\t"
 #print("line_start_expr", line_start_expr); sys.exit()
 
 # TODO assert
@@ -378,6 +380,7 @@ with (
     deadloop_counter = 0
     last_sub_number = 0
     num_done = 0
+    file_offset = len(first_line.encode("utf8"))
 
     #print("inf.readlines")
     #for line in inf.readlines(): # slow
@@ -401,21 +404,30 @@ with (
 
         #len_buf_cols = len(buf_cols)
 
-        is_line_start = re.search(line_start_expr, line)
-        #print("is_line_start", is_line_start)
-        #print("buf", buf)
-        #print("buf_cols", buf_cols)
+        if debug:
+            print("buf1", buf)
+            print("line_end_expr", line_end_expr)
+            print("line", repr(line))
 
         is_line_end = re.search(line_end_expr, line)
 
-        if is_line_start:
-            buf = []
-            # error: buffer was not cleared
-            #errf.write("non-empty buffer: " + repr(buf) + "\n")
+        # no. this produces false-positive matches
+        # line_start_expr has too low selectivity
+        # test/subtitles_all.txt.gz-parse.py/newline-in-value.tsv
+        #is_line_start = re.search(line_start_expr, line)
+        #if is_line_start:
+        #    buf = []
+        #    # error: buffer was not cleared
+        #    #errf.write("non-empty buffer: " + repr(buf) + "\n")
 
         buf += [line] # note: keep "\n"
 
+        if debug:
+            print("buf2", buf)
+
         if not is_line_end:
+            if debug:
+                print("line is not complete. buf", buf)
             continue
 
         # buf contains a full row -> parse columns
@@ -427,6 +439,9 @@ with (
 
         # strip: remove "\n" at end of string = last column = URL
         raw_cols = "".join(buf).strip().split("\t")
+
+        if debug:
+            print("raw_cols", repr(raw_cols))
 
         if raw_cols[0] == "7587300" and raw_cols[1] == "":
             # fix one wrong line. remove raw_cols[1]
@@ -457,7 +472,23 @@ with (
 
         # parse columns before MovieReleaseName
         for idx in range(0, idx_MovieReleaseName):
-            raw_col = raw_cols[idx]
+            try:
+                raw_col = raw_cols[idx]
+            except IndexError as exc:
+
+# FIXME failed to parse line
+# '15\t0.000\t\t\t\tmovie\thttp://www.opensubtitles.org/subtitles/10764727/empty-movie-subscene-id\n'
+# at file_offset 530606291 with error: list index out of range
+# idx_MovieReleaseName = 9
+
+# gzip -d -c subtitles_all.txt.gz.20240714T173551Z | head -c $((530606291 + 1000)) | tail -c 2000 > todo.tsv
+
+# zgrep -b -C5 -F -m1 http://www.opensubtitles.org/subtitles/10764727/empty-movie-subscene-id subtitles_all.txt.gz.20240714T173551Z > newline-in-value.tsv.gz
+
+                print(f"FIXME failed to parse line {line!r} at file_offset {file_offset} with error: {exc}")
+                t2 = time.time()
+                print(f"done {num_done} rows in {t2 - t1:.2f} seconds")
+                raise
             parse_column(idx, raw_col)
 
         if parse_failed:
@@ -492,6 +523,8 @@ with (
         #print("parsed_cols", parsed_cols)
         num_done += 1
         #if num_done >= 10: break # debug
+
+        file_offset += len(line.encode("utf8"))
 
         # show progress
         # TODO show ETA
