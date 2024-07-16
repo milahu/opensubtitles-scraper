@@ -118,7 +118,11 @@ class AiohttpMozillaCookieJar(CookieJar):
                 try:
                     expires = self._expirations[(domain, path, name)].timestamp()
                 except KeyError:
-                    expires = datetime.strptime(morsel_2["expires"], "%a, %d %b %Y %H:%M:%S %Z").timestamp()
+                    try:
+                        expires = datetime.strptime(morsel_2["expires"], "%a, %d %b %Y %H:%M:%S %Z").timestamp()
+                    except ValueError:
+                        # morsel_2["expires"] can be empty string
+                        expires = None
 
                 cookie_1 = Cookie(
                     0, # version
