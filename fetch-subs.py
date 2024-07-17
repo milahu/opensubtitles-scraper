@@ -678,17 +678,25 @@ async def update_metadata_db():
         return
 
     max_age = 10*24*60*60 # 10 days
+    age = time.time() - os.path.getmtime(options.metadata_db)
 
-    if time.time() - os.path.getmtime(options.metadata_db) <= max_age:
+    if age <= max_age:
         return
 
-    logger_print(f"updating metadata db {repr(options.metadata_db)}")
+    # https://stackoverflow.com/questions/538666/format-timedelta-to-string
+    def format_age(age):
+        age = datetime.timedelta(seconds=age)
+        return str(age)
 
-    if True:
-        # debug: use an existing .txt.gz file
-        txt_gz_path = "subtitles_all.txt.gz.20240714T173551Z"
+    logger_print(f"updating metadata db {repr(options.metadata_db)}. age {format_age(age)} > max_age {format_age(max_age)}")
 
-        logger_print(f"updating metadata db: using existing {txt_gz_path}")
+    # debug: use an existing .txt.gz file to avoid re-downloading
+    existing_txt_gz_path = None
+    #existing_txt_gz_path = "subtitles_all.txt.gz.20240714T173551Z"
+
+    if existing_txt_gz_path:
+        txt_gz_path = existing_txt_gz_path
+        logger_print(f"updating metadata db: using existing {txt_gz_path} - FIXME disable existing_txt_gz_path")
 
     else:
         # download the .txt.gz file
@@ -773,6 +781,8 @@ async def update_metadata_db():
         error_path,
         debug_path,
     ]
+
+    logger_print(f"updating metadata db: running: {shlex.join(args)}")
 
     proc = subprocess.run(args)
 
