@@ -24,18 +24,20 @@ import sqlite3
 create_tmp_table = False
 
 debug = False
+#debug = True
 
 
 
-# $ sqlite3 subtitles_all.txt.gz.20240223T095232Z.db "select count(1) from subz_metadata"
-# 6360319
-# $ stat -c%s subtitles_all.txt.gz.20240223T095232Z
-# 339079488
-# $ python -c "print(339079488/6360319)"
-# 53.311710937769
+"""
+txt_path=subtitles_all.txt.gz.20240714T173551Z
+db_path=$txt_path.db
+s=$(stat -c%s "$txt_path")
+n=$(sqlite3 "$db_path" "select count(1) from subz_metadata")
+echo $s $n | awk '{ print ($1 / $2) }'
+"""
 
 # subtitles_all.txt.gz size per subtitle
-estimate_bytes_per_sub = 53.3
+estimate_bytes_per_sub = 52.0074
 
 
 
@@ -85,13 +87,13 @@ table_name_tmp = table_name
 if create_tmp_table:
     table_name_tmp = f"{table_name}_tmp"
 
-assert os.path.exists(subtitles_all_txt_gz_path), "error: missing input file"
+assert os.path.exists(subtitles_all_txt_gz_path), f"missing input file: {subtitles_all_txt_gz_path}"
 
-assert os.path.exists(metadata_db_path) == False, "error: existing output file"
+assert os.path.exists(metadata_db_path) == False, f"existing output file: {metadata_db_path}"
 
 estimate_num_subs = round(os.path.getsize(subtitles_all_txt_gz_path) / estimate_bytes_per_sub)
 
-assert has_table(metadata_db_path, table_name) == False, f"error: output table exists: {table_name}"
+assert has_table(metadata_db_path, table_name) == False, f"output table exists: {table_name}"
 
 sqlite_connection = sqlite3.connect(
     metadata_db_path,
@@ -138,6 +140,8 @@ col_names = [
 ]
 
 len_col_names = len(col_names)
+
+expected_num_cols = len_col_names
 
 idx_IDSubtitle = col_names.index("IDSubtitle")
 idx_MovieName = col_names.index("MovieName")
@@ -380,6 +384,8 @@ with (
     deadloop_counter = 0
     last_sub_number = 0
     num_done = 0
+
+    # offset of the current row (not line)
     file_offset = len(first_line.encode("utf8"))
 
     #print("inf.readlines")
@@ -392,43 +398,13 @@ with (
         # replace("\r", "\n"): convert from old mac line format to unix line format
         line = line.replace("\r\n", "\n").replace("\r", "\n")
 
-        if False:
-            if last_sub_number == buf_cols.get("IDSubtitle"):
-                deadloop_counter += 1
-            else:
-                deadloop_counter = 0
-            last_sub_number = buf_cols.get("IDSubtitle")
-            is_debug = deadloop_counter > deadloop_counter_max
-            if deadloop_counter > deadloop_counter_raise:
-                raise Exception("deadloop")
-
-        #len_buf_cols = len(buf_cols)
-
-        if debug:
-            print("buf1", buf)
-            print("line_end_expr", line_end_expr)
-            print("line", repr(line))
-
-        is_line_end = re.search(line_end_expr, line)
-
-        # no. this produces false-positive matches
-        # line_start_expr has too low selectivity
-        # test/subtitles_all.txt.gz-parse.py/newline-in-value.tsv
-        #is_line_start = re.search(line_start_expr, line)
-        #if is_line_start:
-        #    buf = []
-        #    # error: buffer was not cleared
-        #    #errf.write("non-empty buffer: " + repr(buf) + "\n")
-
         buf += [line] # note: keep "\n"
 
         if debug:
             print("buf2", buf)
 
-        if not is_line_end:
-            if debug:
-                print("line is not complete. buf", buf)
-            continue
+        if len(buf) > 1000:
+            raise Exception(f"deadloop: buffer is too large at offset {file_offset}")
 
         # buf contains a full row -> parse columns
 
@@ -442,6 +418,15 @@ with (
 
         if debug:
             print("raw_cols", repr(raw_cols))
+
+        if len(raw_cols) < expected_num_cols:
+            # add next line to buf
+            continue
+
+        # no. field values can contain unescaped "\t"
+        # so len(raw_cols) is larger than the actual number of columns
+        #if len(raw_cols) > expected_num_cols:
+        #    raise ValueError(f"too many columns. actual {len(raw_cols)}. expected {expected_num_cols}. raw_cols {raw_cols}")
 
         if raw_cols[0] == "7587300" and raw_cols[1] == "":
             # fix one wrong line. remove raw_cols[1]
@@ -475,16 +460,6 @@ with (
             try:
                 raw_col = raw_cols[idx]
             except IndexError as exc:
-
-# FIXME failed to parse line
-# '15\t0.000\t\t\t\tmovie\thttp://www.opensubtitles.org/subtitles/10764727/empty-movie-subscene-id\n'
-# at file_offset 530606291 with error: list index out of range
-# idx_MovieReleaseName = 9
-
-# gzip -d -c subtitles_all.txt.gz.20240714T173551Z | head -c $((530606291 + 1000)) | tail -c 2000 > todo.tsv
-
-# zgrep -b -C5 -F -m1 http://www.opensubtitles.org/subtitles/10764727/empty-movie-subscene-id subtitles_all.txt.gz.20240714T173551Z > newline-in-value.tsv.gz
-
                 print(f"FIXME failed to parse line {line!r} at file_offset {file_offset} with error: {exc}")
                 t2 = time.time()
                 print(f"done {num_done} rows in {t2 - t1:.2f} seconds")
@@ -525,6 +500,9 @@ with (
         #if num_done >= 10: break # debug
 
         file_offset += len(line.encode("utf8"))
+
+        # clear buffer for next line
+        buf = []
 
         # show progress
         # TODO show ETA
