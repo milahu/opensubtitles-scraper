@@ -633,6 +633,13 @@ parser.add_argument(
     metavar="path",
     help="path to subtitles_all.db - parsed from subtitles_all.txt.gz",
 )
+parser.add_argument(
+    "--only-update-metadata-db",
+    dest="only_update_metadata_db",
+    action='store_true',
+    help="update subtitles_all.db and exit",
+)
+
 #options = parser.parse_args(sys.argv)
 options = parser.parse_args()
 
@@ -838,7 +845,11 @@ missing_numbers_txt_path = "missing_numbers.txt"
 if os.path.exists(missing_numbers_txt_path):
     logger_print(f"loading missing_numbers from {missing_numbers_txt_path}")
     with open(missing_numbers_txt_path, "r") as f:
-        nums = list(map(int, f.read().strip().split("\n")))
+        try:
+            nums = list(map(int, f.read().strip().split("\n")))
+        except ValueError:
+            # ValueError: invalid literal for int() with base 10: ''
+            nums = []
         logger_print(f"loaded missing_numbers from {missing_numbers_txt_path}: {nums}")
         missing_numbers += nums
 
@@ -3048,6 +3059,21 @@ async def main_scraper():
     #logger_print(f"main scraper: waiting for socks5 proxy")
     #await asyncio.sleep(10) # TODO dynamic
 
+
+
+    await update_metadata_db()
+
+    if options.only_update_metadata_db:
+        logger_print(f"done update_metadata_db - exiting")
+        return
+
+    if options.metadata_db:
+        logger_print(f"using metadata db {repr(options.metadata_db)}")
+        metadata_db_con = sqlite3.connect(options.metadata_db)
+        metadata_db_cur = metadata_db_con.cursor()
+
+
+
     if options.tempdir:
         tempdir = options.tempdir
     else:
@@ -3060,13 +3086,6 @@ async def main_scraper():
 
     logger_print(f"creating tempdir {tempdir}")
     os.makedirs(tempdir, exist_ok=True)
-
-    await update_metadata_db()
-
-    if options.metadata_db:
-        logger_print(f"using metadata db {repr(options.metadata_db)}")
-        metadata_db_con = sqlite3.connect(options.metadata_db)
-        metadata_db_cur = metadata_db_con.cursor()
 
     #first_num_file = last_num_db
     #last_num_file = 1
