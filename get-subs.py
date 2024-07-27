@@ -298,18 +298,16 @@ def error_cgi(msg, status=400):
 
 
 def parse_args():
-    # TODO argparse
-    #if len(sys.argv) != 2 or not os.path.exists(sys.argv[1]):
-    if len(sys.argv) != 2:
-        print_usage()
-        sys.exit(1)
-    args = types.SimpleNamespace(
-        movie = sys.argv[1],
-        #imdb = imdb,
-        # lang_ISO639
-        lang_list = ["en"],
-        #lang_list = ["en", "de"],
-    )
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-l", "--lang", dest="lang_list")
+    parser.add_argument("--imdb")
+    parser.add_argument("movie")
+    args = parser.parse_args()
+    if args.lang_list != None:
+        args.lang_list = re.findall(r"\b[a-z]{2,3}\b", args.lang_list) or [default_lang]
+    else:
+        args.lang_list = [default_lang]
     #error(repr(args)) # debug
     return args
 
