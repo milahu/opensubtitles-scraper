@@ -2679,9 +2679,11 @@ import aiohttp_socks
 
 
 
+"""
 # TODO python asyncio socks5 proxy
 # https://github.com/Amaindex/asyncio-socks-server
 import asyncio_socks_server
+"""
 
 
 # not used
@@ -2793,6 +2795,7 @@ async def main_tcp_proxy():
 
 
 
+"""
 # based on asyncio_socks_server/__main__.py
 #from asyncio_socks_server.app import SocksServer
 #from asyncio_socks_server.config import BASE_LOGO, SOCKS_SERVER_PREFIX, Config
@@ -2818,6 +2821,7 @@ async def main_socks5_proxy__asyncio_socks_server():
         **{k: v for k, v in config_args.items() if v is not None},
     )
     return app.run()
+"""
 
 
 
