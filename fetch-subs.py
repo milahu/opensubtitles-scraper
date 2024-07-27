@@ -168,14 +168,7 @@ import cryptography.hazmat.primitives.hashes
 # fix: RuntimeError: This event loop is already running
 nest_asyncio.apply()
 
-# FIXME aiohttp_chromium devel2 branch is broken
-#   File "cdp_socket/socket.py", line 78, in exec
-#     del self._responses[_id]
-#         ~~~~~~~~~~~~~~~^^^^^
-# KeyError: 338
-# cd aiohttp_chromium; git worktree add mnt-devel2 devel2
-#sys.path.append("aiohttp_chromium/mnt-devel2/src")
-sys.path.append("aiohttp_chromium/src")
+sys.path.append("lib/thirdparty/aiohttp_chromium/src")
 import aiohttp_chromium
 print("imported aiohttp_chromium", aiohttp_chromium)
 
