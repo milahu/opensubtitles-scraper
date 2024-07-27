@@ -2724,11 +2724,13 @@ tcp_proxy_port_2 = get_free_port()
 
 
 
+"""
 # check proxies
 # but free proxies are still unstable
 # and not usable with chromium
 # https://github.com/TheSpeedX/socker/blob/master/socker.py
 import thespeedx_socker
+"""
 
 # in total, these lists have 10K unique proxies
 # about 500 proxies = 5% will pass the proxy check
