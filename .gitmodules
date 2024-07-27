@@ -1,3 +1,6 @@
 [submodule "lib/thirdparty/pysubs2bytes"]
 	path = lib/thirdparty/pysubs2bytes
 	url = https://github.com/milahu/pysubs2bytes
+[submodule "lib/thirdparty/aiohttp_chromium"]
+	path = lib/thirdparty/aiohttp_chromium
+	url = https://github.com/milahu/aiohttp_chromium
