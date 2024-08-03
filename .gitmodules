@@ -4,3 +4,6 @@
 [submodule "lib/thirdparty/aiohttp_chromium"]
 	path = lib/thirdparty/aiohttp_chromium
 	url = https://github.com/milahu/aiohttp_chromium
+[submodule "piratebay-uploader"]
+	path = piratebay-uploader
+	url = https://github.com/milahu/piratebay-uploader
