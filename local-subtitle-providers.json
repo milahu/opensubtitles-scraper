@@ -38,6 +38,20 @@
       "zipfiles_zipfile_column": "file"
     },
     {
+      "id": "opensubtitles_org_9180518_9521948",
+      "source": "opensubtitles.org",
+      "url": "magnet:?xt=urn:btih:30b8b5120f4b881927d81ab9f071a60004a7183a&xt=urn:btmh:122019eb63683baf6d61f33a9e34039fd9879f042d8d52c8aa9410f29d8d83a804e2&dn=opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26",
+      "num_range_from": 9180518,
+      "num_range_to": 9521948,
+      "type": "sqlite",
+      "db_path_base": "$HOME/down/torrent/done/opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26",
+      "db_path_format": "/langs/{lang}.db",
+      "zipfiles_table": "zipfiles",
+      "zipfiles_num_column": "num",
+      "zipfiles_zipfile_column": "content"
+    },
+    {
+      "enabled": false,
       "comment": [
         "english subs from opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26 (7GB)",
         "size: 2GB"
