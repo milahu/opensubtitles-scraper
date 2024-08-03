@@ -437,9 +437,11 @@ def config_get_providers(config):
         if provider.get("enabled") == False:
             continue
         if "db_path" in provider:
+            # single-file provider
             providers.append(provider)
             continue
-        # expand "shard" provider
+        # multi-file provider: expand to multiple providers
+        # subtitles are grouped by shard or language
         shard_size = provider.get("shard_size")
         db_path_base = expand_path(provider.get("db_path_base"))
         db_path_format = provider.get("db_path_format")
@@ -447,22 +449,36 @@ def config_get_providers(config):
         #db_path_glob = provider.get("db_path_glob")
         #db_path_shard_id_regex = provider.get("db_path_shard_id_regex")
         get_shard_id = None
+        get_lang = None
         if db_path_base and db_path_format:
-            db_path_glob = db_path_base + db_path_format.replace("{shard_id}", "*")
+            db_path_end = db_path_format
+            db_path_end = db_path_end.replace("{shard_id}", "*")
+            db_path_end = db_path_end.replace("{lang}", "*")
+            db_path_glob = db_path_base + db_path_end
             if db_path_format.endswith("/{shard_id}xxx.db"):
                 get_shard_id = lambda db_path: int(os.path.basename(db_path)[:-6])
+            elif db_path_format.endswith("/{lang}.db"):
+                # legacy. split-by-language releases are not stable
+                # so this was used only once in opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26
+                # with 3 letter language codes: eng, ger, cze, rus, chi, ...
+                get_lang = lambda db_path: os.path.basename(db_path)[:-3]
             else:
                 error("not implemented")
         else:
             error("not implemented")
         for db_path in glob.glob(db_path_glob):
-            shard_id = get_shard_id(db_path)
-            num_range_from = shard_id * shard_size
             provider_2 = dict(provider)
-            provider_2["id"] = provider["id"] + f"/shard-{shard_id}"
             provider_2["db_path"] = db_path
-            provider_2["num_range_from"] = num_range_from
-            provider_2["num_range_to"] = num_range_from + shard_size - 1
+            if get_shard_id:
+                shard_id = get_shard_id(db_path)
+                num_range_from = shard_id * shard_size
+                provider_2["id"] = provider["id"] + f"/shard-{shard_id}"
+                provider_2["num_range_from"] = num_range_from
+                provider_2["num_range_to"] = num_range_from + shard_size - 1
+            if get_lang:
+                lang = get_lang(db_path)
+                provider_2["id"] = provider["id"] + f"/lang-{lang}"
+                provider_2["lang"] = lang
             providers.append(provider_2)
     config["providers"] = providers
 
@@ -719,16 +735,16 @@ def get_movie_subs(config, args, video_parsed):
     #if not is_cgi:
     #    print("metadata: num_lang_list:", num_lang_list)
 
+    args_lang3letter_list = list(map(lang3letter, args.lang_list))
+
     for provider in config["providers"]:
         #if provider.get("enabled") == False:
         #    continue
         provider_lang = provider.get("lang", "*")
         if provider_lang != "*":
             # TODO allow multiple languages for one provider
-            # TODO use args.lang_list
-            #if provider_lang != args.lang:
-            #    continue
-            pass
+            if not provider_lang in args_lang3letter_list:
+                continue
 
         def filter_num(num):
             num_range_from = provider.get("num_range_from", 0)
