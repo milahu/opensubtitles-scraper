@@ -42,6 +42,9 @@ let
       inherit undetected-chromedriver;
     };
     pysub-parser = pkgs.python3.pkgs.callPackage ./nix/pysub-parser.nix {};
+    torf = pkgs.python3.pkgs.callPackage ./nix/torf.nix {
+      flatbencode = pkgs.python3.pkgs.callPackage ./nix/flatbencode.nix {};
+    };
   };
 
   #sqlite-bench = pkgs.callPackage ./nix/sqlite-bench.nix {};
@@ -74,6 +77,7 @@ let
     #rpyc
     aiohttp
     aiohttp-socks # https://stackoverflow.com/a/76656557/10440128
+    aiohttp-retry
     aiodns # make aiohttp faster
     brotli # make aiohttp faster
     natsort
@@ -90,6 +94,7 @@ let
     beautifulsoup4 # html parser
     fritzconnection # fritzbox client
     #selenium
+    praw # python reddit api wrapper
   ])
   ++
   (with extraPythonPackages; [
@@ -112,6 +117,7 @@ let
     */
     selenium
     stream-zip
+    torf # torrent file
   ])
   );
 
@@ -206,9 +212,10 @@ pkgs.mkShell rec {
 
     gost
 
-    chromium # for selenium
     chromedriver # for selenium
     */
+
+    chromium # for selenium
 
     torrenttools
 
@@ -244,6 +251,7 @@ pkgs.mkShell rec {
     # fix: ModuleNotFoundError: No module named 'selenium.webdriver.common.devtools'
     selenium
     stream-zip
+    torf # torrent file
   ]);
 
 }
