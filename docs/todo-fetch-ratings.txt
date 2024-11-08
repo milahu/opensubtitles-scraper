@@ -1,3 +1,7 @@
 fetch user ratings for all subs
 
 user ratings are important to rank different subs between "good" and "bad"
+
+workaround:
+prefer new subtitles = descending sort by subtitle number
+usually, newer subs have less errors than older subs
