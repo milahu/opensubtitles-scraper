@@ -87,9 +87,16 @@ done_first=true
 
 done < <(
   # sort by torrent creation date, descending
-  git ls-tree HEAD release/ |
-  cut -d$'\t' -f2 |
-  grep '\.torrent$' |
+  {
+    git ls-tree HEAD release/ |
+    cut -d$'\t' -f2 |
+    grep '\.torrent$'
+
+    # also process not-yet committed torrent files
+    for path in "$@"; do
+      echo "$path"
+    done
+  } |
   while read torrent_path; do
     #timestamp=$(git log -n1 --format=format:%at -- "$torrent_path")
     timestamp=$(torrenttools show creation-date "$torrent_path")
