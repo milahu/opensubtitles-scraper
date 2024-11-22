@@ -208,7 +208,6 @@ commit_message = f"add {torrent_basename}"
 
 args = [
     "git",
-    "status",
     "commit",
     "-m", commit_message,
 ]
