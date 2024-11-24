@@ -159,7 +159,8 @@ use_col_names = [
     "MovieYear", # 3
     #"LanguageName", # 4
     "ISO639", # 5
-    #"SubAddDate", # 6
+    # needed for last-sub-add-date.txt.sh
+    "SubAddDate", # 6
     "ImdbID", # 7
     #"SubFormat", # 8
     "SubSumCD", # 9
