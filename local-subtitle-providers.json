@@ -157,6 +157,18 @@
       "zipfiles_zipfile_column": "content"
     },
     {
+      "id": "opensubtitles_org_10200000_10299999",
+      "source": "opensubtitles.org",
+      "url": "magnet:?xt=urn:btih:339a4817bfd7f53cdb14e411f903dcc09b905570&dn=opensubtitles.org.dump.10200000.to.10299999.v20241124",
+      "num_range_from": 10200000,
+      "num_range_to": 10299999,
+      "type": "sqlite",
+      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.10200000.to.10299999.v20241124/102xxxxx.db",
+      "zipfiles_table": "zipfiles",
+      "zipfiles_num_column": "num",
+      "zipfiles_zipfile_column": "content"
+    },
+    {
       "id": "opensubtitles_org_new_subs",
       "source": "opensubtitles.org",
       "url": "https://github.com/milahu/opensubtitles-scraper-new-subs.git",
