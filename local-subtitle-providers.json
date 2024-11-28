@@ -172,6 +172,7 @@
       "id": "opensubtitles_org_new_subs",
       "source": "opensubtitles.org",
       "url": "https://github.com/milahu/opensubtitles-scraper-new-subs.git",
+      "update_command": "./update.sh",
       "type": "sqlite",
       "db_path_base": "$HOME/src/milahu/opensubtitles-scraper-new-subs/shards",
       "db_path_format": "/*/{shard_id}xxx.db",
