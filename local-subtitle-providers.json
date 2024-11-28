@@ -2,6 +2,7 @@
   "type": "local-subtitle-providers",
   "version": 0.2,
   "subtitles_metadata_db_path": "subtitles_all.db",
+  "subtitles_metadata_db_path_note": "the path is relative to the directory of this config file",
   "providers": [
     {
       "comment": [
