@@ -227,7 +227,8 @@ for shard_dir in shard_dir_list:
     """
 
     output_dir = os.path.dirname(output_db_path)
-    info_dir = output_dir + "/info"
+    #info_dir = output_dir + "/info"
+    info_dir = output_dir # dont create subdirectory for only one file
     os.makedirs(info_dir, exist_ok=True)
 
     with open(info_dir + "/info.txt", "w") as f:
