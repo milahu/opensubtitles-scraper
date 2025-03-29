@@ -65,6 +65,14 @@ to expose [get-subs.py](get-subs.py) as a CGI script on an HTTP server
 
 
 
+#### demo server
+
+[pontus.feralhosting.com/milahu/bin/get-subtitles](https://pontus.feralhosting.com/milahu/bin/get-subtitles)
+([http](http://pontus.feralhosting.com:9591/bin/get-subtitles))
+([http+ddns](http://milahu.ddns.net:9591/bin/get-subtitles))
+
+
+
 ## based on
 
 - [5719123 subtitles from opensubtitles.org](https://www.reddit.com/r/DataHoarder/comments/w7sgcz/5719123_subtitles_from_opensubtitlesorg/) by `-marked-4life`

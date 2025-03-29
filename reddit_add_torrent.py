@@ -212,8 +212,9 @@ subtitles server to make this usable for thin clients (video players)
 working prototype: [get-subs.py](https://github.com/milahu/opensubtitles-scraper/raw/main/get-subs.py)
 
 live demo:
-[erebus.feralhosting.com/milahu/bin/get-subtitles](https://erebus.feralhosting.com/milahu/bin/get-subtitles)
-([http](http://erebus.feralhosting.com:9591/bin/get-subtitles))
+[pontus.feralhosting.com/milahu/bin/get-subtitles](https://pontus.feralhosting.com/milahu/bin/get-subtitles)
+([http](http://pontus.feralhosting.com:9591/bin/get-subtitles))
+([http+ddns](http://milahu.ddns.net:9591/bin/get-subtitles))
 
 ## remove ads
 
