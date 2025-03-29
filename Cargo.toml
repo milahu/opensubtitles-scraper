@@ -1,0 +1,13 @@
+[package]
+name = "opensubtitles-scraper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rusqlite = "*"
+zip = "*"
+chrono = "*"
+serde = "*"
+serde_derive = "*"
+regex = "*"
+lazy_static = "*"

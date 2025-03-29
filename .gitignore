@@ -27,3 +27,8 @@ fetch_subs_secrets.py
 *.log
 new-subs-archive.py-sum_files.txt
 new-subs-archive.py-tempdir/
+
+
+# Added by cargo
+
+/target
