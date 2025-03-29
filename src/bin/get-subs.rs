@@ -2,12 +2,15 @@ use std::{
     env, fs, io,
     path::{Path, PathBuf},
     collections::HashMap,
-    time::SystemTime,
+    // time::SystemTime,
 };
-use rusqlite::{Connection, params};
+use rusqlite::{
+    Connection,
+    // params,
+};
 use zip::ZipArchive;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+// use chrono::{DateTime, Utc};
+use serde_derive::{Serialize, Deserialize};
 use regex::Regex;
 use lazy_static::lazy_static;
 
@@ -71,10 +74,19 @@ fn main() -> Result<()> {
     let (sql_query, sql_args) = build_metadata_query(&video_parsed, &lang_list)?;
     
     let mut stmt = metadata_conn.prepare(&sql_query)?;
+    
+    /*
     let num_lang_list: Vec<(i64, String)> = stmt.query_map(&sql_args, |row| {
         Ok((row.get(0)?, row.get(1)?))
     })?.collect::<Result<_, _>>()?;
-    
+    */
+
+    /*
+    let num_lang_list: Vec<(i64, String)> = stmt.query_map(params, |row| {
+        Ok((row.get(0)?, row.get(1)?))
+    })?.collect::<rusqlite::Result<Vec<_>>>()?;
+    */
+
     // Process providers
     for provider in config.providers {
         if provider.enabled == Some(false) {
@@ -187,6 +199,7 @@ fn parse_video_filename(filename: &str) -> Result<HashMap<String, String>> {
     Ok(result)
 }
 
+/*
 fn build_metadata_query(
     video_parsed: &HashMap<String, String>,
     lang_list: &[String]
@@ -213,6 +226,74 @@ fn build_metadata_query(
         
         // Add title to params
         params.insert(0, Box::new(fts_words("Movie Title"))); // TODO: Get actual title
+    } else {
+        // Episode query
+        unimplemented!("TV episode queries not yet implemented");
+    }
+    
+    Ok((query, params))
+}
+*/
+
+fn build_and_execute_query(
+    conn: &Connection,
+    video_parsed: &HashMap<String, String>,
+    lang_list: &[String]
+) -> Result<Vec<(i64, String)>> {
+    let (sql_query, params) = build_metadata_query(video_parsed, lang_list)?;
+    let mut stmt = conn.prepare(&sql_query)?;
+    
+    // Convert parameters to &dyn ToSql references
+    let mut query_params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+    for param in params {
+        query_params.push(&*param);
+    }
+    
+    let results = stmt.query_map(rusqlite::params_from_iter(query_params), |row| {
+        Ok((row.get(0)?, row.get(1)?))
+    })?;
+    
+    results.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+}
+
+fn build_metadata_query(
+    video_parsed: &HashMap<String, String>,
+    lang_list: &[String]
+) -> Result<(String, Vec<Box<dyn rusqlite::ToSql>>)> {
+    let mut query = String::new();
+    let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+/*
+// Replace the problematic query execution with proper parameter handling
+let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+
+// Add the title parameter
+let title_param = fts_words("Movie Title"); // TODO: Get actual title
+params.push(&title_param);
+
+// Add language parameters
+for lang in &lang_list {
+    params.push(lang);
+}
+*/
+    
+    if video_parsed.get("type") == Some(&"movie".to_string()) {
+        query.push_str(
+            "SELECT rowid, ISO639 FROM subz_metadata, subz_metadata_fts_MovieName \
+             WHERE subz_metadata.rowid = subz_metadata_fts_MovieName.rowid \
+             AND subz_metadata_fts_MovieName.MovieName MATCH ? \
+             AND subz_metadata.ISO639 IN (");
+        
+        query.push_str(&lang_list.iter().map(|_| "?").collect::<Vec<_>>().join(","));
+        query.push_str(") AND subz_metadata.SubSumCD = 1 AND subz_metadata.MovieKind = 'movie' LIMIT 500");
+        
+        // Add title parameter
+        params.push(Box::new(fts_words("Movie Title"))); // TODO: Get actual title
+        
+        // Add language parameters
+        for lang in lang_list {
+            params.push(Box::new(lang.clone()));
+        }
     } else {
         // Episode query
         unimplemented!("TV episode queries not yet implemented");
