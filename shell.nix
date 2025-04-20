@@ -217,7 +217,7 @@ pkgs.mkShell rec {
 
     chromium # for selenium
 
-    torrenttools
+    #torrenttools
 
     lighttpd
 
