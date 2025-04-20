@@ -67,9 +67,8 @@ to expose [get-subs.py](get-subs.py) as a CGI script on an HTTP server
 
 #### demo server
 
-[pontus.feralhosting.com/milahu/bin/get-subtitles](https://pontus.feralhosting.com/milahu/bin/get-subtitles)
-([http](http://pontus.feralhosting.com:9591/bin/get-subtitles))
-([http+ddns](http://milahu.ddns.net:9591/bin/get-subtitles))
+[s.milahu.webredirect.org/bin/get-subtitles](http://s.milahu.webredirect.org/bin/get-subtitles)
+([http](http://milahu.webredirect.org/bin/get-subtitles))
 
 
 
