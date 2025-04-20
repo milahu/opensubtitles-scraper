@@ -1,9 +1,9 @@
 { lib
-, python3
+, python
 , fetchFromGitHub
 }:
 
-python3.pkgs.buildPythonPackage rec {
+python.pkgs.buildPythonPackage rec {
   pname = "stream-zip";
   version = "0.0.71";
   pyproject = true;
@@ -16,14 +16,14 @@ python3.pkgs.buildPythonPackage rec {
   };
 
   nativeBuildInputs = [
-    python3.pkgs.hatchling
+    python.pkgs.hatchling
   ];
 
-  propagatedBuildInputs = with python3.pkgs; [
+  propagatedBuildInputs = with python.pkgs; [
     pycryptodome
   ];
 
-  passthru.optional-dependencies = with python3.pkgs; {
+  passthru.optional-dependencies = with python.pkgs; {
     ci = [
       coverage
       pycryptodome

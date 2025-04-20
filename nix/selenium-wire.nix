@@ -1,6 +1,6 @@
 { lib
 , fetchFromGitHub
-# python3.pkgs
+# python.pkgs
 , buildPythonPackage
 , setuptools
 , wheel

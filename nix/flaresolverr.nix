@@ -1,8 +1,8 @@
 { lib
 , fetchFromGitHub
 , chromium
-#, python3
-# python3.pkgs
+#, python
+# python.pkgs
 , buildPythonApplication
 # moved from src to separate package
 # rm -rf src/undetected_chromedriver
@@ -106,7 +106,7 @@ buildPythonApplication rec {
     rm -rf src/undetected_chromedriver
 
     # add shebang line
-    sed -i '1 i\#!/usr/bin/env python3' src/flaresolverr.py
+    sed -i '1 i\#!/usr/bin/env python' src/flaresolverr.py
 
     # move non-python files to the main_module_path
     # so they are installed as package_data in setup.py
@@ -286,7 +286,7 @@ buildPythonApplication rec {
   # fix: Testing via this command is deprecated
   checkPhase = ''
     runHook preCheck
-    ${python3.interpreter} -m unittest
+    ${python.interpreter} -m unittest
     runHook postCheck
   '';
   */

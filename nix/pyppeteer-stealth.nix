@@ -1,9 +1,9 @@
 { lib
-, python3
+, python
 , fetchPypi
 }:
 
-python3.pkgs.buildPythonApplication rec {
+python.pkgs.buildPythonApplication rec {
   pname = "pyppeteer-stealth";
   version = "2.7.4";
   format = "setuptools";
@@ -19,11 +19,11 @@ python3.pkgs.buildPythonApplication rec {
   # TypeError: chrome_app() missing 1 required positional argument: 'page'
   doCheck = false;
 
-  checkInputs = with python3.pkgs; [
+  checkInputs = with python.pkgs; [
     pyppeteer
   ];
 
-  propagatedBuildInputs = with python3.pkgs; [
+  propagatedBuildInputs = with python.pkgs; [
     pyppeteer
   ];
 

@@ -1,10 +1,10 @@
 { lib
-, python3
+, python
 , fetchPypi
 , fetchFromGitHub
 }:
 
-python3.pkgs.buildPythonApplication rec {
+python.pkgs.buildPythonApplication rec {
   pname = "pygnuutils";
   version = "0.0.6";
   format = "setuptools";
@@ -24,12 +24,12 @@ python3.pkgs.buildPythonApplication rec {
     hash = "sha256-4Nm8mBKhGuYxXs1hUQOSCd7+nSdptOwGUi+dMYh1p/8=";
   };
 
-  propagatedBuildInputs = with python3.pkgs; [
+  propagatedBuildInputs = with python.pkgs; [
     click
     #dataclasses # dataclasses will be included in Python 3.7
   ];
 
-  checkInputs = with python3.pkgs; [
+  checkInputs = with python.pkgs; [
     pytest
   ];
 

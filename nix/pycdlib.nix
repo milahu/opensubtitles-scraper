@@ -1,9 +1,9 @@
 { lib
-, python3
+, python
 , fetchFromGitHub
 }:
 
-python3.pkgs.buildPythonApplication rec {
+python.pkgs.buildPythonApplication rec {
   pname = "pycdlib";
   version = "1.14.0";
   format = "setuptools";

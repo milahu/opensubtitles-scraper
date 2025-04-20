@@ -1,12 +1,12 @@
 { lib
-, python3
+, python
 , fetchFromGitHub
 , fetchurl
 , cdp-socket
 , selenium
 }:
 
-python3.pkgs.buildPythonPackage rec {
+python.pkgs.buildPythonPackage rec {
   pname = "selenium-driverless";
   # grep version src/selenium_driverless/__init__.py
   version = "1.7.3";
@@ -30,11 +30,11 @@ python3.pkgs.buildPythonPackage rec {
   ];
 
   nativeBuildInputs = [
-    python3.pkgs.setuptools
-    python3.pkgs.wheel
+    python.pkgs.setuptools
+    python.pkgs.wheel
   ];
 
-  propagatedBuildInputs = (with python3.pkgs; [
+  propagatedBuildInputs = (with python.pkgs; [
     cdp-socket
     numpy
     pytest

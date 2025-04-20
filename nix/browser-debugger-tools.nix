@@ -1,9 +1,9 @@
 { lib
-, python3
+, python
 , fetchFromGitHub
 }:
 
-python3.pkgs.buildPythonApplication rec {
+python.pkgs.buildPythonApplication rec {
   pname = "browser-debugger-tools";
   version = "6.0.3";
   pyproject = true;
@@ -23,11 +23,11 @@ python3.pkgs.buildPythonApplication rec {
   '';
 
   nativeBuildInputs = [
-    python3.pkgs.setuptools
-    python3.pkgs.wheel
+    python.pkgs.setuptools
+    python.pkgs.wheel
   ];
 
-  propagatedBuildInputs = with python3.pkgs; [
+  propagatedBuildInputs = with python.pkgs; [
     requests
     websocket-client
   ];

@@ -1,7 +1,7 @@
 { lib
 , fetchFromGitHub
 , pkgs-undetected-chromedriver
-# python3.pkgs
+# python.pkgs
 , buildPythonApplication
 , setuptools
 , wheel

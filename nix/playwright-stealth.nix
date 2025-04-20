@@ -1,5 +1,5 @@
 { lib
-, python3
+, python
 , fetchPypi
 , fetchFromGitHub
 , playwright
@@ -7,7 +7,7 @@
 , fetchpatch
 }:
 
-python3.pkgs.buildPythonApplication rec {
+python.pkgs.buildPythonApplication rec {
   pname = "playwright-stealth";
   version = "1.0.5";
   format = "setuptools";

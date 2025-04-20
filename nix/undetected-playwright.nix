@@ -1,9 +1,9 @@
 { lib
-, python3
+, python
 , fetchPypi
 }:
 
-python3.pkgs.buildPythonApplication rec {
+python.pkgs.buildPythonApplication rec {
   pname = "undetected-playwright";
   version = "0.0.5";
   format = "setuptools";
@@ -13,7 +13,7 @@ python3.pkgs.buildPythonApplication rec {
     hash = "sha256-V4I5VXVcesZdfB8VPXvMOV/EgvUIE9ViHk2cAL0pAF4=";
   };
 
-  propagatedBuildInputs = with python3.pkgs; [
+  propagatedBuildInputs = with python.pkgs; [
     playwright
   ];
 
