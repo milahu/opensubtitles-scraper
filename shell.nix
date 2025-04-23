@@ -217,6 +217,8 @@ pkgs.mkShell rec {
 
     chromium # for selenium
 
+    # todo: replace with torf in python
+    # fixme: build error
     #torrenttools
 
     lighttpd
