@@ -84,8 +84,8 @@ def get_request_path():
         "REQUEST_URI",
     ), "/bin/get-subtitles")
     # workaround: nginx does not pass $request_uri as request header
-    if get_request_host().endswith("x.feralhosting.com"):
-        return "/milahu" + val
+    if get_request_host().endswith(".feralhosting.com"):
+        return "/" + os.environ["USER"] + val
     return val
 
 
