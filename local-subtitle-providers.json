@@ -14,7 +14,7 @@
       "num_range_from": 1,
       "num_range_to": 9180517,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.Actually.Open.Edition.2022.07.25/opensubs.db",
+      "db_path": "$HOME/cas/btih/c2f0b5d26a886ba12f7f667d69c0459056dcda9b/opensubtitles.org.Actually.Open.Edition.2022.07.25/opensubs.db",
       "zipfiles_table": "subz",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "file"
@@ -45,7 +45,7 @@
       "num_range_from": 9180518,
       "num_range_to": 9521948,
       "type": "sqlite",
-      "db_path_base": "$HOME/down/torrent/done/opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26",
+      "db_path_base": "$HOME/cas/btih/30b8b5120f4b881927d81ab9f071a60004a7183a/opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26",
       "db_path_format": "/langs/{lang}.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
@@ -64,7 +64,7 @@
       "num_range_from": 9180518,
       "num_range_to": 9521948,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26/langs/eng.db",
+      "db_path": "$HOME/cas/btih/30b8b5120f4b881927d81ab9f071a60004a7183a/opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26/langs/eng.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
@@ -76,7 +76,7 @@
       "num_range_from": 9500000,
       "num_range_to": 9599999,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.9500000.to.9599999.v20240306/95xxxxx.db",
+      "db_path": "$HOME/cas/btih/287508f8acc0a5a060b940a83fbba68455ef2207/opensubtitles.org.dump.9500000.to.9599999.v20240306/95xxxxx.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
@@ -88,7 +88,7 @@
       "num_range_from": 9600000,
       "num_range_to": 9699999,
       "type": "sqlite",
-      "db_path_base": "$HOME/down/torrent/done/opensubtitles.org.dump.9600000.to.9699999",
+      "db_path_base": "$HOME/cas/btih/a76396daa3262f6d908b7e8ee47ab0958f8c7451/opensubtitles.org.dump.9600000.to.9699999",
       "db_path_format": "/{shard_id}xxx.db",
       "shard_size": 1000,
       "zipfiles_table": "zipfiles",
@@ -102,7 +102,7 @@
       "num_range_from": 9700000,
       "num_range_to": 9799999,
       "type": "sqlite",
-      "db_path_base": "$HOME/down/torrent/done/opensubtitles.org.dump.9700000.to.9799999",
+      "db_path_base": "$HOME/cas/btih/de1c9696bfa0e6e4e65d5ed9e1bdf81b910cc7ef/opensubtitles.org.dump.9700000.to.9799999",
       "db_path_format": "/{shard_id}xxx.db",
       "shard_size": 1000,
       "zipfiles_table": "zipfiles",
@@ -116,7 +116,7 @@
       "num_range_from": 9800000,
       "num_range_to": 9899999,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.9800000.to.9899999.v20240420/98xxxxx.db",
+      "db_path": "$HOME/cas/btih/81ea96466100e982dcacfd9068c4eaba8ff587a8/opensubtitles.org.dump.9800000.to.9899999.v20240420/98xxxxx.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
@@ -128,7 +128,7 @@
       "num_range_from": 9900000,
       "num_range_to": 9999999,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.9900000.to.9999999.v20240609/99xxxxx.db",
+      "db_path": "$HOME/cas/btih/c0657537ab06395c61559e6cf10a33a1546cdf3e/opensubtitles.org.dump.9900000.to.9999999.v20240609/99xxxxx.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
@@ -140,7 +140,7 @@
       "num_range_from": 10000000,
       "num_range_to": 10099999,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.10000000.to.10099999.v20240820/100xxxxx.db",
+      "db_path": "$HOME/cas/btih/e961ab2d6bcbb863f43096aad2b2121871a3acc6/opensubtitles.org.dump.10000000.to.10099999.v20240820/100xxxxx.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
@@ -152,7 +152,7 @@
       "num_range_from": 10100000,
       "num_range_to": 10199999,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.10100000.to.10199999.v20241003/101xxxxx.db",
+      "db_path": "$HOME/cas/btih/821de40f4085a45340e52481eb16ee6b3fdef7ac/opensubtitles.org.dump.10100000.to.10199999.v20241003/101xxxxx.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
@@ -164,7 +164,7 @@
       "num_range_from": 10200000,
       "num_range_to": 10299999,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.10200000.to.10299999.v20241124/102xxxxx.db",
+      "db_path": "$HOME/cas/btih/339a4817bfd7f53cdb14e411f903dcc09b905570/opensubtitles.org.dump.10200000.to.10299999.v20241124/102xxxxx.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
