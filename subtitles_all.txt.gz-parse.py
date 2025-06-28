@@ -87,13 +87,13 @@ table_name_tmp = table_name
 if create_tmp_table:
     table_name_tmp = f"{table_name}_tmp"
 
-assert os.path.exists(subtitles_all_txt_gz_path), f"missing input file: {subtitles_all_txt_gz_path}"
+assert os.path.exists(subtitles_all_txt_gz_path), f"missing input file: {subtitles_all_txt_gz_path!r}"
 
-assert os.path.exists(metadata_db_path) == False, f"existing output file: {metadata_db_path}"
+assert os.path.exists(metadata_db_path) == False, f"existing output file: {metadata_db_path!r}"
 
 estimate_num_subs = round(os.path.getsize(subtitles_all_txt_gz_path) / estimate_bytes_per_sub)
 
-assert has_table(metadata_db_path, table_name) == False, f"output table exists: {table_name}"
+assert has_table(metadata_db_path, table_name) == False, f"output table exists: {table_name!r}"
 
 sqlite_connection = sqlite3.connect(
     metadata_db_path,
