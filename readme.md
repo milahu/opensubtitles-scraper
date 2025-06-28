@@ -67,8 +67,7 @@ to expose [get-subs.py](get-subs.py) as a CGI script on an HTTP server
 
 #### demo server
 
-[s.milahu.webredirect.org/bin/get-subtitles](http://s.milahu.webredirect.org/bin/get-subtitles)
-([http](http://milahu.webredirect.org/bin/get-subtitles))
+[milahu.webredirect.org/bin/get-subtitles](http://milahu.webredirect.org/bin/get-subtitles)
 
 
 
