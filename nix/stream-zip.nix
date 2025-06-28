@@ -6,21 +6,14 @@
 
 python.pkgs.buildPythonPackage rec {
   pname = "stream-zip";
-  version = "0.0.83";
+  version = "0.0.81";
   pyproject = true;
 
-  src =
-  if true then
-  fetchurl {
-    url = "https://github.com/uktrade/stream-zip/archive/refs/tags/v${version}.tar.gz";
-    hash = "sha256-LAlABuI/9lWtBr8uiH2Vkc8VYD6h0CwUXMGTwZgOvtI=";
-  }
-  else
-  fetchFromGitHub {
-    owner = "uktrade";
+  src = fetchFromGitHub {
+    owner = "milahu";
     repo = "stream-zip";
     rev = "v${version}";
-    hash = "sha256-zcYfpojAy0ZfJHuvYtsEr9SSpTc+tOH8gTKI9Fd4oHg=";
+    hash = "sha256-kSRCl0mVgntC53cCB6u5OAkzFk+a9yoyfiUJH8yLqAI=";
   };
 
   nativeBuildInputs = [
