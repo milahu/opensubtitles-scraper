@@ -80,6 +80,10 @@ def has_table(db_path, table_name):
     return True
 
 
+if not os.path.exists(metadata_db_path):
+    raise FileNotFoundError(metadata_db_path)
+
+
 table_name = subtitles_all_table_name
 if has_table(metadata_db_path, table_name):
     print(f"found table {table_name}")
