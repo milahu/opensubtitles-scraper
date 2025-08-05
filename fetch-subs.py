@@ -333,11 +333,21 @@ except ImportError:
     api_key_zenrows_com = "88d22df90b3a4c252b480dc8847872dac59db0e0" # expired
 
 
+default_num_downloads = None
+
 
 # opensubtitles.org
 
 try:
     from fetch_subs_secrets import opensubtitles_org_logins
+    if len(opensubtitles_org_logins) > 0:
+        # assume that every login is a VIP account
+        # every VIP account can do 1000 downloads per day
+        # +100% for failed requests
+        # the scraper stops anyway when it reaches the daily quota
+        # see also:
+        # download_quota = response_headers.get("download-quota", None)
+        default_num_downloads = 2000
 except ImportError:
     opensubtitles_org_logins = None
 
@@ -473,7 +483,8 @@ parser = argparse.ArgumentParser(
 )
 
 default_jobs = 1 # see also: max_concurrency
-default_num_downloads = 25
+if default_num_downloads is None:
+    default_num_downloads = 25
 
 # with larger samples, produce more incomplete shards
 # see also fetch_nums_in_random_order
