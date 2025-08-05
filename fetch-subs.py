@@ -3748,6 +3748,7 @@ async def main_scraper():
 
             # save cookies
             cookies_txt_path = f"cookies/opensubtitles.org-cookies.{username}.txt"
+            os.makedirs(os.path.dirname(cookies_txt_path), exist_ok=True)
             cookie_jar = aiohttp_chromium.MozillaCookieJar()
             # copy cookies from driver to cookiejar
             # cookiejar is a list of dicts
