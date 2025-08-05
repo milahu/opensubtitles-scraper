@@ -300,13 +300,6 @@ fetch_nums_in_random_order = True
 #fetcher_lib = "requests"
 
 
-pyppeteer_headless = True
-pyppeteer_headless = False # debug
-
-aiohttp_chromium_headless = True
-aiohttp_chromium_headless = False # debug + solve captchas on login
-# FIXME use a captcha solver
-
 
 # note: these API keys are all expired
 
@@ -516,6 +509,13 @@ parser.add_argument(
         #f"values: {', '.join(proxy_provider_values)}"
     ),
 )
+# FIXME use a captcha solver
+parser.add_argument(
+    '--headful-chromium',
+    dest="headful_chromium", # options.headful_chromium
+    default=False,
+    help="run chromium browser with headless=False. useful to manually solve captchas",
+)
 parser.add_argument(
     '--start-vnc-client',
     dest="start_vnc_client", # options.start_vnc_client
@@ -662,6 +662,9 @@ options = parser.parse_args()
 
 options.vnc_client_list += re.split(r"\s+", os.environ.get("REVERSE_VNC_SERVERS", ""))
 
+# FIXME use a captcha solver
+options.headless_chromium = not options.headful_chromium
+
 logging_level = "INFO"
 if options.debug:
     # TODO disable debug log from selenium (too verbose)
@@ -738,7 +741,7 @@ async def update_metadata_db():
         aiohttp_chromium_session = await aiohttp_chromium.ClientSession(
             #cookie_jar=cookie_jar,
             #tempdir=tempdir,
-            _headless=aiohttp_chromium_headless,
+            _headless=options.headless_chromium,
         )
 
         async def response_cleanup_chromium():
@@ -2617,7 +2620,7 @@ if fritzbox_login:
             change_ipaddr_fritzbox_aiohttp_chromium_session = await aiohttp_chromium.ClientSession(
                 fritzbox_login=fritzbox_login,
                 tempdir=tempdir,
-                _headless=aiohttp_chromium_headless,
+                _headless=options.headless_chromium,
             )
         return await change_ipaddr_fritzbox_aiohttp_chromium_session.change_ipaddr()
     change_ipaddr = change_ipaddr_fritzbox
@@ -3419,7 +3422,7 @@ async def main_scraper():
         aiohttp_chromium_session = await aiohttp_chromium.ClientSession(
             cookie_jar=cookie_jar,
             tempdir=tempdir,
-            _headless=aiohttp_chromium_headless,
+            _headless=options.headless_chromium,
         )
 
         # later cleanup:
@@ -3443,7 +3446,7 @@ async def main_scraper():
         logger_print("pyppeteer.launch")
         pyppeteer_browser = await pyppeteer.launch(
             # https://pptr.dev/api/puppeteer.puppeteerlaunchoptions
-            headless=pyppeteer_headless,
+            headless=options.headless_chromium,
             # path to /bin/chromium
             # chrome binaries from ~/.cache/puppeteer/chrome are not working on nixos linux
             # ldd ~/.cache/puppeteer/chrome/linux-*/chrome-linux/chrome | grep "not found"
