@@ -645,7 +645,7 @@ parser.add_argument(
 parser.add_argument(
     "--metadata-db",
     dest="metadata_db",
-    default=None,
+    default="subtitles_all.db",
     type=str,
     metavar="path",
     help="path to subtitles_all.db - parsed from subtitles_all.txt.gz",
@@ -701,13 +701,19 @@ async def update_metadata_db():
     # FIXME subtitles_all.txt.gz-parse.py
     #return # dont update
 
+    logger_print(f"metadata db: options.metadata_db {options.metadata_db}")
+
     if not options.metadata_db:
+        logger_print(f"not updating metadata db: no options.metadata_db")
         return
 
     max_age = 10*24*60*60 # 10 days
-    age = time.time() - os.path.getmtime(options.metadata_db)
+    age = None
+    if os.path.exists(options.metadata_db):
+        age = time.time() - os.path.getmtime(options.metadata_db)
 
-    if age <= max_age:
+    if age and age <= max_age:
+        logger_print(f"not updating metadata db: age <= max_age: {age} <= {max_age}")
         return
 
     # https://stackoverflow.com/questions/538666/format-timedelta-to-string
@@ -715,7 +721,10 @@ async def update_metadata_db():
         age = datetime.timedelta(seconds=age)
         return str(age)
 
-    logger_print(f"updating metadata db {repr(options.metadata_db)}. age {format_age(age)} > max_age {format_age(max_age)}")
+    if age:
+        logger_print(f"updating metadata db {repr(options.metadata_db)}. age {format_age(age)} > max_age {format_age(max_age)}")
+    else:
+        logger_print(f"initializing metadata db {repr(options.metadata_db)}")
 
     # debug: use an existing .txt.gz file to avoid re-downloading
     existing_txt_gz_path = None
@@ -768,7 +777,7 @@ async def update_metadata_db():
                 await response_cleanup()
                 raise Exception(f"{num} download failed")
             t2 = time.time()
-            logger_print("response._wait_complete done after {(t2 - t1):.3f} seconds")
+            logger_print(f"response._wait_complete done after {(t2 - t1):.3f} seconds")
             shutil.move(response._filepath, txt_gz_path)
         #except asyncio.exceptions.TimeoutError as e:
         except Exception as e:
@@ -829,7 +838,7 @@ async def update_metadata_db():
             os.unlink(link_target)
         logger_print(f"updating metadata db: rm {options.metadata_db}")
         os.unlink(options.metadata_db)
-    else:
+    elif os.path.exists(options.metadata_db):
         if keep_old_file:
             bak_path = options.metadata_db + f".bak.{datetime_str()}"
             logger_print(f"updating metadata db: mv {options.metadata_db} {bak_path}")
