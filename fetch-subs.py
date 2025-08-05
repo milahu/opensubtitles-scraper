@@ -303,6 +303,10 @@ fetch_nums_in_random_order = True
 pyppeteer_headless = True
 pyppeteer_headless = False # debug
 
+aiohttp_chromium_headless = True
+aiohttp_chromium_headless = False # debug + solve captchas on login
+# FIXME use a captcha solver
+
 
 # note: these API keys are all expired
 
@@ -723,7 +727,7 @@ async def update_metadata_db():
         aiohttp_chromium_session = await aiohttp_chromium.ClientSession(
             #cookie_jar=cookie_jar,
             #tempdir=tempdir,
-            _headless=True,
+            _headless=aiohttp_chromium_headless,
         )
 
         async def response_cleanup_chromium():
@@ -2602,7 +2606,7 @@ if fritzbox_login:
             change_ipaddr_fritzbox_aiohttp_chromium_session = await aiohttp_chromium.ClientSession(
                 fritzbox_login=fritzbox_login,
                 tempdir=tempdir,
-                _headless=True,
+                _headless=aiohttp_chromium_headless,
             )
         return await change_ipaddr_fritzbox_aiohttp_chromium_session.change_ipaddr()
     change_ipaddr = change_ipaddr_fritzbox
@@ -3404,7 +3408,7 @@ async def main_scraper():
         aiohttp_chromium_session = await aiohttp_chromium.ClientSession(
             cookie_jar=cookie_jar,
             tempdir=tempdir,
-            _headless=True,
+            _headless=aiohttp_chromium_headless,
         )
 
         # later cleanup:
