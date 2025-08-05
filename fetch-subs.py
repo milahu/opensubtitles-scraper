@@ -483,7 +483,8 @@ proxy_provider_values = [
   "zenrows.com",
 ]
 """
-default_proxy_provider = None
+# default_proxy_provider = None # FIXME aiohttp_chromium_session is None
+default_proxy_provider = "chromium"
 
 #parser.add_argument('filename')
 
@@ -718,6 +719,7 @@ async def update_metadata_db():
 
         # FIXME?
 
+        logger_print("setting aiohttp_chromium_session")
         aiohttp_chromium_session = await aiohttp_chromium.ClientSession(
             #cookie_jar=cookie_jar,
             #tempdir=tempdir,
@@ -3398,6 +3400,7 @@ async def main_scraper():
 
             chromium_cookie_jar = cookie_jar
 
+        logger_print("setting aiohttp_chromium_session")
         aiohttp_chromium_session = await aiohttp_chromium.ClientSession(
             cookie_jar=cookie_jar,
             tempdir=tempdir,
@@ -3586,6 +3589,7 @@ async def main_scraper():
         await asyncio.sleep(5) # wait for page load
         page_source = await driver.page_source
         """
+        assert not (aiohttp_chromium_session is None)
         async with await aiohttp_chromium_session.get(url, timeout=3*60) as resp:
             page_source = await resp.text()
 
