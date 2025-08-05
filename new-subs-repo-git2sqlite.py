@@ -349,6 +349,9 @@ for shard_id in shard_id_list:
             WHERE IDSubtitle BETWEEN {shard_first_num} AND {shard_last_num}
             ORDER BY IDSubtitle ASC
         """
+        print("metadata_db_path", metadata_db["path"])
+        if not os.path.exists(metadata_db["path"]):
+            raise FileNotFoundError(metadata_db["path"])
         metadata_db_conn = sqlite3.connect(metadata_db["path"])
         metadata_db_cur = metadata_db_conn.cursor()
         #print("query", repr(query))
