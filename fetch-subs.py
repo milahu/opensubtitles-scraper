@@ -3165,7 +3165,10 @@ async def main_scraper():
 
     #nums_done_min = 9180517 # last num in opensubs.db
     #nums_done_min = 9521948 # last num in opensubtitles.org.dump.9180519.to.9521948
-    nums_done_min = nums_done[0]
+    if len(nums_done) > 0:
+        nums_done_min = nums_done[0]
+    else:
+        nums_done_min = 1
 
     # optimization: limit range of numbers
     if options.first_num:
