@@ -66,7 +66,7 @@ print(f"tempdir: {tempdir}")
 
 new_subs_path = "new-subs"
 new_subs_repo_path = "new-subs-repo"
-new_subs_repo_shards_path = "new-subs-repo-shards"
+new_subs_repo_shards_path = "opensubtitles-scraper-new-subs"
 new_subs_trash_path = "new-subs-trash"
 
 
