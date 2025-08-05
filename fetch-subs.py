@@ -3669,15 +3669,24 @@ async def main_scraper():
 
                 # click captcha
 
+                # FIXME use a captcha solver
                 logger.debug(f"checking login: clicking captcha")
-                iframe = await driver.find_element(By.CSS_SELECTOR, "#g-recaptcha > div > div > iframe")
-                logger.debug(f"checking login: clicking captcha: iframe {repr(iframe)}")
-
-                iframe_doc = await iframe.content_document
-                logger.debug(f"checking login: clicking captcha: iframe_doc {repr(iframe_doc)}")
-                elem = await iframe_doc.find_element(By.CSS_SELECTOR, "#recaptcha-anchor")
-                logger.debug(f"checking login: clicking captcha: elem {repr(elem)}")
-                await elem.click()
+                iframe_selector = "#g-recaptcha > div > div > iframe"
+                elem_selector = "#recaptcha-anchor"
+                try:
+                    iframe = await driver.find_element(By.CSS_SELECTOR, iframe_selector)
+                    logger.debug(f"checking login: clicking captcha: iframe {repr(iframe)}")
+                    iframe_doc = await iframe.content_document
+                    logger.debug(f"checking login: clicking captcha: iframe_doc {repr(iframe_doc)}")
+                    elem = None
+                    elem = await iframe_doc.find_element(By.CSS_SELECTOR, elem_selector)
+                    logger.debug(f"checking login: clicking captcha: elem {repr(elem)}")
+                    await elem.click()
+                except NoSuchElementException:
+                    logger.debug(
+                        f"checking login: clicking captcha failed: not found captcha element. " +
+                        "please solve the captcha manually"
+                    )
 
                 # TODO use captcha solver
                 # https://www.crx4chrome.com/crx/102543/ # ReCaptcha Solver
