@@ -576,6 +576,13 @@ parser.add_argument(
     help="first subtitle number. default: get from store",
 )
 parser.add_argument(
+    '--dont-guess-first-num',
+    dest="dont_guess_first_num",
+    help=f"dont guess first-num from files in {new_subs_repo_shards_dir}/shards/",
+    default=False,
+    action="store_true",
+)
+parser.add_argument(
     '--last-num',
     dest="last_num",
     default=None,
@@ -3175,6 +3182,18 @@ async def main_scraper():
     if options.first_num:
         logger_print(f"setting nums_done_min to {options.first_num}")
         nums_done_min = options.first_num
+    elif options.dont_guess_first_num == False and os.path.exists(f"{new_subs_repo_shards_dir}/shards"):
+        # guess first_num from files in opensubtitles-scraper-new-subs/shards/
+        logger_print("guessing options.first_num from files in {new_subs_repo_shards_dir}/shards/")
+        shard_dirs = os.listdir(f"{new_subs_repo_shards_dir}/shards")
+        logger_print("shard_dirs", shard_dirs)
+        # ignore "74xxxxx" -- why is it here? todo remove the "shards-74xxxxx" branch?
+        if "74xxxxx" in shard_dirs: shard_dirs.remove("74xxxxx") # TODO remove
+        shard_dir_nums = list(map(lambda s: int(s.replace("x", "")), shard_dirs))
+        shard_dir_nums.sort()
+        logger_print("shard_dir_nums", shard_dir_nums)
+        options.first_num = shard_dir_nums[0] * 100000
+        logger_print("options.first_num", options.first_num)
 
     if options.force_download:
         # quickfix
@@ -3305,7 +3324,7 @@ async def main_scraper():
     first_num = options.first_num or 1
     num = first_num
     while True:
-        if num not in nums_done_set:
+        if num not in nums_done_set and num > first_num:
             # first missing num
             num_stack_first = num
             break
