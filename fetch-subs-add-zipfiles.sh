@@ -11,4 +11,7 @@ if [ -x "$add_files" ]; then
   "$add_files" /run/user/$(id -u)/fetch-subs-*/home/done_downloads/req*/*.not-found
   "$add_files" "$new_subs_dir"/*.zip
   "$add_files" "$new_subs_dir"/*.not-found
+else
+  echo "error: not executable: $add_files"
+  exit 1
 fi
