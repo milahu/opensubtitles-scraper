@@ -95,6 +95,7 @@ let
     fritzconnection # fritzbox client
     #selenium
     praw # python reddit api wrapper
+    legacy-cgi # cgi
   ])
   ++
   (with extraPythonPackages; [
