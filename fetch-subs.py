@@ -381,7 +381,7 @@ new_subs_repo_shards_dir = "new-subs-repo-shards"
 
 def datetime_str():
     # https://stackoverflow.com/questions/2150739/iso-time-iso-8601-in-python#28147286
-    return datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%S.%fZ")
+    return datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S.%fZ")
 
 
 
