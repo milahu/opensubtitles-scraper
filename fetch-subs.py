@@ -4290,7 +4290,7 @@ async def main_scraper():
             await asyncio.sleep(5) 
 
             # no. moved up
-            """
+            r"""
             # find downloaded files
             # and add nums to nums_done_ranges
             for filename in os.listdir(aiohttp_chromium_session.downloads_path):
@@ -4910,7 +4910,7 @@ async def main_scraper():
                     await response_cleanup()
                     raise Exception(f"{url_path} unexpected response_type {repr(response_type)}")
 
-                """
+                r"""
                 # parse /en/search/subs
                 remote_nums = re.findall(r'href="/en/subtitles/(\d+)/', await response.text())
                 logger.debug(f"{url_path} remote_nums {repr(remote_nums)}")
