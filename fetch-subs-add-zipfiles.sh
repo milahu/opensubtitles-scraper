@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-add_files=./new-subs-repo/add-files.sh
+new_subs_repo_shards_dir="opensubtitles-scraper-new-subs"
+
+add_files="./$new_subs_repo_shards_dir/add-files.sh"
 if [ -x "$add_files" ]; then
   "$add_files" /run/user/$(id -u)/fetch-subs-*/home/Downloads/*.zip
   "$add_files" /run/user/$(id -u)/fetch-subs-*/home/Downloads/*.not-found
