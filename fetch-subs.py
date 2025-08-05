@@ -377,7 +377,8 @@ new_subs_dir = "new-subs"
 new_subs_repo_dir = "new-subs-repo"
 #new_subs_dir = "new-subs-temp-debug"
 """
-new_subs_repo_shards_dir = "new-subs-repo-shards"
+# https://github.com/milahu/opensubtitles-scraper-new-subs
+new_subs_repo_shards_dir = "opensubtitles-scraper-new-subs"
 
 def datetime_str():
     # https://stackoverflow.com/questions/2150739/iso-time-iso-8601-in-python#28147286
