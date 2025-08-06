@@ -27,6 +27,7 @@ release_id = 99; release_version = "20240609"
 release_id=100; release_version="20240820" # actually 20240803
 release_id=101; release_version="20241003"
 release_id=102; release_version="20241124"
+release_id=int(sys.argv[1]); release_version=sys.argv[2]
 
 new_subs_repo_path = "opensubtitles-scraper-new-subs"
 # new_subs_repo_modified = False
