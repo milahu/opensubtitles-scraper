@@ -832,7 +832,8 @@ async def update_metadata_db():
 
     if os.path.islink(options.metadata_db):
         if not keep_old_file:
-            # note: this will not follow symlinks
+            # note: os.unlink will not follow symlinks
+            # so we remove the link target first
             link_target = os.readlink(options.metadata_db)
             logger_print(f"updating metadata db: rm {link_target}")
             os.unlink(link_target)
