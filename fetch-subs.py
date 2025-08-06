@@ -263,6 +263,13 @@ fetch_nums_in_random_order = True
 
 
 
+quota_exceeded_error_source = (
+    "If you will continue trying to download, " +
+    "<b>your IP will be blocked</b> by our firewall."
+)
+
+
+
 # no. not needed because i over-estimated the missing number (?)
 # the last batches should run in sequential order
 # last batches = we are limited by API credits
@@ -1825,8 +1832,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
 
             # FIXME handle error
             if not found_error:
-                # Sorry, maximum download count for IP: <b>123.123.123.123</b> exceeded.
-                error_source = "Sorry, maximum download count for IP"
+                error_source = quota_exceeded_error_source
                 if error_source in response_text:
                     found_error = True
                     logger_print(f"{num} status={response_status} error={repr(error_source)} -> result={result_dict}")
@@ -3169,7 +3175,7 @@ async def main_scraper():
         # rate-limiting can start before the daily limit of 1000
         # so, check against 0.9 of the daily limit -> 900
         # usually, the scraper uses 100% of the daily quota
-        # until it gets the "Sorry, maximum download count for IP" message
+        # until it gets the quota_exceeded_error_source message
         daily_quota_is_exceeded = downloads_done_today > (0.9 * daily_quota)
         logger_print(f"daily_quota_is_exceeded: {daily_quota_is_exceeded}")
 
@@ -4220,7 +4226,7 @@ async def main_scraper():
             https://dl.opensubtitles.org/en/download/sub/9843468
             returns html error page
 
-            <div class="msg error">Sorry, maximum download count for IP: <b>250.158.192.75</b> exceeded.
+            <div class="msg error">(logged as xxxx). subs_subtitle d IP: <b>123.123.123.123</b> exceeded.
             If you will continue trying to download, <b>your IP will be blocked</b> by our firewall.
             For more information read our <a href="/faq#antileech">FAQ</a> or contact us, if you think
             you should not see this error. This deny will be removed after around 24 hours, so be patient.</div>
@@ -4290,8 +4296,7 @@ async def main_scraper():
                                     logger_print(f"FIXME subtitle file doesnt exists. retry download later, or mark this sub as missing")
                                     await asyncio.sleep(99999999)
 
-                                # Sorry, maximum download count for IP: <b>123.123.123.123</b> exceeded.
-                                error_source = "Sorry, maximum download count for IP"
+                                error_source = quota_exceeded_error_source
                                 if error_source in page_source:
                                     logger_print(f"FIXME too many requests. wait and/or change_ipaddr")
                                     # TODO loop accounts: use next account for opensubtitles.org
