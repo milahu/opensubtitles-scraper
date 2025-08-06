@@ -166,7 +166,7 @@ for filename in os.listdir(new_subs_path):
         print(f"ignoring file {repr(path)}")
 
         # based on fetch-subs.py
-        """
+        r"""
         match = re.fullmatch(r"([0-9]+)\.(zip|not-found|dmca|not-found-dmca|.*\.zip)", filename)
         if match:
             # new format in f"{new_subs_repo_dir}/files.txt"
