@@ -25,6 +25,19 @@ new_subs_repo_path = "opensubtitles-scraper-new-subs"
 # new_subs_repo_modified = False
 new_subs_repo_remove_paths = []
 
+trackers = None
+
+def get_trackers():
+    # https://github.com/ngosang/trackerslist
+    url = "https://github.com/ngosang/trackerslist/raw/refs/heads/master/trackers_best_ip.txt"
+    print("fetching", url)
+    import requests
+    response = requests.get(url)
+    assert response.status_code == 200, f"response.status_code {response.status_code}"
+    trackers = re.findall(r"^[a-z]+\S+", response.text, re.M)
+    trackers = trackers[:5] # top 5
+    return trackers
+
 def run(args, **kwargs):
     print(">", shlex.join(args))
     return subprocess.run(args, **kwargs)
@@ -70,16 +83,19 @@ for shard_dir in shard_dir_list:
 
     print(f"shard dir {shard_dir} is complete -> adding release {release_name}")
 
-
+    output_dir = f"release/{release_name}"
 
     # output_db_path = f"release/opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v{release_version}/{release_id}xxxxx.db"
-    output_db_path = f"release/opensubtitles.org.dump.{release_id}xxxxx.v{release_version}/{release_id}xxxxx.db"
-
+    output_db_path = f"{output_dir}/{release_id}xxxxx.db"
     print("output_db_path", repr(output_db_path))
-
     assert os.path.exists(output_db_path) == False, f"error: output exists: {output_db_path}"
 
+    output_torrent_path = f"{output_dir}.torrent"
+    print("output_torrent_path", output_torrent_path)
+    assert os.path.exists(output_torrent_path) == False, f"error: output exists: {output_torrent_path}"
+
     os.makedirs(os.path.dirname(output_db_path) or ".", exist_ok=True)
+    os.makedirs(os.path.dirname(output_torrent_path) or ".", exist_ok=True)
 
     connection = sqlite3.connect(output_db_path)
 
@@ -231,6 +247,16 @@ for shard_dir in shard_dir_list:
 
     with open(info_dir + "/info.txt", "w") as f:
         f.write(info_txt)
+
+    print("writing", output_torrent_path)
+    if not trackers:
+        trackers = get_trackers()
+    torrent = torf.Torrent(
+        path=output_dir,
+        trackers=trackers,
+    )
+    torrent.generate()
+    torrent.write(output_torrent_path)
 
 if len(new_subs_repo_remove_paths) > 0:
     print("removing paths from new_subs_repo:", new_subs_repo_remove_paths)
