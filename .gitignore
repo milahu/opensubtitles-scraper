@@ -32,3 +32,7 @@ new-subs-archive.py-tempdir/
 # Added by cargo
 
 /target
+cookies/
+subtitles_all.txt.gz.2*T*.*Z*
+new-subs/
+opensubtitles-scraper-new-subs/
