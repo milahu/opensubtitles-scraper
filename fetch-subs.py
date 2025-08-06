@@ -514,6 +514,7 @@ parser.add_argument(
     '--headful-chromium',
     dest="headful_chromium", # options.headful_chromium
     default=False,
+    action='store_true',
     help="run chromium browser with headless=False. useful to manually solve captchas",
 )
 parser.add_argument(
