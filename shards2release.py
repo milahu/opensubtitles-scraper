@@ -11,6 +11,7 @@
 
 import sys
 import os
+import re
 import sqlite3
 import glob
 import time
@@ -19,15 +20,6 @@ import subprocess
 import shlex
 
 total_t1 = time.time()
-
-# FIXME auto detect from files in release/
-release_id = 95; release_version = "20240306"
-release_id = 98; release_version = "20240420"
-release_id = 99; release_version = "20240609"
-release_id=100; release_version="20240820" # actually 20240803
-release_id=101; release_version="20241003"
-release_id=102; release_version="20241124"
-release_id=int(sys.argv[1]); release_version=sys.argv[2]
 
 new_subs_repo_path = "opensubtitles-scraper-new-subs"
 # new_subs_repo_modified = False
@@ -59,7 +51,10 @@ for shard_dir in shard_dir_list:
     release_id = int(os.path.basename(shard_dir)[:-5])
     #print("release_id", release_id)
 
-    torrent_files = glob.glob(f"release/opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v*.torrent")
+    torrent_files = (
+        glob.glob(f"release/opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v*.torrent") +
+        glob.glob(f"release/opensubtitles.org.dump.{release_id}xxxxx.v*.torrent")
+    )
 
     if len(torrent_files) > 0:
         print(f"shard dir {shard_dir} has release -> removing shard_dir from new_subs_repo")
@@ -70,13 +65,15 @@ for shard_dir in shard_dir_list:
     release_version = datetime.datetime.fromtimestamp(os.path.getmtime(shard_dir)).strftime("%Y%m%d")
     #print("release_version", release_version)
 
-    release_name = f"opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v{release_version}"
+    # release_name = f"opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v{release_version}"
+    release_name = f"opensubtitles.org.dump.{release_id}xxxxx.v{release_version}"
 
     print(f"shard dir {shard_dir} is complete -> adding release {release_name}")
 
 
 
-    output_db_path = f"release/opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v{release_version}/{release_id}xxxxx.db"
+    # output_db_path = f"release/opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v{release_version}/{release_id}xxxxx.db"
+    output_db_path = f"release/opensubtitles.org.dump.{release_id}xxxxx.v{release_version}/{release_id}xxxxx.db"
 
     print("output_db_path", repr(output_db_path))
 
@@ -235,26 +232,15 @@ for shard_dir in shard_dir_list:
     with open(info_dir + "/info.txt", "w") as f:
         f.write(info_txt)
 
-
-########
-
-
 if len(new_subs_repo_remove_paths) > 0:
-    # remove shard_dir from git repo + force-push git repo
-    # based on new-subs-repo-shards/remove-shards.sh
     print("removing paths from new_subs_repo:", new_subs_repo_remove_paths)
-    run(["git", "-C", new_subs_repo_path, "checkout", "main"], check=True)
-    t = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
-    run(["git", "-C", new_subs_repo_path, "branch", "bak-main-" + t], check=True)
-    args = ["git", "-C", new_subs_repo_path, "filter-repo", "--force", "--refs", "main", "--invert-paths"]
+    args = ["bash", "remove-shards.sh"]
+    rest_paths = []
     for path in new_subs_repo_remove_paths:
-        args += ["--path", path]
-    run(args, check=True)
-    print("pushing new_subs_repo")
-    # git -C new-subs-repo-shards/ remote show
-    git_remote_list = run(["git", "-C", new_subs_repo_path, "remote", "show"], check=True, stdout=subprocess.PIPE, text=True).stdout
-    for git_remote in git_remote_list.strip().split("\n"):
-        # git -C new-subs-repo-shards/ push --force github
-        run(["git", "-C", new_subs_repo_path, "push", "--force", git_remote]) # , check=True)
-
-
+        if re.fullmatch(r"shards/[0-9]+xxxxx", path):
+            args.append(path)
+        else:
+            rest_paths.append(path)
+    run(args, cwd=new_subs_repo_path)
+    if rest_paths:
+        print(f"FIXME remove rest_paths {rest_paths}")
