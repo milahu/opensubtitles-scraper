@@ -55,6 +55,8 @@ flair_text = "Sharing"
 
 torrent_path = sys.argv[1]
 
+assert re.fullmatch(r"release/opensubtitles.org.dump.[a-z0-9.]+.torrent", torrent_path)
+
 print("reading", torrent_path)
 torrent = torf.Torrent.read(torrent_path)
 
@@ -279,6 +281,7 @@ reddit_posts.append(dict(
     id=provider_id,
     title=post_title,
     url=submission_url,
+    torrent_path=torrent_path,
 ))
 
 # avoid diff noise from comma
@@ -289,4 +292,5 @@ if is_test:
 else:
     print("writing", reddit_posts_json_path)
     with open(reddit_posts_json_path, "w") as f:
-        json.dump(reddit_posts, f, indent=2)
+        # json.dump(reddit_posts, f, indent=2)
+        f.write(json.dumps(reddit_posts, indent=2) + "\n")
