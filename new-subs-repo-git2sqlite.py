@@ -351,7 +351,7 @@ for shard_id in shard_id_list:
             WHERE IDSubtitle BETWEEN {shard_first_num} AND {shard_last_num}
             ORDER BY IDSubtitle ASC
         """
-        print("metadata_db_path", metadata_db["path"])
+        # print("metadata_db_path", metadata_db["path"])
         if not os.path.exists(metadata_db["path"]):
             raise FileNotFoundError(metadata_db["path"])
         metadata_db_conn = sqlite3.connect(metadata_db["path"])
@@ -417,7 +417,8 @@ for shard_id in shard_id_list:
                     sys.exit()
             break
     if not shard_is_complete:
-        if debug_shard_id and shard_id == debug_shard_id:
+        # if debug_shard_id and shard_id == debug_shard_id:
+        if 1:
             print(f"ignoring incomplete shard {shard_id}")
             # TODO print missing nums
         continue
