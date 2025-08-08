@@ -18,6 +18,24 @@ import time
 import datetime
 import subprocess
 import shlex
+import argparse
+
+parser = argparse.ArgumentParser(
+    prog='shards2release',
+    #description='Fetch subtitles',
+    #epilog='Text at the bottom of help',
+)
+
+parser.add_argument(
+    '--min-release-id',
+    dest="min_release_id", # options.min_release_id
+    default=0,
+    type=int,
+    metavar="N",
+    help=f"minimum release_id. example: 100 -> start from release 100xxxxx",
+)
+
+options = parser.parse_args()
 
 total_t1 = time.time()
 
@@ -55,14 +73,17 @@ files_per_shard = 100
 
 for shard_dir in shard_dir_list:
 
+    release_id = int(os.path.basename(shard_dir)[:-5])
+    #print("release_id", release_id)
+
+    if release_id < options.min_release_id:
+        continue
+
     shard_file_list = glob.glob(shard_dir + "/*xxx.db")
     if len(shard_file_list) != files_per_shard:
         # ignore incomplete shard dir
         print(f"shard dir {shard_dir} is incomplete (done {len(shard_file_list)} of {files_per_shard} shards) -> ignoring")
         continue
-
-    release_id = int(os.path.basename(shard_dir)[:-5])
-    #print("release_id", release_id)
 
     torrent_files = (
         glob.glob(f"release/opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v*.torrent") +
