@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eu
+set -e
 
 next_release_id="$1"
 if [ -z "$next_release_id" ]; then next_release_id=102; fi
@@ -196,7 +196,7 @@ write_missing_zipfiles_list=false
 write_missing_zipfiles_list=true
 
 if $write_missing_zipfiles_list && [ -n "$missing_zipfiles_list" ]; then
-  missing_files_path="missing_files.$(date -Is).txt"
+  missing_files_path="missing_numbers.txt"
   echo "writing $missing_files_path"
   #echo -n "$missing_zipfiles_list" >"$workdir/$missing_files_path"
   # write only the first 100 missing
@@ -204,8 +204,4 @@ if $write_missing_zipfiles_list && [ -n "$missing_zipfiles_list" ]; then
   #echo -n "$missing_zipfiles_list" | head -n100 >"$workdir/$missing_files_path"
   # prefer to finish the next release
   echo -n "$missing_zipfiles_list" | grep ^$next_release_id | head -n100 >"$workdir/$missing_files_path"
-
-  echo "TODO"
-  echo "  mv $missing_files_path missing_numbers.txt"
-  echo "... so fetch-subs.py can fetch the missing files"
 fi
