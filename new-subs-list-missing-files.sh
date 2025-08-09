@@ -2,8 +2,26 @@
 
 set -e
 
+new_subs_repo_shards_dir="opensubtitles-scraper-new-subs"
+
+
+min_release_id=100 # ignore release 74
 next_release_id="$1"
-if [ -z "$next_release_id" ]; then next_release_id=102; fi
+if [ -z "$next_release_id" ]; then
+  next_release_id=100 # ignore release 74
+  while read release_id; do
+    if ((release_id < min_release_id)); then continue; fi
+    # is this release complete?
+    num_shards=$(ls "$new_subs_repo_shards_dir/shards/${release_id}xxxxx/${release_id}"[0-9][0-9]xxx.db | wc -l)
+    if ((num_shards < 100)); then
+      next_release_id=$release_id
+      break
+    fi
+  done < <(
+    ls "$new_subs_repo_shards_dir/shards" |
+    grep -E -x '[0-9]+xxxxx' | sed 's/x//g' | sort -n
+  )
+fi
 echo "next_release_id: $next_release_id"
 
 debug_zipfile_num=
@@ -199,9 +217,12 @@ if $write_missing_zipfiles_list && [ -n "$missing_zipfiles_list" ]; then
   missing_files_path="missing_numbers.txt"
   echo "writing $missing_files_path"
   #echo -n "$missing_zipfiles_list" >"$workdir/$missing_files_path"
-  # write only the first 100 missing
+  num_first_missing=100
+  num_first_missing=200
+  # write only the first $num_first_missing missing
 
-  #echo -n "$missing_zipfiles_list" | head -n100 >"$workdir/$missing_files_path"
+  #echo -n "$missing_zipfiles_list" | head -n$num_first_missing >"$workdir/$missing_files_path"
   # prefer to finish the next release
-  echo -n "$missing_zipfiles_list" | grep ^$next_release_id | head -n100 >"$workdir/$missing_files_path"
+  echo -n "$missing_zipfiles_list" | grep ^$next_release_id | head -n$num_first_missing >"$workdir/$missing_files_path"
+  wc -l "$workdir/$missing_files_path"
 fi
