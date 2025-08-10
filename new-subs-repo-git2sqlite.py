@@ -606,6 +606,9 @@ for shard_id in shard_id_list:
 
         name_parts = file_name.split(".")
         num = int(name_parts[0])
+        # this fails on new-subs/10305063.not-found.html etc
+        # when quota_exceeded_error_source was not found
+        # todo: update quota_exceeded_error_source
         assert name_parts[-1] == "zip", f"not a zip file: {file_path}"
         # no. this should NEVER happen
         # because opensubs-metadata.db has only "found" nums
