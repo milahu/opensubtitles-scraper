@@ -4,6 +4,38 @@ set -e
 
 new_subs_repo_shards_dir="opensubtitles-scraper-new-subs"
 
+debug=false
+# debug=true
+
+# TODO simplify?
+# diff <(seq 10305000 10305999) <(ls new-subs/10305* | cut -c10-17 | sort -n -u) | grep '^< ' | cut -c3-
+
+debug_not_missing_zipfile_num=
+# debug_not_missing_zipfile_num=10305138
+# 10305138 is not missing:
+# $ ls new-subs/10305138*
+# 'new-subs/10305138.5ive.days.to.midnight.(2004).ara.1cd.zip'
+#
+# values get lost between "ls new-subs/ | sort -n" and "while read zipfile_path"
+# but there is no "read" inside the "while read zipfile_path" loop
+#
+# zipfile_num: 10305136
+# loop_num: 129 -- zipfile_path: 10305137.the.middle.s01.e24.average.rules.(2010).nor.1cd.zip
+# zipfile_num: 10305137
+# loop_num: 130 -- zipfile_path: 10305139.the.exorcist.iii.(1990).per.1cd.zip
+# zipfile_num: 10305139
+# missing zipfiles between 10305137 and 10305139 = 1 zipfiles are missing
+# missing_zipfile_num 10305138
+# FIXME zipfile is not missing: 10305138
+#
+# blame "sort -n"
+#
+# test:
+# printf "10305138.5\n10305137.t\n10305139.t\n10319013.s\n10305703.8\n" | LANG=C sort -n
+# printf "10305138.5\n10305137.t\n10305139.t\n10319013.s\n10305703.8\n" | LANG=C sort -n -k1,1 -t.
+#
+# fix: "sort -n" -> "sort -n -k1,1 -t."
+# note: -k1 means field 1 to end of line. -k1,1 means only field 1
 
 min_release_id=100 # ignore release 74
 next_release_id="$1"
@@ -59,7 +91,6 @@ last_shard_id_in_sequence=
 done_shards=""
 
 # find last shard in steady sequence
-# new-subs-repo-shards/shards/98xxxxx/9812xxx.db
 while read shard_path; do
 
   shard_id=${shard_path##*/}
@@ -90,7 +121,7 @@ while read shard_path; do
 
 done < <(
   #find shards/ -name '*.db' | LANG=C sort
-  ls new-subs-repo-shards/shards/*xxxxx/*xxx.db | LANG=C sort --version-sort
+  ls "$new_subs_repo_shards_dir"/shards/*xxxxx/*xxx.db | LANG=C sort --version-sort
 )
 
 if [ -z "$last_shard_id_in_sequence" ]; then
@@ -116,14 +147,28 @@ echo "min_zipfile_num: $min_zipfile_num"
 
 declare -A missing_zipfiles_by_shard
 
+loop_num=0
+
 while read zipfile_path; do
+
+  if $debug; then
+    loop_num=$((loop_num + 1))
+    echo "loop_num: $loop_num -- zipfile_path: $zipfile_path"
+  fi
 
   zipfile_num=${zipfile_path##*/}
   zipfile_num=${zipfile_num%%.*}
 
-  ((zipfile_num < min_zipfile_num)) && continue
+  if ((zipfile_num < min_zipfile_num)); then
+    if $debug; then
+      echo "ignoring too-low zipfile_num: $zipfile_num"
+    fi
+    continue
+  fi
 
-  #echo "zipfile_num: $zipfile_num"
+  if $debug; then
+    echo "zipfile_num: $zipfile_num"
+  fi
 
   if [ -z "$last_zipfile_num" ]; then
     zipfile_shard_num="${zipfile_num:0: -3}"
@@ -143,9 +188,11 @@ while read zipfile_path; do
     num_zipfiles_missing_here=$((zipfile_num - last_zipfile_num - 1)) # TODO?
     num_zipfiles_missing=$((num_zipfiles_missing + num_zipfiles_missing_here))
 
-    #echo "missing zipfiles between $last_zipfile_num and $zipfile_num = $num_zipfiles_missing_here zipfiles are missing"
-    #echo "missing zipfiles from $((last_zipfile_num + 1)) to $((zipfile_num - 1)) = $num_zipfiles_missing_here zipfiles are missing"
-    #echo "seq $((last_zipfile_num + 1)) $((zipfile_num - 1))"
+    if $debug; then
+      echo "missing zipfiles between $last_zipfile_num and $zipfile_num = $num_zipfiles_missing_here zipfiles are missing"
+      # echo "missing zipfiles from $((last_zipfile_num + 1)) to $((zipfile_num - 1)) = $num_zipfiles_missing_here zipfiles are missing"
+      # echo "seq $((last_zipfile_num + 1)) $((zipfile_num - 1))"
+    fi
 
     zipfile_shard_num="${zipfile_num:0: -3}"
     #echo "zipfile $zipfile_num: shard $zipfile_shard_num"
@@ -168,8 +215,16 @@ while read zipfile_path; do
         continue
       fi
 
-      #echo "missing_zipfile_num $missing_zipfile_num"
-      #echo "shard_id $shard_id"
+      if $debug; then
+        echo "missing_zipfile_num $missing_zipfile_num"
+
+        if [ "$missing_zipfile_num" == "$debug_not_missing_zipfile_num" ]; then
+          echo "FIXME zipfile is not missing: $missing_zipfile_num"
+          exit 1
+        fi
+
+        # echo "shard_id $shard_id"
+      fi
 
       #missing_zipfiles_list+="$missing_zipfile_num"$'\n'
       # TODO perf: exploit the fact that nums are sorted
@@ -179,15 +234,18 @@ while read zipfile_path; do
 
   fi
 
-  #echo "shard: $shard_path -- zipfile_num: $zipfile_num -- last zipfile_num: $last_zipfile_num"
-  #echo "done shard $zipfile_num"
-  #echo "+ $zipfile_num"
+  if $debug; then
+    :
+    # echo "shard: $zipfile_shard_num -- zipfile_num: $zipfile_num -- last zipfile_num: $last_zipfile_num"
+    # echo "done shard $zipfile_num"
+    # echo "+ $zipfile_num"
+  fi
 
   #last_zipfile_num=$zipfile_num
   last_zipfile_num=$zipfile_num
 
 done < <(
-  ls -U new-subs/ | sort -n
+  ls -U new-subs/ | LANG=C sort -n -k1,1 -t.
 )
 
 
@@ -223,6 +281,6 @@ if $write_missing_zipfiles_list && [ -n "$missing_zipfiles_list" ]; then
 
   #echo -n "$missing_zipfiles_list" | head -n$num_first_missing >"$workdir/$missing_files_path"
   # prefer to finish the next release
-  echo -n "$missing_zipfiles_list" | grep ^$next_release_id | head -n$num_first_missing >"$workdir/$missing_files_path"
+  echo -n "$missing_zipfiles_list" | grep ^$next_release_id | sort -n | head -n$num_first_missing >"$workdir/$missing_files_path"
   wc -l "$workdir/$missing_files_path"
 fi
