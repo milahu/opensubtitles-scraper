@@ -391,6 +391,7 @@ for shard_id in shard_id_list:
 
     # diff lists
     shard_is_complete = True
+    missing_subs_count = 0
     for expected_num in expected_num_list:
         if expected_num in not_found_num_set:
             print(f"TODO verify: num is in metadata but was not found. num {expected_num}. reason: not found. TODO update metadata")
@@ -404,6 +405,7 @@ for shard_id in shard_id_list:
             continue
         if not expected_num in actual_num_set:
             shard_is_complete = False
+            missing_subs_count += 1
             # stop at first missing num
             # TODO debug: show all missing nums
             # verbose
@@ -415,11 +417,11 @@ for shard_id in shard_id_list:
                 if shard_id == 9533:
                     import sys
                     sys.exit()
-            break
+            # break # no, keep on couting missing_subs_count
     if not shard_is_complete:
         # if debug_shard_id and shard_id == debug_shard_id:
         if 1:
-            print(f"ignoring incomplete shard {shard_id}")
+            print(f"ignoring incomplete shard {shard_id} ({missing_subs_count} missing subs)")
             # TODO print missing nums
         continue
 
