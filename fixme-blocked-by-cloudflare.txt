@@ -1,0 +1,24 @@
+2025-08-27 10:00:29,630 fetch-subs INFO metadata db: options.metadata_db subtitles_all.db
+2025-08-27 10:00:29,630 fetch-subs INFO updating metadata db 'subtitles_all.db'. age 11 days, 8:34:03.076527 > max_age 10 days, 0:00:00
+2025-08-27 10:00:29,630 fetch-subs INFO updating metadata db: fetching subtitles_all.txt.gz.20250827T080029.630670Z from https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
+2025-08-27 10:00:30,401 aiohttp_chromium.client DEBUG _start_chromium: driver.start_session
+2025-08-27 10:00:30,402 aiohttp_chromium.client DEBUG _start_chromium: waiting for chromium to start
+2025-08-27 10:00:32,427 aiohttp_chromium.client DEBUG _start_chromium: loading cookies
+2025-08-27 10:00:42,438 aiohttp_chromium.client DEBUG _request: url = 'https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz'
+2025-08-27 10:00:42,476 aiohttp_chromium.client DEBUG _request: driver.get 'https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz'
+2025-08-27 10:00:42,478 aiohttp_chromium.client DEBUG requestWillBeSent 31741CB5BCC4EF4AC11C46F1589FD8E5 https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz setting expected_request_id
+2025-08-27 10:00:42,478 aiohttp_chromium.client DEBUG requestWillBeSent 31741CB5BCC4EF4AC11C46F1589FD8E5 https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
+2025-08-27 10:00:42,822 aiohttp_chromium.client DEBUG responseReceivedExtraInfo 31741CB5BCC4EF4AC11C46F1589FD8E5 https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
+2025-08-27 10:00:42,830 aiohttp_chromium.client DEBUG requestWillBeSent 31741CB5BCC4EF4AC11C46F1589FD8E5 https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
+2025-08-27 10:00:42,870 aiohttp_chromium.client DEBUG responseReceived: status 403: url https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
+2025-08-27 10:00:42,870 aiohttp_chromium.client DEBUG responseReceived: Network.getResponseBody sleep
+2025-08-27 10:00:42,870 aiohttp_chromium.client DEBUG _request: response_queue.get
+2025-08-27 10:00:44,871 aiohttp_chromium.client DEBUG responseReceived: Network.getResponseBody ...
+2025-08-27 10:00:44,873 aiohttp_chromium.client DEBUG responseReceived: Network.getResponseBody done
+2025-08-27 10:00:44,873 aiohttp_chromium.client DEBUG responseReceived: response_queue.put
+2025-08-27 10:00:44,873 aiohttp_chromium.client DEBUG _request: status 403
+2025-08-27 10:00:44,874 aiohttp_chromium.client DEBUG _request: status 403: title Just a moment... -> waiting for a better response
+2025-08-27 10:00:44,874 aiohttp_chromium.client DEBUG _request: response_queue.get
+
+quickfix:
+./fetch-subs.py --headful-chromium
