@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+set -x
+
+min_release_id=103 # ignore old files in opensubtitles-scraper-new-subs/shards/
+
+fetch_subs_timeout=3600 # 1 hour
+fetch_subs_kill_timeout=60 # 1 minute
+
+cd "$(dirname "$0")"
+
+grep $'^\tpath = ' .gitmodules | cut -c9- | while read path; do
+  if [ "$(stat -c%F "$path")" != "directory" ]; then
+    echo "error: missing gitmodule $path. hint: git submodule update --init"
+    exit 1
+  fi
+done
+
+if [ -x ./opensubtitles-scraper-new-subs/mount-branches.sh ]; then
+  # mount all "shard" branches in opensubtitles-scraper-new-subs/shards/
+  ./opensubtitles-scraper-new-subs/mount-branches.sh
+fi
+
+# infinite loop: run the scraper every 6 hours
+while true; do
+
+  # write missing_numbers.txt for fetch-subs.py
+  # so we can finish nearly-complete shards
+  ./new-subs-list-missing-files.sh
+
+  # download subtitles_all.txt.gz and initialize subtitles_all.db
+  #   fetch new subs to new-subs/
+  #   the scraper can hang (fixme) so we kill it after $fetch_subs_timeout seconds
+  timeout --foreground --kill-after="$fetch_subs_kill_timeout" "$fetch_subs_timeout"  \
+  # headless mode is blocked by cloudflare -> http 403
+  # https://github.com/kaliiiiiiiiii/Selenium-Driverless/issues/343
+  # ./fetch-subs.py "$@"
+  ./fetch-subs.py --headful-chromium "$@"
+  # TODO if the scraper always hangs, debug it with
+  #   ./fetch-subs.py --headful-chromium
+  # move new-subs/* to opensubtitles-scraper-new-subs/shards/*xxxxx/*xxx.db
+  ./new-subs-repo-git2sqlite.py
+  # create release
+
+  # create release db and torrent files
+  ./shards2release.py --min-release-id "$min_release_id"
+
+  # add new torrents to git
+  # "new" torrent files are untracked by git
+  git ls-files --others --exclude-standard |
+  grep -E -x 'release/opensubtitles.org.dump.[a-z0-9.]+.torrent' |
+  while read -r torrent_path; do
+    ./release_add_to_git.py $torrent_path
+  done
+
+  # publish new torrents to reddit
+  if ! [ -e release/reddit-posts.json ]; then
+    echo "FIXME missing release/reddit-posts.json"
+  else
+    done_torrent_files="$(
+      cat release/reddit-posts.json |
+      jq -r '
+        .[] | select(. != null) |
+        if .torrent_path then .torrent_path else (.torrent_paths | .[]) end
+      ' |
+      LANG=C sort
+    )"
+    all_torrent_files="$(ls release/*.torrent | LANG=C sort)"
+    new_torrent_files="$(
+      diff <(echo "$done_torrent_files") <(echo "$all_torrent_files") |
+      grep '^> ' | cut -c3-
+    )"
+    if [ -n "$new_torrent_files" ]; then
+      for torrent_path in $new_torrent_files; do
+        ./reddit_add_torrent.py $torrent_path
+      done
+    fi
+  fi
+
+  # publish temporary files
+  ./opensubtitles-scraper-new-subs/add-shards.sh
+  ./opensubtitles-scraper-new-subs/git-push.sh
+
+  # TODO print download progress for each release in percent
+  # example: 30 of 100 shards done -> 30% of release done
+
+  # done loop step
+  date
+  echo "sleeping 6 hours ..."
+  sleep 6h
+done
