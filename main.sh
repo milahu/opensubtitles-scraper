@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# fetch + commit + push subtitles
+
+# usage:
+# while true; do timeout -k 60 3600 ./main.sh; sleep 6h; done
+
+# note: timeout is needed because fetch-subs.py can hang forever
+
 set -x
 
 min_release_id=103 # ignore old files in opensubtitles-scraper-new-subs/shards/
@@ -22,7 +29,7 @@ if [ -x ./opensubtitles-scraper-new-subs/mount-branches.sh ]; then
 fi
 
 # infinite loop: run the scraper every 6 hours
-while true; do
+# while true; do
 
   # write missing_numbers.txt for fetch-subs.py
   # so we can finish nearly-complete shards
@@ -31,6 +38,7 @@ while true; do
   # download subtitles_all.txt.gz and initialize subtitles_all.db
   #   fetch new subs to new-subs/
   #   the scraper can hang (fixme) so we kill it after $fetch_subs_timeout seconds
+  #   FIXME timeout is not working. fetch-subs.py can hang forever
   timeout --foreground --kill-after="$fetch_subs_kill_timeout" "$fetch_subs_timeout"  \
   # headless mode is blocked by cloudflare -> http 403
   # https://github.com/kaliiiiiiiiii/Selenium-Driverless/issues/343
@@ -85,7 +93,9 @@ while true; do
   # example: 30 of 100 shards done -> 30% of release done
 
   # done loop step
+  exit
+
   date
   echo "sleeping 6 hours ..."
   sleep 6h
-done
+# done
