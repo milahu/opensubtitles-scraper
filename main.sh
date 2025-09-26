@@ -38,11 +38,11 @@ fi
   # download subtitles_all.txt.gz and initialize subtitles_all.db
   #   fetch new subs to new-subs/
   #   the scraper can hang (fixme) so we kill it after $fetch_subs_timeout seconds
-  #   FIXME timeout is not working. fetch-subs.py can hang forever
-  timeout --foreground --kill-after="$fetch_subs_kill_timeout" "$fetch_subs_timeout"  \
   # headless mode is blocked by cloudflare -> http 403
   # https://github.com/kaliiiiiiiiii/Selenium-Driverless/issues/343
   # ./fetch-subs.py "$@"
+  # FIXME chrome window can stay open
+  timeout --kill-after="$fetch_subs_kill_timeout" "$fetch_subs_timeout" \
   ./fetch-subs.py --headful-chromium "$@"
   # TODO if the scraper always hangs, debug it with
   #   ./fetch-subs.py --headful-chromium
