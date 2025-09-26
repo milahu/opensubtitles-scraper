@@ -89,8 +89,17 @@ fi
   ./opensubtitles-scraper-new-subs/add-shards.sh
   ./opensubtitles-scraper-new-subs/git-push.sh
 
-  # TODO print download progress for each release in percent
-  # example: 30 of 100 shards done -> 30% of release done
+  # print download progress for each release
+  shards_path=opensubtitles-scraper-new-subs/shards
+  ls "$shards_path" | grep -xE '[0-9]+xxxxx' | sort -n | while read shard_name; do
+    shard_progress=$(ls "$shards_path/$shard_name" | wc -l)
+    echo "$shards_path/$shard_name: done $shard_progress of 100 shards"
+  done
+  new_subs_path=new-subs
+  if [ -d "$new_subs_path" ]; then
+    n=$(ls "$new_subs_path" | wc -l)
+    echo "$new_subs_path: done $n zipfiles = $((n / 1000)) shards"
+  fi
 
   # done loop step
   exit
