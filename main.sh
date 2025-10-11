@@ -14,6 +14,11 @@ min_release_id=103 # ignore old files in opensubtitles-scraper-new-subs/shards/
 fetch_subs_timeout=3600 # 1 hour
 fetch_subs_kill_timeout=60 # 1 minute
 
+# fetch-subs.py
+#   tempdir = f"/run/user/{os.getuid()}"
+#   tempdir = tempdir + f"/fetch-subs-{datetime_str()}"
+tempdir_prefix=/run/user/$UID/fetch-subs-
+
 cd "$(dirname "$0")"
 
 grep $'^\tpath = ' .gitmodules | cut -c9- | while read path; do
@@ -46,6 +51,17 @@ fi
   ./fetch-subs.py --headful-chromium "$@"
   # TODO if the scraper always hangs, debug it with
   #   ./fetch-subs.py --headful-chromium
+
+  # workaround: kill leftover chromium processes
+  # FIXME all chromium processes should be killed in cleanup of aiohttp_chromium
+  echo "killing leftover chromium processes"
+  ps -AF | grep "user-data-dir=$tempdir_prefix" | grep chromium | awk '{ print $2 }' | xargs -r kill
+
+  # workaround: remove leftover tempdirs
+  # FIXME all tempdirs should be removed in cleanup of aiohttp_chromium
+  echo "removing leftover tempdirs"
+  rm -rf "$tempdir_prefix"*
+
   # move new-subs/* to opensubtitles-scraper-new-subs/shards/*xxxxx/*xxx.db
   ./new-subs-repo-git2sqlite.py
   # create release
