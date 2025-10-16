@@ -235,10 +235,14 @@ def expand_path(path):
     global data_dir
     if path == None:
         return path
+    # TODO use os.path.expanduser
     if path.startswith("~/"):
         path = os.environ["HOME"] + path[1:]
+    # TODO use os.path.expandvars
     elif path.startswith("$HOME/"):
         path = os.environ["HOME"] + path[5:]
+    elif path.startswith("$CAS/"):
+        path = os.environ["CAS"] + path[4:]
     return os.path.join(data_dir, path)
 
 
