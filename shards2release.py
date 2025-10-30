@@ -139,8 +139,12 @@ for shard_dir in shard_dir_list:
 
     # parsed from https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
     # with subtitles_all.txt.gz-parse.py
-    matadata_db_path = "subtitles_all.latest.db"
+    matadata_db_path = "subtitles_all.db"
 
+    assert os.path.exists(matadata_db_path)
+    assert os.path.getsize(matadata_db_path) > 0
+
+    print(f"attaching {matadata_db_path!r} as metadata_db")
     cursor.execute("ATTACH DATABASE ? as metadata_db", (matadata_db_path,))
 
 
