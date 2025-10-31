@@ -20,6 +20,8 @@ import subprocess
 import shlex
 import argparse
 
+import torf
+
 parser = argparse.ArgumentParser(
     prog='shards2release',
     #description='Fetch subtitles',
