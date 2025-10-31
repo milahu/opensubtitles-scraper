@@ -102,9 +102,14 @@ for shard_dir in shard_dir_list:
     # release_name = f"opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v{release_version}"
     release_name = f"opensubtitles.org.dump.{release_id}xxxxx.v{release_version}"
 
-    print(f"shard dir {shard_dir} is complete -> adding release {release_name}")
-
     output_dir = f"release/{release_name}"
+
+    if os.path.exists(output_dir):
+        # TODO verify that the release is complete = count subtitles
+        print(f"shard dir {shard_dir} is complete -> keeping existing {output_dir}")
+        continue
+
+    print(f"shard dir {shard_dir} is complete -> adding release {release_name}")
 
     # output_db_path = f"release/opensubtitles.org.dump.{release_id}00000.to.{release_id}99999.v{release_version}/{release_id}xxxxx.db"
     output_db_path = f"{output_dir}/{release_id}xxxxx.db"
