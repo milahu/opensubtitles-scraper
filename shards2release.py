@@ -2,7 +2,6 @@
 
 # join shards to a single database
 
-# TODO after: release2torrent.sh
 # TODO after: release_add_to_git.py $torrent
 # TODO after: reddit_add_torrent.py $torrent
 
