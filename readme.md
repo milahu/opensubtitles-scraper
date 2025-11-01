@@ -95,3 +95,33 @@ videos:
 
 - https://asciinema.org/a/6fG6TXEkF3UOOL0qu8tivViXF
 - [docs/fetch-subs.py.cast](docs/fetch-subs.py.cast)
+
+## running the scraper
+
+```sh
+git clone https://github.com/milahu/opensubtitles-scraper
+cd opensubtitles-scraper
+
+git submodule update --init
+
+# install dependencies with nix
+# https://github.com/NixOS/nix
+./shell.nix.sh
+
+# fetch milahu's temporary files to continue scraping
+# note: this will fetch all branches
+# the "shard branches are called remotes/origin/shards-102xxxxx etc
+git clone https://github.com/milahu/opensubtitles-scraper-new-subs
+
+# mount all "shard" branches in opensubtitles-scraper-new-subs/shards/
+./opensubtitles-scraper-new-subs/mount-branches.sh
+
+# TODO add your opensubtitles.org VIP accounts here
+# so you get subtitles without ads
+# so you can 1000 subtitles per day per VIP account
+cp fetch_subs_secrets.py.example fetch_subs_secrets.py
+$EDITOR fetch_subs_secrets.py
+
+# infinite loop: run the scraper every 6 hours
+./main-loop.sh
+```
