@@ -60,6 +60,8 @@ assert re.fullmatch(r"release/opensubtitles.org.dump.[a-z0-9.]+.torrent", torren
 print("reading", torrent_path)
 torrent = torf.Torrent.read(torrent_path)
 
+# NOTE torf does not support v2 torrents
+# https://github.com/rndusr/torf/issues/55
 torrent_btih = torrent.infohash
 print("torrent_btih", torrent_btih)
 
@@ -68,22 +70,32 @@ print("torrent_name", torrent_name)
 
 torrent_magnet_link = f"magnet:?xt=urn:btih:{torrent_btih}&dn={torrent_name}"
 
-m = re.fullmatch(r"opensubtitles\.org\.dump\.([0-9]+)\.to\.([0-9]+)(?:\.v([0-9]+))?", torrent_name)
+# opensubtitles.org.dump.10200000.to.10299999.v20241124
+if m := re.fullmatch(r"opensubtitles\.org\.dump\.([0-9]+)\.to\.([0-9]+)(?:\.v([0-9]+))?", torrent_name):
 
-assert m != None, f"unexpected torrent_name {torrent_name!r}"
+    subs_per_release = 100_000
 
-subs_per_release = 100_000
+    subs_from = int(m.group(1))
+    print("subs_from", subs_from)
 
-subs_from = int(m.group(1))
-print("subs_from", subs_from)
+    subs_to = int(m.group(2))
+    print("subs_to", subs_to)
+    assert subs_from + subs_per_release - 1 == subs_to, f"unexpected: subs_from={subs_from} subs_to={subs_to}"
 
-subs_to = int(m.group(2))
-print("subs_to", subs_to)
-assert subs_from + subs_per_release - 1 == subs_to, f"unexpected: subs_from={subs_from} subs_to={subs_to}"
+    subs_range_id = subs_from // subs_per_release
+    print("subs_range_id", subs_range_id)
+    assert subs_from == subs_range_id * subs_per_release
 
-subs_range_id = subs_from // subs_per_release
-print("subs_range_id", subs_range_id)
-assert subs_from == subs_range_id * subs_per_release
+# opensubtitles.org.dump.103xxxxx.v20251031
+elif m := re.fullmatch(r"opensubtitles\.org\.dump\.([0-9]+)x{5}(?:\.v([0-9]+))?", torrent_name):
+    subs_per_release = 100_000
+    subs_range_id = int(m.group(1)) # 103
+    subs_from = subs_range_id * subs_per_release
+    subs_to = subs_from + subs_per_release - 1
+
+else:
+    raise ValueError(f"unexpected torrent_name {torrent_name!r}")
+
 
 #torrent_version = m.group(3)
 
@@ -95,9 +107,11 @@ post_title = f"subtitles from opensubtitles.org - subs {subs_from} to {subs_to}"
 #post_title = f"subtitles from opensubtitles.org {subs_pattern}"
 #torrent_version = "TODO_torrent_version_20240609"
 #torrent_name = f"opensubtitles.org.dump.{subs_from}.to.{subs_to}.v{torrent_version}"
-provider_id = f"opensubtitles_org_{subs_from}_{subs_to}"
+#provider_id = f"opensubtitles_org_{subs_from}_{subs_to}"
+provider_id = f"opensubtitles_org_{subs_pattern}"
 
-torrent_db_path = f"$HOME/down/torrent/done/{torrent_name}/{subs_pattern}.db"
+#torrent_db_path = f"$HOME/down/torrent/done/{torrent_name}/{subs_pattern}.db"
+torrent_db_path = f"$CAS/btih/{torrent_btih}/{torrent_name}/{subs_pattern}.db"
 
 
 
@@ -185,7 +199,7 @@ continue
 please consider subscribing to my release feed:
 [opensubtitles.org.dump.torrent.rss](https://github.com/milahu/opensubtitles-scraper/raw/main/release/opensubtitles.org.dump.torrent.rss)
 
-there is one major release every 50 days
+there is one major release every 100 days
 
 there are daily releases in [opensubtitles-scraper-new-subs](https://github.com/milahu/opensubtitles-scraper-new-subs)
 
@@ -197,7 +211,7 @@ most of this process is automated
 
 my scraper is based on my [aiohttp\_chromium](https://github.com/milahu/aiohttp_chromium) to bypass cloudflare
 
-i have 2 VIP accounts (20 euros per year) so i can download 2000 subs per day.
+i have 1 VIP account (10 euros per year) so i can download 1000 subs per day.
 for continuous scraping, this is cheaper than a scraping service like zenrows.com.
 also, with VIP accounts, i get subtitles without ads.
 
@@ -214,9 +228,7 @@ subtitles server to make this usable for thin clients (video players)
 working prototype: [get-subs.py](https://github.com/milahu/opensubtitles-scraper/raw/main/get-subs.py)
 
 live demo:
-[pontus.feralhosting.com/milahu/bin/get-subtitles](https://pontus.feralhosting.com/milahu/bin/get-subtitles)
-([http](http://pontus.feralhosting.com:9591/bin/get-subtitles))
-([http+ddns](http://milahu.ddns.net:9591/bin/get-subtitles))
+[milahu.webredirect.org/bin/get-subtitles](http://milahu.webredirect.org/bin/get-subtitles)
 
 ## remove ads
 
@@ -240,7 +252,7 @@ similar projects:
 
 ## maintainers wanted
 
-in the long run, i want to "get rid" of this project
+in the long run, i want to get rid of this project...
 
 so im looking for maintainers, to keep my scraper running in the future
 
@@ -248,7 +260,7 @@ so im looking for maintainers, to keep my scraper running in the future
 
 the more VIP accounts i have, the faster i can scrape
 
-currently i have 2 VIP accounts = 20 euro per year
+currently i have 1 VIP account = 10 euro per year
 """
 
 # https://praw.readthedocs.io/en/stable/code_overview/models/subreddit.html#praw.models.Subreddit.submit
