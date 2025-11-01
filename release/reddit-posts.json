@@ -20,9 +20,9 @@
     "title": "subtitles from opensubtitles.org - subs 9500000 to 9799999",
     "url": "https://www.reddit.com/r/DataHoarder/comments/1azqwa4/subtitles_from_opensubtitlesorg_subs_9500000_to/",
     "torrent_paths": [
-        "release/opensubtitles.org.dump.9500000.to.9599999.v20240306.torrent",
-        "release/opensubtitles.org.dump.9600000.to.9699999.torrent",
-        "release/opensubtitles.org.dump.9700000.to.9799999.torrent"
+      "release/opensubtitles.org.dump.9500000.to.9599999.v20240306.torrent",
+      "release/opensubtitles.org.dump.9600000.to.9699999.torrent",
+      "release/opensubtitles.org.dump.9700000.to.9799999.torrent"
     ]
   },
   {
@@ -54,6 +54,12 @@
     "title": "subtitles from opensubtitles.org - subs 10200000 to 10299999",
     "url": "https://www.reddit.com/r/DHExchange/comments/1gz15tk/subtitles_from_opensubtitlesorg_subs_10200000_to/",
     "torrent_path": "release/opensubtitles.org.dump.10200000.to.10299999.v20241124.torrent"
+  },
+  {
+    "id": "opensubtitles_org_103xxxxx",
+    "title": "subtitles from opensubtitles.org - subs 10300000 to 10399999",
+    "url": "https://www.reddit.com/r/DHExchange/comments/1olmntz/subtitles_from_opensubtitlesorg_subs_10300000_to/",
+    "torrent_path": "release/opensubtitles.org.dump.103xxxxx.v20251031.torrent"
   },
   null
 ]
