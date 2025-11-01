@@ -96,6 +96,7 @@ let
     #selenium
     praw # python reddit api wrapper
     legacy-cgi # cgi
+    qbittorrent-api
   ])
   ++
   (with extraPythonPackages; [

@@ -18,8 +18,10 @@ import datetime
 import subprocess
 import shlex
 import argparse
+import json
 
 import torf
+import qbittorrentapi
 
 parser = argparse.ArgumentParser(
     prog='shards2release',
@@ -34,6 +36,24 @@ parser.add_argument(
     type=int,
     metavar="N",
     help=f"minimum release_id. example: 100 -> start from release 100xxxxx",
+)
+
+# example qbittorrentapi.json
+r'''
+{
+  "host": "127.0.0.1",
+  "port": 9001,
+  "username": "admin",
+  "password": "xxx"
+}
+'''
+parser.add_argument(
+    '--qbittorrentapi-config',
+    dest="qbittorrentapi_config", # options.qbittorrentapi_config
+    default="~/.config/qbittorrentapi.json",
+    type=str,
+    metavar="PATH",
+    help=f"path to qbittorrentapi.json. default: ~/.config/qbittorrentapi.json",
 )
 
 options = parser.parse_args()
@@ -60,6 +80,17 @@ def get_trackers():
 def run(args, **kwargs):
     print(">", shlex.join(args))
     return subprocess.run(args, **kwargs)
+
+qbittorrent_client = None
+qbittorrentapi_config_path = os.path.expanduser(options.qbittorrentapi_config)
+if not os.path.exists(qbittorrentapi_config_path):
+    print(f"missing config file: {qbittorrentapi_config_path}")
+else:
+    with open(qbittorrentapi_config_path) as f:
+        qbittorrentapi_config = json.load(f)
+    # TODO does this work without context? do we need to call __enter__?
+    qbittorrent_client = qbittorrentapi.Client(**qbittorrentapi_config)
+    qbittorrent_client.auth_log_in()
 
 #shard_dir_list = os.listdir(new_subs_repo_path + "/shards")
 shard_dir_list = glob.glob(new_subs_repo_path + "/shards/*xxxxx")
@@ -289,6 +320,24 @@ for shard_dir in shard_dir_list:
     )
     torrent.generate()
     torrent.write(output_torrent_path)
+
+    # TODO move output_dir to a cas filesystem
+    # https://github.com/milahu/cas-filesystem-spec
+    # ~/.config/cas.json
+    r'''
+    {
+      "dirs": [
+        "/media/ZYD82805_24TB/cas"
+      ]
+    }
+    '''
+
+    if qbittorrent_client:
+        print("adding to qbittorrent", output_torrent_path)
+        qbittorrent_client.torrents_add(
+            torrent_files=[output_torrent_path],
+            save_path=os.path.dirname(output_dir),
+        )
 
 if len(new_subs_repo_remove_paths) > 0:
     print("removing paths from new_subs_repo:", new_subs_repo_remove_paths)
