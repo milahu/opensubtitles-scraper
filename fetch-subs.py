@@ -2172,7 +2172,7 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                 await response_cleanup()
                 raise Exception(f"{num} download failed")
             t2 = time.time()
-            logger_print("response._wait_complete done after {(t2 - t1):.3f} seconds")
+            logger_print(f"response._wait_complete done after {(t2 - t1):.3f} seconds")
             # TODO move response._filepath to output path
             logger_print("response._filepath open")
             with open(response._filepath, "rb") as f:
