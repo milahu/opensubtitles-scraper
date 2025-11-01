@@ -60,13 +60,19 @@
       <title>opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26</title>
       <pubDate>Thu, 27 Apr 2023 20:26:49 +0000</pubDate>
       <guid isPermaLink="false">30b8b5120f4b881927d81ab9f071a60004a7183a</guid>
-      <enclosure type="application/x-bittorrent" url="magnet:?xt=urn:btih:30b8b5120f4b881927d81ab9f071a60004a7183a&amp;xt=urn:btmh:122019eb63683baf6d61f33a9e34039fd9879f042d8d52c8aa9410f29d8d83a804e2&amp;dn=opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26"/>
+      <enclosure type="application/x-bittorrent" url="magnet:?xt=urn:btih:30b8b5120f4b881927d81ab9f071a60004a7183a&amp;dn=opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26"/>
     </item>
     <item>
       <title>opensubtitles.org.Actually.Open.Edition.2022.07.25</title>
       <pubDate>Mon, 25 Jul 2022 06:51:57 +0000</pubDate>
       <guid isPermaLink="false">c2f0b5d26a886ba12f7f667d69c0459056dcda9b</guid>
       <enclosure type="application/x-bittorrent" url="magnet:?xt=urn:btih:c2f0b5d26a886ba12f7f667d69c0459056dcda9b&amp;dn=opensubtitles.org.Actually.Open.Edition.2022.07.25"/>
+    </item>
+    <item>
+      <title>opensubtitles.org.dump.103xxxxx.v20251031</title>
+      <pubDate>Thu, 01 Jan 1970 00:00:00 +0000</pubDate>
+      <guid isPermaLink="false">0e73b297c8bb4502b5851022e72d46043754add4</guid>
+      <enclosure type="application/x-bittorrent" url="magnet:?xt=urn:btih:0e73b297c8bb4502b5851022e72d46043754add4&amp;dn=opensubtitles.org.dump.103xxxxx.v20251031"/>
     </item>
   </channel>
 </rss>
