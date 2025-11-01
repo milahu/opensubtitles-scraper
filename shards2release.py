@@ -285,6 +285,7 @@ for shard_dir in shard_dir_list:
     torrent = torf.Torrent(
         path=output_dir,
         trackers=trackers,
+        piece_size_min=4*1024**2, # 4 MiB
     )
     torrent.generate()
     torrent.write(output_torrent_path)
