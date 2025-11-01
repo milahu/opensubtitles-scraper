@@ -12,6 +12,8 @@ import os
 import re
 import sys
 import json
+import shlex
+import subprocess
 
 import praw # python reddit api wrapper
 import torf # torrent file
@@ -306,3 +308,35 @@ else:
     with open(reddit_posts_json_path, "w") as f:
         # json.dump(reddit_posts, f, indent=2)
         f.write(json.dumps(reddit_posts, indent=2) + "\n")
+
+    # FIXME refactor with release_add_to_git.py
+
+    def git_add(path):
+        args = [
+            "git",
+            "add",
+            path,
+        ]
+        print(">", shlex.join(args))
+        #subprocess.run(args)
+        subprocess.check_call(args)
+
+    git_add(reddit_posts_json_path)
+
+    args = [
+        "git",
+        "status",
+    ]
+    print(">", shlex.join(args))
+    #subprocess.run(args)
+    subprocess.check_call(args)
+
+    commit_message = f"up {reddit_posts_json_path}"
+    args = [
+        "git",
+        "commit",
+        "-m", commit_message,
+    ]
+    print(">", shlex.join(args))
+    #subprocess.run(args)
+    subprocess.check_call(args)
