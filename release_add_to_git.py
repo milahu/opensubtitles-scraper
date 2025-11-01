@@ -185,11 +185,10 @@ if not provider_exists:
 
 print(f"adding release to {torrent_rss_path}")
 
-# TODO rewrite in python
 args = [
-    "./release/opensubtitles.org.dump.torrent.rss.sh",
+    "./release/opensubtitles.org.dump.torrent.rss.py",
     # we need to pass torrent_path here
-    # otherwise opensubtitles.org.dump.torrent.rss.sh
+    # otherwise opensubtitles.org.dump.torrent.rss.py
     # would process only committed torrent files
     torrent_path,
 ]
