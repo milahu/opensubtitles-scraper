@@ -65,22 +65,31 @@ print("torrent_name", torrent_name)
 
 torrent_magnet_link = f"magnet:?xt=urn:btih:{torrent_btih}&dn={torrent_name}"
 
-m = re.fullmatch(r"opensubtitles\.org\.dump\.([0-9]+)\.to\.([0-9]+)(?:\.v([0-9]+))?", torrent_name)
+# opensubtitles.org.dump.10200000.to.10299999.v20241124
+if m := re.fullmatch(r"opensubtitles\.org\.dump\.([0-9]+)\.to\.([0-9]+)(?:\.v([0-9]+))?", torrent_name):
 
-assert m != None, f"unexpected torrent_name {torrent_name!r}"
+    subs_per_release = 100_000
 
-subs_per_release = 100_000
+    subs_from = int(m.group(1))
+    print("subs_from", subs_from)
 
-subs_from = int(m.group(1))
-print("subs_from", subs_from)
+    subs_to = int(m.group(2))
+    print("subs_to", subs_to)
+    assert subs_from + subs_per_release - 1 == subs_to, f"unexpected: subs_from={subs_from} subs_to={subs_to}"
 
-subs_to = int(m.group(2))
-print("subs_to", subs_to)
-assert subs_from + subs_per_release - 1 == subs_to, f"unexpected: subs_from={subs_from} subs_to={subs_to}"
+    subs_range_id = subs_from // subs_per_release
+    print("subs_range_id", subs_range_id)
+    assert subs_from == subs_range_id * subs_per_release
 
-subs_range_id = subs_from // subs_per_release
-print("subs_range_id", subs_range_id)
-assert subs_from == subs_range_id * subs_per_release
+# opensubtitles.org.dump.103xxxxx.v20251031
+elif m := re.fullmatch(r"opensubtitles\.org\.dump\.([0-9]+)x{5}(?:\.v([0-9]+))?", torrent_name):
+    subs_per_release = 100_000
+    subs_range_id = int(m.group(1)) # 103
+    subs_from = subs_range_id * subs_per_release
+    subs_to = subs_from + subs_per_release - 1
+
+else:
+    raise ValueError(f"unexpected torrent_name {torrent_name!r}")
 
 #torrent_version = m.group(3)
 
