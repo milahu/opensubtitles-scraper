@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import sys
 import html
 import subprocess
@@ -41,8 +42,13 @@ def get_creation_timestamp(torrent_path: str) -> int:
     t = Torrent.read(torrent_path)
     if t.creation_date:
         return int(t.creation_date.timestamp())
-    else:
-        return 0
+    if m := re.search(r"\.v([0-9]{8})\.torrent$", torrent_path):
+        # get creation_date from filename
+        date_str = m.group(1)
+        dt = datetime.strptime(date_str, "%Y%m%d")
+        dt_utc = dt.replace(tzinfo=timezone.utc)
+        return int(dt_utc.timestamp())
+    return 0
 
 def get_pub_date(timestamp: int) -> str:
     """Format date as RFC 2822."""
