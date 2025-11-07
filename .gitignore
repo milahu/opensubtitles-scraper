@@ -36,3 +36,6 @@ cookies/
 subtitles_all.txt.gz.2*T*.*Z*
 new-subs/
 opensubtitles-scraper-new-subs/
+
+# IntelliJ
+.idea
