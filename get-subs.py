@@ -845,7 +845,8 @@ def get_movie_subs(config, args, video_parsed):
                 lang = lang_by_num[num]
                 # return subtitle files with 3 letter codes: eng, ger, cze, ...
                 lang = lang3letter(lang)
-                (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, lang)
+                sub_path_format = args.pathformat
+                (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, lang, sub_path_format)
             else:
                 (sub_path, sub_content) = (f"{num}.zip", zip_content)
             # no. dont require stream_zip here
@@ -857,8 +858,26 @@ def get_movie_subs(config, args, video_parsed):
         #print(f"""local provider {provider["id"]}: done""")
 
 
+def format_sub_path(format: str, data: dict, format_char = "@") -> str:
+    ret = ""
 
-def extract_sub(zip_content, video_path_base, num, lang):
+    i = 0
+    while i < len(format):
+        char = format[i]
+        if char == format_char and i + 1 < len(format):
+            ahead_char = format[i + 1]
+            if ahead_char in data:
+                ret += str(data[ahead_char])
+                i += 2
+                continue
+
+        ret += char
+        i += 1
+
+    return ret
+
+
+def extract_sub(zip_content, video_path_base, num, lang, sub_path_format):
     #print(f"extracting sub {num}")
     with zipfile.ZipFile(io.BytesIO(zip_content)) as zip_file:
         #print(f"extracting sub {num}: done opening zip file")
@@ -879,7 +898,7 @@ def extract_sub(zip_content, video_path_base, num, lang):
                 break
             if filename == "":
                 filename = "empty_filename.srt"
-            _, ext = os.path.splitext(filename)
+            filename_without_ext, ext = os.path.splitext(filename)
             if ext == ".nfo":
                 continue
             if ext == ".dlsubc":
@@ -900,7 +919,16 @@ def extract_sub(zip_content, video_path_base, num, lang):
             num_width = 8
             num_padded = str(num).rjust(num_width, "0")
             # put language code before extension like ".eng.srt" so mpv can parse it
-            sub_path = f"{video_path_base}.{num_padded}.{lang}{ext}"
+            sub_path = format_sub_path(sub_path_format, {
+                "b": video_path_base,
+                "i": num_padded,
+                "I": str(num),
+                "l": lang,
+                "e": ext.removeprefix("."),
+                "f": filename_without_ext,
+                "F": filename,
+            }) if sub_path_format else f"{video_path_base}.{num_padded}.{lang}{ext}"
+
             sub_content = zip_file.read(zipinfo)
             if recode_sub_content_to_utf8:
                 sub_encoding = charset_normalizer.from_bytes(sub_content).best().encoding
