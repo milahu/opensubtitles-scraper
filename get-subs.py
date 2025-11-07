@@ -32,6 +32,7 @@ import glob
 import pathlib
 import types
 import re
+import string
 
 # requirements
 import guessit
@@ -48,6 +49,20 @@ recode_sub_content_to_utf8 = False
 
 # if is_cgi: unpack_zipfiles = False
 unpack_zipfiles = True
+
+# put language code before extension like ".eng.srt" so mpv can parse it
+default_path_format = "$video_base.$num0.$lang.$ext"
+
+path_format_vars = {
+    "video_path": "path/to/Some.Movie.mp4",
+    "video_base": "path/to/Some.Movie",
+    "path": "subtitle filename: Some.Movie.srt",
+    "base": "subtitle basename: Some.Movie",
+    "ext": "subtitle file extension: srt",
+    "num": "subtitle number: 12345",
+    "num0": "zero-padded subtitle number: 00012345",
+    "lang": "subtitle language as 3-letter code: eng",
+}
 
 
 
@@ -138,9 +153,11 @@ def show_help_cgi():
     print('command -v unzip >/dev/null || { echo "error: unzip was not found"; exit 1; }')
     print('[ -n "$1" ] || { echo "usage: $0 [--lang en,es,de,ru,cn] path/to/Scary.Movie.2000.720p.mp4"; exit 1; }')
     print('lang=')
+    print('path_format=')
     print('while (( $# > 0 )); do')
     print('case "$1" in')
     print('  --lang|-l) lang="$2"; shift 2; continue;;')
+    print('  --path-format) path_format="$2"; shift 2; continue;;')
     print('  *) :;;')
     print('esac')
     print('dir="$(dirname "$1")"')
@@ -151,6 +168,7 @@ def show_help_cgi():
     print('curl_data=(')
     print('  --data-urlencode "movie=$movie"')
     print('  --data-urlencode "lang=$lang"')
+    print('  --data-urlencode "path_format=$path_format"')
     print(')')
     print('if command -v bsdtar >/dev/null; then')
     print('  # https://superuser.com/a/1834410/951886 # write error body to stderr')
@@ -179,6 +197,11 @@ def show_help_cgi():
     print("then the subtitle files will be named Scary.Movie.2000.720p.12345.srt etc")
     print("so when you extract them to the folder of the movie file")
     print("then your video player should find the subtitles")
+    print()
+    print("you can change the filenames format with the path_format parameter")
+    print(f"default: {default_path_format}")
+    print("variables:")
+    print("".join(map(lambda kv: f"${{{kv[0]}}}: {kv[1]}\n", path_format_vars.items())), end="")
     print()
     print()
     print()
@@ -314,8 +337,23 @@ def error_cgi(msg, status=400):
 
 def parse_args():
     import argparse
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     parser.add_argument("-l", "--lang", dest="lang_list")
+    parser.add_argument(
+        "--path-format", # args.path_format
+        default=default_path_format,
+        type=str,
+        metavar="FORMAT",
+        help=(
+            f"path format for subtitle files\n"
+            f"default: {default_path_format!r}\n"
+            f"variables:\n"
+            +
+            "".join(map(lambda kv: f"${{{kv[0]}}}: {kv[1]}\n", path_format_vars.items()))
+        ),
+    )
     parser.add_argument("--imdb")
     parser.add_argument("movie")
     args = parser.parse_args()
@@ -323,6 +361,8 @@ def parse_args():
         args.lang_list = re.findall(r"\b[a-z]{2,3}\b", args.lang_list) or [default_lang]
     else:
         args.lang_list = [default_lang]
+    if not args.path_format:
+        args.path_format = default_path_format
     #error(repr(args)) # debug
     return args
 
@@ -360,12 +400,17 @@ def parse_args_cgi():
     # parse list of 2 or 3 letter language codes
     lang_list = re.findall(r"\b[a-z]{2,3}\b", lang_str) or [default_lang]
 
+    path_format = query_dict.get("path_format", [None])[0]
+    if not path_format:
+        path_format = default_path_format
+
     #error_cgi("lang_list: " + repr(lang_list)) # debug
 
     args = types.SimpleNamespace(
         movie = movie,
         imdb = imdb,
         lang_list = lang_list,
+        path_format = path_format,
     )
     #error_cgi(repr(args)) # debug
     return args
@@ -845,7 +890,7 @@ def get_movie_subs(config, args, video_parsed):
                 lang = lang_by_num[num]
                 # return subtitle files with 3 letter codes: eng, ger, cze, ...
                 lang = lang3letter(lang)
-                (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, lang)
+                (sub_path, sub_content) = extract_sub(zip_content, video_path_base, num, lang, args)
             else:
                 (sub_path, sub_content) = (f"{num}.zip", zip_content)
             # no. dont require stream_zip here
@@ -857,8 +902,7 @@ def get_movie_subs(config, args, video_parsed):
         #print(f"""local provider {provider["id"]}: done""")
 
 
-
-def extract_sub(zip_content, video_path_base, num, lang):
+def extract_sub(zip_content, video_path_base, num, lang, args):
     #print(f"extracting sub {num}")
     with zipfile.ZipFile(io.BytesIO(zip_content)) as zip_file:
         #print(f"extracting sub {num}: done opening zip file")
@@ -879,7 +923,7 @@ def extract_sub(zip_content, video_path_base, num, lang):
                 break
             if filename == "":
                 filename = "empty_filename.srt"
-            _, ext = os.path.splitext(filename)
+            file_base, ext = os.path.splitext(filename)
             if ext == ".nfo":
                 continue
             if ext == ".dlsubc":
@@ -899,8 +943,18 @@ def extract_sub(zip_content, video_path_base, num, lang):
             # (99999999 - 9521948) / 1000 / 365 = 250
             num_width = 8
             num_padded = str(num).rjust(num_width, "0")
-            # put language code before extension like ".eng.srt" so mpv can parse it
-            sub_path = f"{video_path_base}.{num_padded}.{lang}{ext}"
+            sub_path = string.Template(args.path_format).safe_substitute(dict(
+                # TODO keep in sync with path_format_vars
+                video_path = args.movie,
+                video_base = video_path_base,
+                path = filename,
+                base = file_base,
+                ext = ext.removeprefix("."),
+                # num = str(num),
+                num = num,
+                num0 = num_padded,
+                lang = lang,
+            ))
             sub_content = zip_file.read(zipinfo)
             if recode_sub_content_to_utf8:
                 sub_encoding = charset_normalizer.from_bytes(sub_content).best().encoding
