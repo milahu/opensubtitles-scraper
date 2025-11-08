@@ -32,6 +32,7 @@ import glob
 import pathlib
 import types
 import re
+import string
 
 # requirements
 import guessit
@@ -858,25 +859,6 @@ def get_movie_subs(config, args, video_parsed):
         #print(f"""local provider {provider["id"]}: done""")
 
 
-def format_sub_path(format: str, data: dict, format_char = "@") -> str:
-    ret = ""
-
-    i = 0
-    while i < len(format):
-        char = format[i]
-        if char == format_char and i + 1 < len(format):
-            ahead_char = format[i + 1]
-            if ahead_char in data:
-                ret += str(data[ahead_char])
-                i += 2
-                continue
-
-        ret += char
-        i += 1
-
-    return ret
-
-
 def extract_sub(zip_content, video_path_base, num, lang, sub_path_format):
     #print(f"extracting sub {num}")
     with zipfile.ZipFile(io.BytesIO(zip_content)) as zip_file:
@@ -919,15 +901,16 @@ def extract_sub(zip_content, video_path_base, num, lang, sub_path_format):
             num_width = 8
             num_padded = str(num).rjust(num_width, "0")
             # put language code before extension like ".eng.srt" so mpv can parse it
-            sub_path = format_sub_path(sub_path_format, {
-                "b": video_path_base,
-                "i": num_padded,
-                "I": str(num),
-                "l": lang,
-                "e": ext.removeprefix("."),
-                "f": filename_without_ext,
-                "F": filename,
-            }) if sub_path_format else f"{video_path_base}.{num_padded}.{lang}{ext}"
+            default_format = "$video_base.$num_padded.$lang.$ext"
+            sub_path = string.Template(sub_path_format or default_format).safe_substitute({
+                "video_base": video_path_base,
+                "num": str(num),
+                "num_padded": num_padded,
+                "lang": lang,
+                "ext": ext.removeprefix("."),
+                "filename": filename,
+                "filename_noext": filename_without_ext
+            })
 
             sub_content = zip_file.read(zipinfo)
             if recode_sub_content_to_utf8:
