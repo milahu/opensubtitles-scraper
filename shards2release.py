@@ -89,8 +89,14 @@ else:
     with open(qbittorrentapi_config_path) as f:
         qbittorrentapi_config = json.load(f)
     # TODO does this work without context? do we need to call __enter__?
-    qbittorrent_client = qbittorrentapi.Client(**qbittorrentapi_config)
-    qbittorrent_client.auth_log_in()
+    try:
+        qbittorrent_client = qbittorrentapi.Client(**qbittorrentapi_config)
+        qbittorrent_client.auth_log_in()
+    except Exception as exc:
+        # Failed to connect to qBittorrent
+        # qBittorrent is not running? login is wrong?
+        print(exc)
+        qbittorrent_client = None
 
 #shard_dir_list = os.listdir(new_subs_repo_path + "/shards")
 shard_dir_list = glob.glob(new_subs_repo_path + "/shards/*xxxxx")
