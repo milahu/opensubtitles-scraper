@@ -1790,6 +1790,14 @@ async def fetch_num(num, aiohttp_session, semaphore, dt_download_list, t2_downlo
                     response_status = 500 # internal server error
 
             if not found_error:
+                error_source = "<title>opensubtitles.org | 500: Internal server error</title>"
+                if error_source in response_text:
+                    found_error = True
+                    result_dict["wait"] = True
+                    result_dict["retry"] = True
+                    response_status = 500 # internal server error
+
+            if not found_error:
                 error_source = " subtitle file doesnt exists, you can contact admin GetSubtitleContents()"
                 if error_source in response_text:
                     found_error = True
