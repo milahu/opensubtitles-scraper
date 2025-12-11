@@ -3231,6 +3231,8 @@ async def main_scraper():
         # guess first_num from files in opensubtitles-scraper-new-subs/shards/
         logger_print("guessing options.first_num from files in {new_subs_repo_shards_dir}/shards/")
         shard_dirs = os.listdir(f"{new_subs_repo_shards_dir}/shards")
+        # ignore tempdirs like "104xxxxx.bak-Tg66yaU3"
+        shard_dirs = list(filter(lambda s: re.match(r"^[0-9]+xxxxx$", s), shard_dirs))
         logger_print("shard_dirs", shard_dirs)
         # ignore "74xxxxx" -- why is it here? todo remove the "shards-74xxxxx" branch?
         if "74xxxxx" in shard_dirs: shard_dirs.remove("74xxxxx") # TODO remove
