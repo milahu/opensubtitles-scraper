@@ -257,3 +257,186 @@ You are not using it right...
 </blockquote>
 
 you are still doing same. We are refunding the funds. Send your payment info - how did you pay, when etc.
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-04 10:02 +0100  
+From: Milan Hauth <milahu@gmail.com>  
+To: Support <support@opensubtitles.org>
+
+...
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-04 18:15 +0100  
+From: Milan Hauth <milahu@gmail.com>  
+To: Support <support@opensubtitles.org>
+
+also please make me an offer  
+for a bulk download of 3 million subtitles  
+with zip files in the old .org format
+
+with VIP accounts i would pay  
+3E6 / 1000 / 365 * 10  
+82 euros
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-05 04:32 +0100  
+From: Support <support@opensubtitles.org>  
+To: milaxnuts <milahu@gmail.com>
+
+Dear milaxnuts,
+
+Hi
+
+exactly thats why we blocked you - we see what you are doing.
+
+VIP accounts are not to be used to download bulk data - you start very wrong on this, so we can not help you.
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-05 08:10 +0100  
+From: Milan Hauth <milahu@gmail.com>  
+To: Support <support@opensubtitles.org>
+
+then close my VIP accounts and send me a refund
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-05 09:51 +0100  
+From: Support <support@opensubtitles.org>  
+To: milaxnuts <milahu@gmail.com>
+
+Dear milaxnuts,
+
+Sure no problem
+
+as you paid with bitcoins, please give us a wallet address and we'll send your funds right back
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-05 11:18 +0100  
+From: Milan Hauth <milahu@gmail.com>  
+To: Support <support@opensubtitles.org>
+
+...
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-06 08:58 +0100  
+From: Support <support@opensubtitles.org>  
+To: milaxnuts <milahu@gmail.com>
+
+Dear milaxnuts,
+
+https://mempool.space/tx/5c064e9b5be9d024061f40ee629b688a9c629e40e4f0b8b493725df88c42de6c
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-06 09:45 +0100  
+From: Milan Hauth <milahu@gmail.com>  
+To: Support <support@opensubtitles.org>
+
+that is not my wallet
+
+did you just send 12.645 eur to nowhere?
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-07 04:06 +0100  
+From: Support <support@opensubtitles.org>  
+To: milaxnuts <milahu@gmail.com>
+
+Dear milaxnuts,
+
+Hi
+
+we are not sending you back anything anymore, you are using our service against TOS, you make copy of subtitles which is not allowed, so you was banned for this reason.
+
+You are VIP, you got what you paid for, bye
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-07 10:59 +0100  
+From: Milan Hauth <milahu@gmail.com>  
+To: Support <support@opensubtitles.org>
+
+where is my refund?  
+why are you breaking our contract again?  
+why are you stealing from me?  
+is that your revenge?  
+is your dick that small?
+
+.
+
+> you got what you paid for
+
+no. i have used 185+70 of 2*365 days  
+= 35% of my VIP accounts
+
+so you owe me  
+either 475000 subtitles  
+or 13.013698630136988 euros
+
+.
+
+> you are using our service against TOS
+
+no, i have not violated your terms of service  
+that is why i deserve a refund
+
+otherwise you are a criminal  
+stealing from customers you hate for no reason
+
+.
+
+> you make copy of subtitles which is not allowed
+
+you do not own the intellectual property of "your" subtitles  
+so you cannot limit what other people can do with "your" subtitles
+
+therefore, any clause in your terms of service  
+limiting the use of "your" subtitles has no effect
+
+if you are too stupid for logic, go ask a lawyer
+
+.
+
+> we are not sending you back anything
+
+so you have created a bitcoin transaction to your own wallet  
+worth 0.00023067 btc = around 12.645 eur  
+to trick me into believing that you sent me a refund?  
+you just wasted 482 sats (about 0.31 usd) transaction fees for your magic trick
+
+.
+
+> bye  
+
+so now that you stole my VIP accounts  
+worth 13 euros (or 475000 subtitles)  
+you stop talking to me
+
+ok, i will publish our discussion  
+so the world can see what a disgusting piece of shit you are
