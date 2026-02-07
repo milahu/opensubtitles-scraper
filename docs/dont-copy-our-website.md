@@ -440,3 +440,17 @@ you stop talking to me
 
 ok, i will publish our discussion  
 so the world can see what a disgusting piece of shit you are
+
+
+
+## Re: blocked download requests
+
+Date: 2026-02-07 13:33 +0100  
+From: Support <support@opensubtitles.org>  
+To: milaxnuts <milahu@gmail.com>
+
+Dear milaxnuts,
+
+you can publish our discussion, feel free to do that and send me link afterwards.
+
+thank you
