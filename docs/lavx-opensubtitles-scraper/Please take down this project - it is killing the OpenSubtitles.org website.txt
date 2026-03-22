@@ -1,0 +1,265 @@
+https://github.com/LavX/opensubtitles-scraper/issues/9
+
+Please take down this project — it is killing the OpenSubtitles.org website #9
+
+Closed
+
+
+
+---
+
+
+
+opensubtitles opened 3 days ago
+
+Hello,
+
+I am writing to ask you to take down this project, or at the very least, stop distributing it publicly.
+
+What this scraper does to our server:
+
+Your tool makes automated HTTP requests directly to www.opensubtitles.org at machine speed, bypassing our Cloudflare protection using cloudscraper. It is designed explicitly to avoid our rate limiting and anti-bot measures.
+
+Every user who runs your Docker image generates a continuous stream of requests against our infrastructure — at zero cost to them, and at direct cost to us in server load, bandwidth, and Cloudflare billing. With 31 stars and growing usage, this is not a single actor problem — it scales with every new user who runs your container.
+
+Why this is harmful:
+
+OpenSubtitles.org is a free, community-supported service. We provide a legitimate, documented REST API at api.opensubtitles.com with generous free tier limits specifically so that tools like Bazarr can integrate properly — without scraping. Your project bypasses this entirely, giving your users free access while undermining the sustainability of the service for everyone else.
+
+Scraping our HTML pages also breaks every time we update our frontend, causing your users to file bugs and adding to your own maintenance burden.
+
+What we ask:
+
+Take down the Docker image
+Archive or remove this repository
+If you genuinely want to help Bazarr users — contribute to the official OpenSubtitles Bazarr provider which uses our proper API
+We have a free API tier. There is no justification for scraping.
+
+Thank you.
+
+
+
+---
+
+
+
+LavX commented 3 days ago
+
+Thanks for raising the concern.
+
+The goal of this project was to preserve functionality for users affected by the loss of the old OpenSubtitles.org integration path, not to cause operational harm.
+
+If you are seeing specific abusive traffic patterns that you believe are attributable to this project, please share concrete details such as endpoints, request characteristics, timestamps, or other technical indicators. I’m happy to review the implementation based on actual evidence.
+
+In the meantime, I will review request behavior, rate limiting, caching, and distribution to reduce unnecessary load where possible.
+
+A factual correction as well: the repository does not have 31 stars, so I’d prefer that we keep the discussion grounded in accurate details.
+
+
+
+---
+
+
+
+opensubtitles commented 3 days ago
+
+put this project down, you make it (or actually AI did), so just put it down, or I just put all opensubtitles.org down and send you couple of happy users - which will thank you...
+
+you dont understand, that your project is killing the website ? we are phasing out .org completely and one way how to do it is to shift all users to .com ?
+
+also stop using AI to write your replies and take this issue seriously.
+
+
+
+---
+
+
+
+morpheus65535 commented 3 days ago
+
+I've already raised my concern about this on Discord last week: opensubtitles.org has been removed from Bazarr for a legitimate reason. Please, stop promoting this project.
+
+opensubtitles.org is only kept online because of the missing upload functionality on opensubtitles.com. By hammering .org, you're preventing uploader from providing new subtitles to the community. It's pretty selfish of you and must stop right now!
+
+
+
+---
+
+
+
+cvthuis commented 3 days ago
+
+I completely agree with Morpheus65535. Yesterday afternoon and evening, every time you tried to upload something, the connection dropped and you had to refresh the page just to continue working on your uploads. When you performed a search, you needed a lot of patience and had to hope you wouldn’t be thrown out of the results.
+And all this for a little project like this? A project that survives on the work and effort others have put into creating subtitles?
+Maybe start seriously questioning yourself and think about what you’re actually doing. Users on OpenSubtitles.org are complaining heavily about how overloaded the site has become.
+
+
+
+---
+
+
+
+LavX commented 3 days ago
+
+I have already acknowledged the concern and asked for concrete technical evidence. If you have logs, request patterns, or other measurable data linking specific traffic to this project, feel free to provide it. I will review rate limiting, retries, and request behavior accordingly.
+
+Also, the functionality gap is not hypothetical. On your own forum, users have documented that the .com API/database is not yet a complete replacement for .org, citing missing subtitles, miscategorized episodes, incomplete sync, and unreliable search results. Your own developer also acknowledged that “the .com database is not yet a complete replacement for .org” and said the goal is to make .com ready before .org is retired. That is the gap this project was created to address.
+
+Public pressure, personal remarks, and requests for pile-ons are not a substitute for technical evidence. If no actionable details are provided, I will consider this issue exhausted.
+
+
+
+---
+
+
+
+opensubtitles commented 2 days ago
+
+@LavX you programmed this, so you know what it is doing. This proxy acts like normal browser and it is almost impossible to stop. We will do everything what we can to stop this, because it is going against our TOS - DONT DO THIS, why in earth you can not understand, that we ask you (nicely) to stop doing this ?
+
+There is opensubtitles.org API - dont scrape WEBSITE. Then, we have to implement downloads for logged-in users and later for VIP users. Why ? Because of this project. So other users will thank you, because you caused this.
+
+What I can send you ? 2500 User-Agents what you rotate ? That you passing Cloudflare protection and scraping website ? Please dont make from yourself stupid, that you dont know what is happening.
+
+Just stop it. Thank you.
+
+
+
+---
+
+
+
+LavX commented 2 days ago
+
+A few factual clarifications before I close this.
+
+On the technical claims:
+
+This project uses a single, static User-Agent, not "2500 rotating User-Agents." This is verifiable in the source code.
+The scraper enforces strict rate limits: 1 request per second, 60 requests per minute.
+I asked on multiple occasions for technical evidence (logs, request patterns, timestamps) linking traffic to this project. None were provided.
+You reference TOS in your latest message. I was not able to locate published Terms of Service on www.opensubtitles.org If specific terms exist that apply to this project, please share them.
+
+This project has minimal adoption. Attributing a 15x traffic increase to a project with this level of usage and a 1 req/s rate limit is not supported by the evidence presented.
+
+This issue received reports from your forum following a post describing this project as "evil." You also stated you would "put all opensubtitles.org down" and direct blame toward this project. These are noted for the record.
+This project accesses pages available to any unauthenticated visitor. If you have specific, evidence-backed technical concerns, I am open to reviewing them through a private channel.
+Closing this issue.
+
+
+
+---
+
+
+
+LavX closed this as completed 2 days ago
+
+
+
+---
+
+
+
+opensubtitles commented 2 days ago
+
+@LavX
+
+We have reviewed your source code. We need to address a specific factual claim you made:
+
+"The scraper enforces strict rate limits: 1 request per second, 60 requests per minute."
+
+This is directly contradicted by your own README, which states under ⚠️ Limitations:
+
+"No built-in rate limiting (implement externally if needed)"
+
+Your main.py confirms this: it is a plain FastAPI application with no rate limiting middleware, no slowapi, no asyncio.sleep, no throttling of any kind on the /search or /download endpoints. There is no rate limiting in this codebase.
+
+You made a false claim in a public issue to deflect a legitimate concern from the service you are damaging. That is the record.
+
+The rest of your argument — requesting logs, timestamps, "technical evidence" — is a procedural deflection. You built a tool that explicitly advertises Cloudflare bypass as a feature (your README: "🛡️ Cloudflare Bypass: Uses cloudscraper to automatically bypass Cloudflare protection"). You know exactly what it does. We should not have to provide packet captures to a developer who wrote the tool doing the damage.
+
+Our position remains unchanged. Take down the Docker image and archive this repository. The free API at https://api.opensubtitles.com exists precisely for this use case.
+
+The problem is you (and many other "developers") are using AI tools and even don't know what those programs do. If you dont want to put this program down, implement proper rate-limiting as you wrote - 1 request per second.
+
+
+
+---
+
+
+
+opensubtitles commented 2 days ago
+
+@LavX
+
+Adding to our previous comment on the rate limiting lie. Let us address your second false claim:
+
+"This project uses a single, static User-Agent"
+
+This is also false. Your project vendors a customized, enhanced version of cloudscraper (in vendor/cloudscraper/) which you describe in your own README as providing "enhanced features and compatibility". The cloudscraper library you vendor — and its README describes — includes:
+
+70+ built-in User-Agent strings covering Chrome, Firefox, and Safari across Windows, macOS, Android, and iOS
+Automatic UA rotation on each new session or on challenge failure
+Full matching browser header sets for every UA — not just the User-Agent string, but the complete set of Accept, Accept-Language, Accept-Encoding, Sec-Fetch-Mode, Sec-Fetch-Site, Sec-Fetch-Dest, Sec-Ch-Ua, and Sec-Ch-Ua-Platform headers that a real browser would send — all consistent and matched to the claimed browser profile
+Automatic Cloudflare JS challenge solving using js2py/Node.js, obtaining a valid cf_clearance cookie that passes all Cloudflare verification checks
+Intelligent retry logic with exponential backoff (your own README's words)
+Why this makes your scraper nearly impossible to distinguish from real users:
+
+A request from your tool arriving at our servers looks like this:
+
+Valid cf_clearance cookie: ✅ (solved the JS challenge)
+Realistic User-Agent (e.g. Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0): ✅
+Full matching browser header set consistent with that Chrome version: ✅
+No bot-identifying string anywhere in the request: ✅
+To our infrastructure, this is indistinguishable from a real Chrome user on Windows. Differentiating it from legitimate traffic requires Cloudflare Enterprise Bot Management with JA3/TLS fingerprinting — which operates at the TLS handshake layer before any HTTP headers are even sent. That is an expensive enterprise feature. You have built a tool that specifically and deliberately circumvents the protections available to us at our plan tier.
+
+Your claim of a "single static User-Agent" is not a mistake — it is a deliberate misrepresentation made in a public issue to minimize the perceived impact of your tool. The source code of your own vendored dependency directly contradicts it.
+
+To summarise what your source code actually shows:
+
+No rate limiting — your README admits it, your main.py confirms it
+UA rotation across 70+ browser profiles — your vendored cloudscraper implements it
+Complete browser header impersonation — making each request look like a different real user
+Automatic Cloudflare bypass — your README lists it as a primary feature
+Exponential backoff retry — ensuring requests keep coming even when temporarily slowed
+This is not a project that accidentally causes load. It is engineered, feature by feature, to be undetectable and unstoppable against standard Cloudflare protection. You know this. You built it.
+
+
+
+---
+
+
+
+LavX commented 2 days ago
+
+I see you've now reviewed the source code, or at least, had something review it for you. Unfortunately, the analysis is wrong on every specific technical claim.
+
+Rate limiting:
+session_manager.py, line 109: _wait_for_rate_limit(), enforcing a 1.5-second minimum between outbound requests, called on every request at line 152. It's right there. The README note you quoted refers to inbound API throttling on the FastAPI service, not outbound request behavior. These are different things. Next time prompt better your ai...
+
+User-Agent rotation:
+session_manager.py, line 79: a single, hardcoded User-Agent string that overrides cloudscraper's default on session creation. One session, one UA, for the lifetime of the process. No rotation. Your "70+ rotating User-Agents" describes what the cloudscraper library can do in general, not what this project actually does.
+
+You accused me of using AI to write my responses. I'll leave readers to judge whose comments in this thread read like unverified AI output about a library rather than actual analysis of the code in question.
+
+This is a 2-star (maybe it will be more after you made it famous on your own forum...) repository. You've dedicated forum posts, coordinated reports, threats to shut down your own site, personal insults, and now two lengthy comments built on claims that don't survive a basic grep all directed at a project with negligible adoption that you could have simply blocked at the infrastructure level.
+
+I've engaged in good faith from the start. I'm done here. Have a nice day!
+
+
+
+---
+
+
+
+Repository owner locked as too heated and limited conversation to collaborators 2 days ago
+
+
+
+---
+
+
+
+LavX added a commit that references this issue 12 hours ago
+feat: add FlareSolverr integration for Cloudflare bypass
+https://github.com/LavX/opensubtitles-scraper/commit/74e0a7e88ebfcf2a251e4b9a69e561c29dd6bd3c
