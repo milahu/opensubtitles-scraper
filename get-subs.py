@@ -43,6 +43,10 @@ import charset_normalizer
 
 default_lang = "en"
 
+# default values if args.movie is empty
+default_title = "movie"
+default_container = "mkv"
+
 # with recode, this is 2x slower
 # ideally recode once and cache the result
 recode_sub_content_to_utf8 = False
@@ -229,6 +233,18 @@ def show_help_cgi():
     print()
     print()
     print()
+    print("movie title")
+    print()
+    print("in rare cases, the guessit library (https://github.com/guessit-io/guessit) fails to parse movie filenames")
+    print("examples: xXx.2002.mp4 22.July.2018.mp4")
+    print()
+    print("in these cases, you can override the guessit result with the video-parsed-json parameter")
+    print("examples:")
+    print(curl + """ -G -O --fail-with-body -J --data-urlencode 'video-parsed-json={"type":"movie","title":"22 July","year":2018}' """ + request_url)
+    print(curl + """ -G -O --fail-with-body -J --data-urlencode 'video-parsed-json={"type":"episode","title":"The Simpsons","season":1,"episode":1}' """ + request_url)
+    print()
+    print()
+    print()
     print("encoding")
     print()
     print("the subtitles are not recoded to utf8")
@@ -355,6 +371,7 @@ def parse_args():
         ),
     )
     parser.add_argument("--imdb")
+    parser.add_argument("--video-parsed-json") # args.video_parsed_json
     parser.add_argument("movie")
     args = parser.parse_args()
     if args.lang_list != None:
@@ -385,15 +402,16 @@ def parse_args_cgi():
 
     movie = query_dict.get("movie", [None])[0]
     imdb = query_dict.get("imdb", [None])[0] # TODO
+    video_parsed_json = query_dict.get("video-parsed-json", [None])[0]
 
     # check required arguments
     """
     if movie == None and imdb == None:
         error_cgi("missing argument: movie or imdb")
     """
-    if movie == None:
+    if movie == None and video_parsed_json == None:
         error_cgi("missing argument: movie")
-    else:
+    elif movie != None:
         movie = os.path.basename(movie)
 
     lang_str = query_dict.get("lang", [""])[0].lower()
@@ -411,6 +429,7 @@ def parse_args_cgi():
         imdb = imdb,
         lang_list = lang_list,
         path_format = path_format,
+        video_parsed_json = video_parsed_json,
     )
     #error_cgi(repr(args)) # debug
     return args
@@ -419,7 +438,10 @@ def parse_args_cgi():
 
 def send_zipfile_cgi(args, member_files):
 
-    basename, _extension = os.path.splitext(args.movie)
+    if args.movie:
+        basename, _extension = os.path.splitext(args.movie)
+    else:
+        basename = args.video_parsed.get("title", default_title).replace(" ", ".")
 
     headers = []
 
@@ -596,20 +618,27 @@ def main():
     os.makedirs(os.path.dirname(video_path), exist_ok=True)
     """
 
-    video_filename = os.path.basename(args.movie)
-    #print("video_filename", video_filename)
+    if args.video_parsed_json:
+        video_parsed = json.loads(args.video_parsed_json)
 
-    # TODO allow to set title and year
-    # guessit can fail in rare cases
+    else:
+        video_filename = os.path.basename(args.movie)
+        #print("video_filename", video_filename)
 
-    # len("abc 2000.mp4") == 12
-    if len(video_filename) < 12:
-        error("video_filename is too short")
+        # TODO allow to set title and year
+        # guessit can fail in rare cases
 
-    if len(video_filename) > 255:
-        error("video_filename is too long")
+        # len("abc 2000.mp4") == 12
+        if len(video_filename) < 12:
+            error("video_filename is too short")
 
-    video_parsed = guessit.guessit(video_filename)
+        if len(video_filename) > 255:
+            error("video_filename is too long")
+
+        video_parsed = guessit.guessit(video_filename)
+
+    args.video_parsed = video_parsed
+
     #print("video_parsed", video_parsed)
 
     config_get_providers(config)
@@ -623,8 +652,10 @@ def main():
             return (a, b, c, ZIP_32, e)
         try:
             send_zipfile_cgi(args, map(fix_args, get_movie_subs(config, args, video_parsed)))
-        except Exception as e:
-            error(f"Exception {type(e)} {e}")
+        except Exception as exc:
+            import traceback
+            tb_str = "".join(traceback.format_exception(exc))
+            error(f"{type(exc).__name__}: {exc}\n\n{tb_str}\n\nvideo_parsed={video_parsed}")
     else:
         #return get_movie_subs(video_path, video_parsed, lang, config)
         for item in get_movie_subs(config, args, video_parsed):
@@ -660,11 +691,14 @@ def fts_words(str):
     return " ".join(map(lambda word: word.lower(), pat.findall(str)))
 
 
-
 def get_movie_subs(config, args, video_parsed):
     global data_dir
     global is_cgi
-    video_path_base, video_path_extension = os.path.splitext(args.movie)
+    if args.movie:
+        video_path_base, video_path_extension = os.path.splitext(args.movie)
+    else:
+        video_path_base = video_parsed.get("title", default_title).replace(" ", ".")
+        video_path_extension = video_parsed.get("container", default_container)
     # one database for metadata: 1.6GB
     #print(f"""metadata: getting connection""")
     # FIXME opensubs-metadata.db is slow
@@ -699,7 +733,7 @@ def get_movie_subs(config, args, video_parsed):
         movie_year = video_parsed.get("year")
 
         if not movie_title and not movie_year:
-            error(f"failed to parse movie_title and movie_year from filename {repr(args.movie)}")
+            error(f"failed to parse movie_title and movie_year from filename {repr(args.movie)}\n\nvideo_parsed={video_parsed}")
 
         def basename(path):
             # os.path.basename does not split on both / and \
@@ -979,5 +1013,14 @@ def extract_sub(zip_content, video_path_base, num, lang, args):
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    if os.environ.get("GATEWAY_INTERFACE") == "CGI/1.1":
+        is_cgi = True
+        error = error_cgi
+    try:
+        main()
+    except Exception as exc:
+        import traceback
+        tb_str = "".join(traceback.format_exception(exc))
+        error(f"{type(exc).__name__}: {exc}\n\n{tb_str}")
     sys.exit()
