@@ -698,6 +698,11 @@ def get_movie_subs(config, args, video_parsed):
         video_path_base, video_path_extension = os.path.splitext(args.movie)
     else:
         video_path_base = video_parsed.get("title", default_title).replace(" ", ".")
+        if video_parsed.get("type") == "episode":
+            season = video_parsed.get("season")
+            episode = video_parsed.get("episode")
+            if season != None and episode != None:
+                video_path_base += f".S{season:02d}E{episode:02d}"
         video_path_extension = video_parsed.get("container", default_container)
     # one database for metadata: 1.6GB
     #print(f"""metadata: getting connection""")
