@@ -176,7 +176,7 @@
       "num_range_from": 10300000,
       "num_range_to": 10399999,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.103xxxxx.v20251031/103xxxxx.db",
+      "db_path": "$CAS/btih/0e73b297c8bb4502b5851022e72d46043754add4/opensubtitles.org.dump.103xxxxx.v20251031/103xxxxx.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
@@ -188,7 +188,7 @@
       "num_range_from": 10400000,
       "num_range_to": 10499999,
       "type": "sqlite",
-      "db_path": "$HOME/down/torrent/done/opensubtitles.org.dump.104xxxxx.v20260124/104xxxxx.db",
+      "db_path": "$CAS/btih/aca1f121d33782b00c795e32fb92e9fb4a46a6d7/opensubtitles.org.dump.104xxxxx.v20260124/104xxxxx.db",
       "zipfiles_table": "zipfiles",
       "zipfiles_num_column": "num",
       "zipfiles_zipfile_column": "content"
