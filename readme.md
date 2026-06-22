@@ -128,3 +128,7 @@ $EDITOR fetch_subs_secrets.py
 # infinite loop: run the scraper every 6 hours
 ./main-loop.sh
 ```
+
+## similar projects
+
+- https://github.com/LavX/opensubtitles-scraper
