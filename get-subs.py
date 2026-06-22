@@ -5,7 +5,11 @@
 # get subtitles for a video file
 # from local subtitle providers
 
-# to expose this over an http server, see docs/lighttpd.conf
+# to expose this over an http server, see
+# docs/wsgi/lighttpd.conf
+# docs/cgi/lighttpd.conf
+# WSGI = many requests, low latency
+# CGI = few requests, high latency
 
 # TODO search for episode
 # TODO allow passing name/year/season/episode/imdb-id as extra arguments
@@ -33,11 +37,16 @@ import pathlib
 import types
 import re
 import string
+import traceback
+import urllib.parse
 
 # requirements
+# pip install guessit langcodes charset_normalizer stream_zip platformdirs
 import guessit
 import langcodes
 import charset_normalizer
+import stream_zip
+import platformdirs
 
 
 
@@ -71,202 +80,226 @@ path_format_vars = {
 
 
 # global state
+is_debug = False
 data_dir = None
 is_cgi = False
+is_wsgi = False
+# runtime = "cli"
+is_cli = False
+config = None
 
 
 
-def get_env(keys, default=None):
+def get_env(keys, default=None, environ=os.environ):
     if isinstance(keys, str):
         keys = [keys]
     for key in keys:
-        val = os.environ.get(key)
+        val = environ.get(key)
         if not val is None:
             return val
     return default
 
-def get_request_scheme():
-    return get_env((
+def get_request_scheme(environ=os.environ):
+    keys = (
         "HTTP_X_FORWARDED_PROTO",
         "REQUEST_SCHEME",
-    ), "http")
+    )
+    return get_env(keys, "http", environ)
 
-def get_request_host():
-    return get_env((
+def get_request_host(environ=os.environ):
+    keys = (
         "HTTP_X_HOST",
         "HTTP_HOST",
-    ), "localhost")
+    )
+    return get_env(keys, "localhost", environ)
+    # FIXME also get port
+    # port 9592
 
-def get_request_path():
-    val = get_env((
+def get_request_path(environ=os.environ):
+    keys = (
         #"", # FIXME get original path
         "REQUEST_URI",
-    ), "/bin/get-subtitles")
+    )
+    val = get_env(keys, "/bin/get-subtitles", environ)
     # workaround: nginx does not pass $request_uri as request header
-    if get_request_host().endswith(".feralhosting.com"):
+    if get_request_host(environ).endswith(".feralhosting.com"):
         return "/" + os.environ["USER"] + val
     return val
 
 
+def start_response_cgi(status, headers):
+    print(f"Status: {status}")
+    for key, val in headers:
+        print(f"{key}: {val}")
+    print()
+
 
 def show_help_cgi():
-    request_url = (
-        get_request_scheme() + "://" +
-        get_request_host() +
-        get_request_path()
-    )
-    print("Status: 200")
-    print("Content-Type: text/plain")
-    print()
-
-    curl = "curl"
-    if os.environ.get("SERVER_NAME", "").endswith(".onion"):
-        curl += " --proxy socks5h://127.0.0.1:9050"
-
-    print("get-subtitles")
-    print()
-    print("returns a zip archive with subtitles for a movie")
-    print()
-    print()
-    print()
-    print("usage")
-    print()
-    print(f'{curl} -G --fail-with-body -O -J --data-urlencode "movie=Scary.Movie.2000.720p.mp4" {request_url} && unzip Scary.Movie.2000.720p.subs.zip')
-    print()
-    print(f'{curl} -G --fail-with-body -o - --data-urlencode "movie=Scary.Movie.2000.720p.mp4" {request_url} | bsdtar -xvf -')
-    print()
-    print()
-    print()
-    print("source")
-    print()
-    print("https://github.com/milahu/opensubtitles-scraper/raw/main/get-subs.py")
-    print()
-    print()
-    print()
-    print("client")
-    print()
-    # TODO store a fully functional get-subs.sh script in git
-    print('#!/usr/bin/env bash')
-    print('# get-subs.sh - get subtitles from subtitles server')
-    print('#set -x # xtrace')
-    print(f'server_url="{request_url}"')
-    if os.environ.get("SERVER_NAME", "").endswith(".onion"):
-        print("# note: this requires a running tor proxy on 127.0.0.1:9050 - hint: sudo systemctl start tor")
-    print(f'curl=({curl})')
-    print('command -v curl >/dev/null || { echo "error: curl was not found"; exit 1; }')
-    print('command -v unzip >/dev/null || { echo "error: unzip was not found"; exit 1; }')
-    print('[ -n "$1" ] || { echo "usage: $0 [--lang en,es,de,ru,cn] path/to/Scary.Movie.2000.720p.mp4"; exit 1; }')
-    print('lang=')
-    print('path_format=')
-    print('while (( $# > 0 )); do')
-    print('case "$1" in')
-    print('  --lang|-l) lang="$2"; shift 2; continue;;')
-    print('  --path-format) path_format="$2"; shift 2; continue;;')
-    print('  *) :;;')
-    print('esac')
-    print('dir="$(dirname "$1")"')
-    print('[ -e "$dir" ] || { echo "error: no such directory: ${dir@Q}"; exit 1; }')
-    print('pushd "$dir" >/dev/null')
-    print('movie="$(basename "$1")"')
-    # TODO escape request_url for bash string
-    print('curl_data=(')
-    print('  --data-urlencode "movie=$movie"')
-    print('  --data-urlencode "lang=$lang"')
-    print('  --data-urlencode "path_format=$path_format"')
-    print(')')
-    print('if command -v bsdtar >/dev/null; then')
-    print('  # https://superuser.com/a/1834410/951886 # write error body to stderr')
-    print('  "${curl[@]}" -G --fail-with-body -D - -o - "${curl_data[@]}" "$server_url" | {')
-    print('    s=; while read -r h; do h="${h:0: -1}"; if [ -z "$s" ]; then s=${h#* }; s=${s%% *}; fi; [ -z "$h" ] && break; done')
-    print('    if [ "${s:0:1}" = 2 ]; then cat; else cat >&2; fi') # write error body to stderr
-    print('  } | bsdtar -xvf -')
-    print('else')
-    print('  zip="${movie%.*}.subs.zip"')
-    print('  ! [ -e "$zip" ] || { echo "error: tempfile exists: ${zip@Q}"; exit 1; }')
-    print('  if ! "${curl[@]}" -G --fail-with-body -o "$zip" "${curl_data[@]}" "$server_url"; then')
-    print('    cat "$zip" && rm "$zip" # zip contains the error message')
-    print('  else')
-    print('    unzip "$zip" && rm "$zip"')
-    print('  fi')
-    print('fi')
-    print('popd >/dev/null')
-    print('shift')
-    print('done')
-    print()
-    print()
-    print()
-    print("filenames")
-    print()
-    print("when you pass a movie filename like movie=Scary.Movie.2000.720p.mp4")
-    print("then the subtitle files will be named Scary.Movie.2000.720p.12345.srt etc")
-    print("so when you extract them to the folder of the movie file")
-    print("then your video player should find the subtitles")
-    print()
-    print("you can change the filenames format with the path_format parameter")
-    print(f"default: {default_path_format}")
-    print("variables:")
-    print("".join(map(lambda kv: f"${{{kv[0]}}}: {kv[1]}\n", path_format_vars.items())), end="")
-    print()
-    print()
-    print()
-    print("language")
-    print()
-    print("you can pass one or more languages as 2 letter codes per ISO 639-1")
-    print("or as 3 letter codes per ISO 639-2")
-    print("https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes")
-    print()
-    print('the output filenames have the format "Some.Movie.2000.{num}.{lang}.srt"')
-    print("where lang is a 3 letter code compatible with video players")
-    print()
-    print("?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=es")
-    print()
-    print("?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=en,es,fr,de,cz,cn")
-    print()
-    print("?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=eng,spa,fre,ger,cze,chi")
-    # TODO
-    """
-    print()
-    print("?imdb=tt2580382")
-    print()
-    print("?imdb=tt0705920")
-    """
-    print()
-    print()
-    print()
-    print("movie title")
-    print()
-    print("in rare cases, the guessit library (https://github.com/guessit-io/guessit) fails to parse movie filenames")
-    print("examples: xXx.2002.mp4 22.July.2018.mp4")
-    print()
-    print("in these cases, you can override the guessit result with the video-parsed-json parameter")
-    print("examples:")
-    print(curl + """ -G -O --fail-with-body -J --data-urlencode 'video-parsed-json={"type":"movie","title":"22 July","year":2018}' """ + request_url)
-    print(curl + """ -G -O --fail-with-body -J --data-urlencode 'video-parsed-json={"type":"episode","title":"The Simpsons","season":1,"episode":1}' """ + request_url)
-    print()
-    print()
-    print()
-    print("encoding")
-    print()
-    print("the subtitles are not recoded to utf8")
-    print("because im too lazy to finish this postprocessing")
-    print("most subtitles should have utf8 encoding")
-    print("but some subtitles can have single-byte encodings like latin1")
-    print("see also")
-    print("https://github.com/milahu/opensubtitles-scraper/raw/main/repack.py")
-    print()
-    print()
-    print()
-    print("adblocker")
-    print()
-    print("this is not done on the server side to save cpu time")
-    print()
-    print("to remove ads, see")
-    print("https://github.com/milahu/opensubtitles-scraper/raw/main/opensubtitles_adblocker.py")
-    print()
-    print("to add more ads to the blocklist, see")
-    print("https://github.com/milahu/opensubtitles-scraper/raw/main/opensubtitles_adblocker_add.py")
-
+    environ = dict(os.environ)
+    for chunk in get_help_wsgi(os.environ, start_response_cgi):
+        sys.stdout.buffer.write(chunk)
     sys.exit()
+
+
+def get_help_wsgi(environ, start_response):
+    headers = [
+        ("Content-Type", "text/plain"),
+    ]
+    start_response("200 OK", headers)
+    request_url = (
+        get_request_scheme(environ) + "://" +
+        get_request_host(environ) +
+        get_request_path(environ)
+    )
+    request_url = request_url.encode("utf8")
+
+    curl = b"curl"
+    if environ.get("SERVER_NAME", "").endswith(".onion"):
+        curl += b" --proxy socks5h://127.0.0.1:9050"
+
+    yield b"get-subtitles\n"
+    yield b"\n"
+    yield b"returns a zip archive with subtitles for a movie\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"usage\n"
+    yield b"\n"
+    yield curl + b' -G --fail-with-body -O -J --data-urlencode "movie=Scary.Movie.2000.720p.mp4" ' + request_url + b' && unzip Scary.Movie.2000.720p.subs.zip\n'
+    yield b"\n"
+    yield curl + b' -G --fail-with-body -o - --data-urlencode "movie=Scary.Movie.2000.720p.mp4" ' + request_url + b' | bsdtar -xvf -\n'
+    yield b"\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"source\n"
+    yield b"\n"
+    yield b"https://github.com/milahu/opensubtitles-scraper/raw/main/get-subs.py\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"client\n"
+    yield b"\n"
+    # TODO store a fully functional get-subs.sh script in git
+    yield b'#!/usr/bin/env bash\n'
+    yield b'# get-subs.sh - get subtitles from subtitles server\n'
+    yield b'#set -x # xtrace\n'
+    yield b'server_url="' + request_url + b'"\n'
+    if os.environ.get("SERVER_NAME", "").endswith(".onion"):
+        yield b"# note: this requires a running tor proxy on 127.0.0.1:9050 - hint: sudo systemctl start tor\n"
+    yield b'curl=(' + curl + b')\n'
+    yield b'command -v curl >/dev/null || { echo "error: curl was not found"; exit 1; }\n'
+    yield b'command -v unzip >/dev/null || { echo "error: unzip was not found"; exit 1; }\n'
+    yield b'[ -n "$1" ] || { echo "usage: $0 [--lang en,es,de,ru,cn] path/to/Scary.Movie.2000.720p.mp4"; exit 1; }\n'
+    yield b'lang=\n'
+    yield b'path_format=\n'
+    yield b'while (( $# > 0 )); do\n'
+    yield b'case "$1" in\n'
+    yield b'  --lang|-l) lang="$2"; shift 2; continue;;\n'
+    yield b'  --path-format) path_format="$2"; shift 2; continue;;\n'
+    yield b'  *) :;;\n'
+    yield b'esac\n'
+    yield b'dir="$(dirname "$1")"\n'
+    yield b'[ -e "$dir" ] || { echo "error: no such directory: ${dir@Q}"; exit 1; }\n'
+    yield b'pushd "$dir" >/dev/null\n'
+    yield b'movie="$(basename "$1")"\n'
+    # TODO escape request_url for bash string
+    yield b'curl_data=(\n'
+    yield b'  --data-urlencode "movie=$movie"\n'
+    yield b'  --data-urlencode "lang=$lang"\n'
+    yield b'  --data-urlencode "path_format=$path_format"\n'
+    yield b')\n'
+    yield b'if command -v bsdtar >/dev/null; then\n'
+    yield b'  # https://superuser.com/a/1834410/951886 # write error body to stderr\n'
+    yield b'  "${curl[@]}" -G --fail-with-body -D - -o - "${curl_data[@]}" "$server_url" | {\n'
+    yield b'    s=; while read -r h; do h="${h:0: -1}"; if [ -z "$s" ]; then s=${h#* }; s=${s%% *}; fi; [ -z "$h" ] && break; done\n'
+    yield b'    if [ "${s:0:1}" = 2 ]; then cat; else cat >&2; fi' # write error body to stderr
+    yield b'  } | bsdtar -xvf -\n'
+    yield b'else\n'
+    yield b'  zip="${movie%.*}.subs.zip"\n'
+    yield b'  ! [ -e "$zip" ] || { echo "error: tempfile exists: ${zip@Q}"; exit 1; }\n'
+    yield b'  if ! "${curl[@]}" -G --fail-with-body -o "$zip" "${curl_data[@]}" "$server_url"; then\n'
+    yield b'    cat "$zip" && rm "$zip" # zip contains the error message\n'
+    yield b'  else\n'
+    yield b'    unzip "$zip" && rm "$zip"\n'
+    yield b'  fi\n'
+    yield b'fi\n'
+    yield b'popd >/dev/null\n'
+    yield b'shift\n'
+    yield b'done\n'
+    yield b"\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"filenames\n"
+    yield b"\n"
+    yield b"when you pass a movie filename like movie=Scary.Movie.2000.720p.mp4\n"
+    yield b"then the subtitle files will be named Scary.Movie.2000.720p.12345.srt etc\n"
+    yield b"so when you extract them to the folder of the movie file\n"
+    yield b"then your video player should find the subtitles\n"
+    yield b"\n"
+    yield b"you can change the filenames format with the path_format parameter\n"
+    yield b"default: " + default_path_format.encode("utf8") + b"\n"
+    yield b"variables:\n"
+    for key, val in path_format_vars.items():
+        yield f"${{{key}}}: {val}\n".encode("utf8")
+    yield b"\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"language\n"
+    yield b"\n"
+    yield b"you can pass one or more languages as 2 letter codes per ISO 639-1\n"
+    yield b"or as 3 letter codes per ISO 639-2\n"
+    yield b"https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes\n"
+    yield b"\n"
+    yield b'the output filenames have the format "Some.Movie.2000.{num}.{lang}.srt"\n'
+    yield b"where lang is a 3 letter code compatible with video players\n"
+    yield b"\n"
+    yield b"?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=es\n"
+    yield b"\n"
+    yield b"?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=en,es,fr,de,cz,cn\n"
+    yield b"\n"
+    yield b"?movie=Futurama.S06E07.The.Late.Philip.J.Fry.mp4&lang=eng,spa,fre,ger,cze,chi\n"
+    # TODO
+
+    yield b"\n"
+    yield b"?imdb=tt2580382\n"
+    yield b"\n"
+    yield b"?imdb=tt0705920\n"
+
+    yield b"\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"movie title\n"
+    yield b"\n"
+    yield b"in rare cases, the guessit library (https://github.com/guessit-io/guessit) fails to parse movie filenames\n"
+    yield b"examples: xXx.2002.mp4 22.July.2018.mp4\n"
+    yield b"\n"
+    yield b"in these cases, you can override the guessit result with the video-parsed-json parameter\n"
+    yield b"examples:\n"
+    yield curl + b""" -G -O --fail-with-body -J --data-urlencode 'video-parsed-json={"type":"movie","title":"22 July","year":2018}' """ + request_url + b"\n"
+    yield curl + b""" -G -O --fail-with-body -J --data-urlencode 'video-parsed-json={"type":"episode","title":"The Simpsons","season":1,"episode":1}' """ + request_url + b"\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"encoding\n"
+    yield b"\n"
+    yield b"the subtitles are not recoded to utf8\n"
+    yield b"because im too lazy to finish this postprocessing\n"
+    yield b"most subtitles should have utf8 encoding\n"
+    yield b"but some subtitles can have single-byte encodings like latin1\n"
+    yield b"see also\n"
+    yield b"https://github.com/milahu/opensubtitles-scraper/raw/main/repack.py\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"\n"
+    yield b"adblocker\n"
+    yield b"\n"
+    yield b"this is not done on the server side to save cpu time\n"
+    yield b"\n"
+    yield b"to remove ads, see\n"
+    yield b"https://github.com/milahu/opensubtitles-scraper/raw/main/opensubtitles_adblocker.py\n"
+    yield b"\n"
+    yield b"to add more ads to the blocklist, see\n"
+    yield b"https://github.com/milahu/opensubtitles-scraper/raw/main/opensubtitles_adblocker_add.py\n"
 
 
 
@@ -281,6 +314,12 @@ def expand_path(path):
     elif path.startswith("$HOME/"):
         path = os.environ["HOME"] + path[5:]
     elif path.startswith("$CAS/"):
+        # TODO try to find path in CAS dirs from ~/.config/cas.json
+        # {
+        #   "dirs": [
+        #     "/path/to/cas"
+        #   ]
+        # }
         path = os.environ["CAS"] + path[4:]
     return os.path.join(data_dir, path)
 
@@ -385,17 +424,15 @@ def parse_args():
 
 
 
-def parse_args_cgi():
+def parse_args_cgi(environ=None):
 
-    import urllib.parse
+    environ = environ or os.environ
 
-    query_string = os.environ.get("QUERY_STRING")
-    #assert query_string != None
-    if query_string == None:
-        error("no query string")
+    query_string = environ.get("QUERY_STRING")
 
-    if query_string == "":
-        show_help_cgi()
+    if not query_string:
+        return None
+        # show_help_cgi()
 
     #query_list = urllib.parse.parse_qsl(query_string, keep_blank_values=True)
     query_dict = urllib.parse.parse_qs(query_string, keep_blank_values=True)
@@ -455,7 +492,7 @@ def send_zipfile_cgi(args, member_files):
     #   wget --content-disposition
     # https://stackoverflow.com/questions/1361604/how-to-encode-utf8-filename-for-http-headers-python-django
     filename = basename + ".subs.zip"
-    from urllib.parse import quote
+    quote = urllib.parse.quote
     disposition = 'attachment'
     try:
         filename.encode('ascii')
@@ -468,7 +505,7 @@ def send_zipfile_cgi(args, member_files):
 
     sent_headers = False
 
-    from stream_zip import stream_zip
+    # from stream_zip import stream_zip
 
     zip_header = None
 
@@ -476,7 +513,7 @@ def send_zipfile_cgi(args, member_files):
 
     is_first_chunk = True
 
-    for zipped_chunk in stream_zip(member_files):
+    for zipped_chunk in stream_zip.stream_zip(member_files):
 
         if is_first_chunk and zipped_chunk == empty_zip_header:
             # buffer headers and this chunk
@@ -566,40 +603,208 @@ def config_get_providers(config):
 
 
 
-def main():
+def db_path_regex_of_pattern(pattern: str) -> re.Pattern:
+    token_re = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}|\*")
+    parts = []
+    pos = 0
+    for m in token_re.finditer(pattern):
+        # Escape literal text before the token
+        parts.append(re.escape(pattern[pos:m.start()]))
+        if m.group(1):  # {name}
+            name = m.group(1)
+            if name == "lang":
+                # {lang} -> [a-z]{2,3}
+                # provider_lang = provider.get("lang", "*")
+                parts.append(f"(?P<{name}>[a-z]{{2,3}})")
+            elif name == "shard_id":
+                # {shard_id} -> [0-9]+
+                # num_range_from = provider.get("num_range_from", 0)
+                # num_range_to = provider.get("num_range_to", 0)
+                parts.append(f"(?P<{name}>[0-9]+)")
+            else:
+                parts.append(f"(?P<{name}>.*?)")
+        else:  # *
+            parts.append(".*?")
+        pos = m.end()
+    # Escape remaining literal text
+    parts.append(re.escape(pattern[pos:]))
+    regex = "^" + "".join(parts) + "$"
+    return re.compile(regex)
+
+
+
+def resolve_providers(providers):
+
+    global is_cli
+    global is_debug
+
+    # resolve database files from glob patterns in provider["db_path_format"]
+    new_providers = []
+    for provider in providers:
+        if provider.get("enabled") == False:
+            continue
+        if "db_path" in provider:
+            # nothing to resolve here
+            new_providers.append(provider)
+            continue
+        if "db_path_base" in provider and "db_path_format" in provider:
+            # resolve db files
+            # NOTE we expand variables only in db_path_base
+            # NOTE db_path_format is a glob pattern for .db files
+            # which can contain placeholders
+            # {lang} -> [a-z]{2,3}
+            # {shard_id} -> [0-9]+
+            # NOTE db_path_format must start with "/"
+            db_path_base = provider["db_path_base"]
+            db_path_base = expand_path(db_path_base)
+            db_path_format = provider["db_path_format"]
+            db_path_regex = db_path_regex_of_pattern(db_path_format)
+            db_path_base_len = len(db_path_base)
+            new_provider_base = dict(provider) # shallow copy
+            del new_provider_base["db_path_base"]
+            del new_provider_base["db_path_format"]
+            for root, dirs, files in os.walk(db_path_base):
+                # if '__pycache__' in dirs:
+                #     dirs.remove('__pycache__')  # don't visit __pycache__ directories
+                for name in sorted(files):
+                    db_path = os.path.join(root, name)
+                    # NOTE db_subpath starts with "/"
+                    db_subpath = db_path[db_path_base_len:]
+                    # print(f"db_subpath: {db_subpath!r}")
+                    match = db_path_regex.fullmatch(db_subpath)
+                    if not match:
+                        continue
+                    # print(f"db_path: {db_path!r}")
+                    # these values are used later to filter databases
+                    # num_range_from = provider.get("num_range_from", 0)
+                    # num_range_to = provider.get("num_range_to", 0)
+                    # provider_lang = provider.get("lang", "*")
+                    match_dict = match.groupdict()
+                    if "shard_id" in match_dict:
+                        shard_id = match_dict["shard_id"] = int(match_dict["shard_id"])
+                        if "shard_size" in provider and type(provider["shard_size"]) == int:
+                            shard_size = provider["shard_size"]
+                            match_dict["num_range_from"] = shard_id * shard_size
+                            match_dict["num_range_to"] = (shard_id + 1) * shard_size - 1
+                    # print(f"db_subpath={db_subpath!r} match_dict={match_dict}")
+                    new_provider = dict(new_provider_base) # shallow copy
+                    new_provider["db_path"] = db_path
+                    new_provider.update(match_dict)
+                    new_providers.append(new_provider)
+        else:
+            # FIXME load all databases
+            if is_cli or is_debug:
+                print(f"not loading database: provider={json.dumps(provider, indent=2)}")
+
+    return new_providers
+
+
+
+def init():
+
+    # init global state for WSGI app
 
     global data_dir
     global is_cgi
+    global is_cli
+    global is_debug
+    global is_wsgi
     global error
     global unpack_zipfiles
-
-    # see also https://github.com/technetium/cgli/blob/main/cgli/cgli.py
+    global config
 
     if os.environ.get("GATEWAY_INTERFACE") == "CGI/1.1":
         is_cgi = True
         error = error_cgi
+    elif "_" in os.environ:
+        # os.environ["_"] == sys.argv[0] == "./get-subs.py"
+        is_cli = True
+    elif any(arg.endswith(":wsgi_request_handler") for arg in sys.argv):
+        # gunicorn --preload get-subs:wsgi_request_handler
+        is_wsgi = True
+
+    if 0:
+        # compare env between CLI and WSGI
+        # ./get-subs.py >get-subs.py.out.cli
+        # ./docs/wsgi/gunicorn.sh >get-subs.py.out.wsgi
+        # diff -u get-subs.py.out.cli get-subs.py.out.wsgi
+        print("os.environ:", json.dumps(dict(os.environ), indent=2))
+        print("sys.argv:", json.dumps(sys.argv, indent=2))
+
+    if is_debug:
+        print(f"init: is_cgi={is_cgi} is_cli={is_cli}")
+
+    # see also https://github.com/technetium/cgli/blob/main/cgli/cgli.py
+
+    if os.environ.get("GATEWAY_INTERFACE") == "CGI/1.1":
+        # print("init: GATEWAY_INTERFACE = CGI/1.1", file=sys.stderr)
+        is_cgi = True
+        error = error_cgi
         if os.environ.get("REQUEST_METHOD") != "GET":
             error("only GET requests are supported")
-        # no. this has almost no effect on speed
-        # the slowest part is "search by movie name" in database
-        # -> use sqlite fts (full text search) -> 5x faster
-        #unpack_zipfiles = False
 
     # relative paths are relative to data_dir
     # on linux: $HOME/.config/subtitles
-    if is_cgi:
-        data_dir = str(pathlib.Path(sys.argv[0]).parent.parent.parent / "subtitles")
-    else:
-        import platformdirs
-        data_dir = platformdirs.user_config_dir("subtitles")
+    # data_dir = str(pathlib.Path(sys.argv[0]).parent.parent.parent / "subtitles")
+    data_dir = (
+        os.environ.get("SUBTITLES_DATA_DIR") or
+        platformdirs.user_config_dir("subtitles")
+    )
     if not os.path.exists(data_dir):
         error(f"missing data_dir: {repr(data_dir)}")
 
     config_path = f"{data_dir}/local-subtitle-providers.json"
     if not os.path.exists(config_path):
         error(f"missing config_path: {repr(config_path)}")
+
     with open(config_path) as f:
         config = json.load(f)
+
+    metadata_db_path = expand_path(config["subtitles_metadata_db_path"])
+    if not os.path.exists(metadata_db_path):
+        error(f"no such file: {metadata_db_path}")
+
+    #print(f"opening database {metadata_db_path}")
+    # metadata_con = sqlite3.connect(metadata_db_path)
+    metadata_con = sqlite3.connect(f"file:{metadata_db_path}?mode=ro", uri=True)
+    metadata_cur = metadata_con.cursor()
+    config["subtitles_metadata_db_con"] = metadata_con
+    config["subtitles_metadata_db_cur"] = metadata_cur
+
+    if 1:
+        # load all databases now to fail early
+        config["providers"] = resolve_providers(config["providers"])
+        num_loaded_dbs = 0
+        for provider in config["providers"]:
+            if provider.get("enabled") == False:
+                continue
+            if not "db_path" in provider:
+                # FIXME load all databases
+                if is_cli or is_debug:
+                    print(f"not loading database: provider={json.dumps(provider, indent=2)}")
+                continue
+            db_path = provider.get("db_path")
+            # print(f"loading database: db_path={db_path!r}")
+            db_path = expand_path(db_path)
+            if not os.path.exists(db_path):
+                error(f"no such file: {db_path}")
+            # provider["db_con"] = sqlite3.connect(db_path)
+            provider["db_con"] = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+            # cache the cursor for faster lookup of similar nums
+            provider["db_cur"] = provider["db_con"].cursor()
+            num_loaded_dbs += 1
+        assert num_loaded_dbs > 0, "no databases were loaded"
+        if is_cli or is_debug:
+            print(f"loaded {num_loaded_dbs} databases")
+
+
+
+def main():
+
+    global data_dir
+    global is_cgi
+    global error
+    global unpack_zipfiles
 
     # TODO use default from locale in os.environ["LANG"]
     # lang_ISO639
@@ -644,16 +849,16 @@ def main():
     config_get_providers(config)
 
     if is_cgi:
-        from stream_zip import ZIP_32
+        # from stream_zip import ZIP_32
         # set the zip_fn here so the non-cgi code works without stream_zip
         def fix_args(args):
-            #yield (sub_path, modified_at, mode, ZIP_32, (sub_content,))
+            #yield (sub_path, modified_at, mode, stream_zip.ZIP_32, (sub_content,))
             (a, b, c, _, e) = args
-            return (a, b, c, ZIP_32, e)
+            return (a, b, c, stream_zip.ZIP_32, e)
         try:
-            send_zipfile_cgi(args, map(fix_args, get_movie_subs(config, args, video_parsed)))
+            # send_zipfile_cgi(args, map(fix_args, get_movie_subs(config, args, video_parsed)))
+            send_zipfile_cgi(args, get_movie_subs(config, args, video_parsed))
         except Exception as exc:
-            import traceback
             tb_str = "".join(traceback.format_exception(exc))
             error(f"{type(exc).__name__}: {exc}\n\n{tb_str}\n\nvideo_parsed={video_parsed}")
     else:
@@ -665,6 +870,125 @@ def main():
             with open(sub_path, "wb") as sub_file:
                 sub_file.write(sub_content)
 
+
+def wsgi_request_handler(environ, start_response):
+
+    # WSGI request handler
+
+    global config
+
+    if is_debug:
+        print("wsgi_request_handler")
+
+    # for key, val in environ.items():
+    #     print(f"environ: {key} = {val}")
+
+    try:
+        args = parse_args_cgi(environ)
+
+        if not args:
+            # show_help_cgi()
+            yield from get_help_wsgi(environ, start_response)
+            return
+
+        if is_debug:
+            print(f"args: {args}")
+
+        if args.video_parsed_json:
+            video_parsed = json.loads(args.video_parsed_json)
+
+        else:
+            video_filename = os.path.basename(args.movie)
+            #print("video_filename", video_filename)
+
+            # TODO allow to set title and year
+            # guessit can fail in rare cases
+
+            # len("abc 2000.mp4") == 12
+            if len(video_filename) < 12:
+                error("video_filename is too short")
+
+            if len(video_filename) > 255:
+                error("video_filename is too long")
+
+            video_parsed = guessit.guessit(video_filename)
+
+        args.video_parsed = video_parsed
+
+        # # set the zip_fn here so the non-cgi code works without stream_zip
+        # def fix_args(args):
+        #     #yield (sub_path, modified_at, mode, stream_zip.ZIP_32, (sub_content,))
+        #     (a, b, c, _, e) = args
+        #     return (a, b, c, stream_zip.ZIP_32, e)
+        # member_files = map(fix_args, get_movie_subs(config, args, video_parsed))
+
+        member_files = get_movie_subs(config, args, video_parsed)
+
+        headers = [
+            ("Content-Type", "application/zip"),
+            # ("Content-Disposition", 'attachment; filename="subs.zip"'),
+            # ("Transfer-Encoding", "chunked"), # stream response?
+        ]
+
+        if args.movie:
+            basename, _extension = os.path.splitext(args.movie)
+        else:
+            basename = args.video_parsed.get("title", default_title).replace(" ", ".")
+
+        filename = basename + ".subs.zip"
+        quote = urllib.parse.quote
+        disposition = 'attachment'
+        try:
+            filename.encode('ascii')
+            # TODO better? escape filename
+            #file_expr = 'filename="{}"'.format(filename)
+            file_expr = 'filename="{}"'.format(quote(filename))
+        except UnicodeEncodeError:
+            file_expr = "filename*=utf-8''{}".format(quote(filename))
+        headers.append(('Content-Disposition', f'{disposition}; {file_expr}'))
+
+        sent_headers = False
+        zip_header = None
+        # empty_zip_header = b"PK\x05\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        # len(empty_zip_header) == 22
+        is_first_chunk = True
+        for zipped_chunk in stream_zip.stream_zip(member_files):
+            # if is_first_chunk and zipped_chunk == empty_zip_header:
+            if is_first_chunk and len(zipped_chunk) == 22:
+                # print(f"chunk 1: {zipped_chunk!r}")
+                # buffer headers and this chunk
+                # https://github.com/uktrade/stream-zip/issues/116
+                # return nothing on empty input
+                zip_header = zipped_chunk
+                is_first_chunk = False
+                continue
+            if not sent_headers:
+                # stream_zip returned the second chunk
+                # print(f"chunk 2: {zipped_chunk[:50]!r}")
+                start_response("200 OK", headers)
+                sent_headers = True
+            if zip_header:
+                # zip_header was set in the previous iteration
+                yield zip_header
+                zip_header = None
+            # print(f"chunk N: {zipped_chunk[:50]!r}")
+            yield zipped_chunk
+            is_first_chunk = False
+
+        if not sent_headers:
+            # stream_zip(member_files) did not return any data
+            headers = tuple()
+            start_response("404 Not Found", headers)
+
+    except Exception as exc:
+        tb = "".join(traceback.format_exception(exc))
+        print(tb)
+        start_response(
+            "500 Internal Server Error",
+            [("Content-Type", "text/plain")]
+        )
+        # return [tb.encode()]
+        return tb.encode()
 
 
 def print_usage():
@@ -710,12 +1034,16 @@ def get_movie_subs(config, args, video_parsed):
     # add index for (MovieName, MovieYear)
     # add full-text-search index for MovieName
     # add index for MovieYear
+    r'''
     metadata_db_path = expand_path(config["subtitles_metadata_db_path"])
     if not os.path.exists(metadata_db_path):
         error(f"no such file: {metadata_db_path}")
     #print(f"opening database {metadata_db_path}")
     metadata_con = sqlite3.connect(metadata_db_path)
     metadata_cur = metadata_con.cursor()
+    '''
+    metadata_cur = config["subtitles_metadata_db_cur"]
+
     # multiple databases for zipfiles: 24GB for english subs
     sql_query = None
     sql_args = None
@@ -730,7 +1058,7 @@ def get_movie_subs(config, args, video_parsed):
 
     args.lang_list = list(args.lang_list)
 
-    if not is_cgi:
+    if is_cli or is_debug:
         print("video_parsed", video_parsed)
 
     if video_parsed.get("type") == "movie":
@@ -826,12 +1154,12 @@ def get_movie_subs(config, args, video_parsed):
                 result += f" {repr(sql_args[idx])} "
         return result
 
-    if not is_cgi:
+    if is_cli or is_debug:
         print(f"""metadata: getting results for query:""", format_query(sql_query, sql_args))
 
     num_lang_list = metadata_cur.execute(sql_query, sql_args).fetchall()
 
-    #if not is_cgi:
+    #if is_cli or is_debug:
     #    print("metadata: num_lang_list:", num_lang_list)
 
     args_lang3letter_list = list(map(lang3letter, args.lang_list))
@@ -869,6 +1197,10 @@ def get_movie_subs(config, args, video_parsed):
         #print(f"""local provider {provider["id"]}: getting {len(provider_num_lang_list)} nums""")
 
         if not "db_con" in provider:
+            continue
+
+        r'''
+        if not "db_con" in provider:
             db_path = expand_path(provider.get("db_path"))
 
             # use sqlite ATTACH? - no. number is limited to 10 files
@@ -878,7 +1210,8 @@ def get_movie_subs(config, args, video_parsed):
             if not os.path.exists(db_path):
                 error(f"no such file: {db_path}")
 
-            provider["db_con"] = sqlite3.connect(db_path)
+            # provider["db_con"] = sqlite3.connect(db_path)
+            provider["db_con"] = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
             # TODO? build external index
             # https://sqlite.org/forum/forumpost/0ed07b9626
@@ -896,6 +1229,7 @@ def get_movie_subs(config, args, video_parsed):
         if not "db_cur" in provider:
             # cache the cursor for faster lookup of similar nums
             provider["db_cur"] = provider["db_con"].cursor()
+        '''
 
         provider_num_list = list(map(lambda x: x[0], provider_num_lang_list))
 
@@ -910,7 +1244,7 @@ def get_movie_subs(config, args, video_parsed):
             f"""WHERE {provider["zipfiles_num_column"]} IN """
             f"""({", ".join(map(str, provider_num_list))})"""
         )
-        if not is_cgi:
+        if is_cli or is_debug:
             #print("sql_query", sql_query)
             print(f"""local provider {provider["id"]}: getting results for query:""", sql_query)
 
@@ -935,7 +1269,8 @@ def get_movie_subs(config, args, video_parsed):
             # no. dont require stream_zip here
             #from stream_zip import ZIP_32
             #yield (sub_path, modified_at, mode, ZIP_32, (sub_content,))
-            zip_fn = None
+            # zip_fn = None
+            zip_fn = stream_zip.ZIP_32
             yield (sub_path, modified_at, mode, zip_fn, (sub_content,))
             # found zipfile -> dont search other providers
         #print(f"""local provider {provider["id"]}: done""")
@@ -1017,15 +1352,15 @@ def extract_sub(zip_content, video_path_base, num, lang, args):
             # TODO write multiple files
 
 
+
+init()
+
+
+
 if __name__ == "__main__":
-    # main()
-    if os.environ.get("GATEWAY_INTERFACE") == "CGI/1.1":
-        is_cgi = True
-        error = error_cgi
     try:
         main()
     except Exception as exc:
-        import traceback
         tb_str = "".join(traceback.format_exception(exc))
         error(f"{type(exc).__name__}: {exc}\n\n{tb_str}")
     sys.exit()

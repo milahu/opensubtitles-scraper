@@ -224,6 +224,8 @@ pkgs.mkShell rec {
     #torrenttools
 
     lighttpd
+    nginx
+    python3Packages.gunicorn
 
   ]) ++ [
     python
