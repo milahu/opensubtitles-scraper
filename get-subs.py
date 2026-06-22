@@ -146,9 +146,13 @@ def get_help_wsgi(environ, start_response):
         ("Content-Type", "text/plain"),
     ]
     start_response("200 OK", headers)
+    request_host = get_request_host(environ)
+    # fix: nginx wrongly passes HTTP_X_FORWARDED_PROTO=http
+    # request_scheme = get_request_scheme(environ)
+    request_scheme = "http" if request_host == "localhost" else "https"
     request_url = (
-        get_request_scheme(environ) + "://" +
-        get_request_host(environ) +
+        request_scheme + "://" +
+        request_host +
         get_request_path(environ)
     )
     request_url = request_url.encode("utf8")
