@@ -69,8 +69,12 @@ to expose [get-subs.py](get-subs.py) as a CGI script on an HTTP server
 
 #### demo server
 
-- [milahu.webredirect.org/bin/get-subtitles](https://milahu.webredirect.org/bin/get-subtitles)
-  - [milahu.duckdns.org/bin/get-subtitles](https://milahu.duckdns.org/bin/get-subtitles)
+- [enceladus.feralhosting.com/milahu/bin/get-subtitles](https://enceladus.feralhosting.com/milahu/bin/get-subtitles)
+- [milahu.duckdns.org/bin/get-subtitles](https://milahu.duckdns.org/bin/get-subtitles)
+
+see also [subtitles-servers.txt](subtitles-servers.txt)
+
+feel free to add your own subtitles server
 
 
 
