@@ -62,8 +62,8 @@ output 'Scary.Movie.2000.en.05115082.srt' from 'Scary Movie 1.[2000].UNRATED.DVD
 ### subtitles server
 
 to run your own subtitles server,
-see [docs/lighttpd.conf](docs/lighttpd.conf)
-to expose [get-subs.py](get-subs.py) as a CGI script on an HTTP server
+see [docs/wsgi/](docs/wsgi/)
+to expose [get-subs.py](get-subs.py) as a WSGI script on an HTTP server
 
 
 
