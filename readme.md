@@ -90,6 +90,24 @@ which requires about 200 GB of disk space for all the database files
 
 
 
+##### can i create my own subtitles client
+
+if you want to create your own subtitles client, then you are probably trying to reinvent the wheel,
+and you should look at existing opensubtitles clients:
+
+- https://github.com/jellyfin/jellyfin-plugin-opensubtitles
+- https://github.com/josdion/subbuzz
+- https://github.com/exebetche/vlsub
+- https://github.com/emericg/OpenSubtitlesDownload
+- https://github.com/QNapi/qnapi
+- https://github.com/matcornic/subify
+
+from there it should be trivial to integrate my subtitles server
+
+see also [docs/integration-with-opensubtitles-mirrors.md](docs/integration-with-opensubtitles-mirrors.md)
+
+
+
 ## based on
 
 - [5719123 subtitles from opensubtitles.org](https://www.reddit.com/r/DataHoarder/comments/w7sgcz/5719123_subtitles_from_opensubtitlesorg/) by `-marked-4life`
