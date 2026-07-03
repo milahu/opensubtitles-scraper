@@ -69,8 +69,8 @@ to expose [get-subs.py](get-subs.py) as a WSGI script on an HTTP server
 
 #### demo server
 
-- [enceladus.feralhosting.com/milahu/bin/get-subtitles](https://enceladus.feralhosting.com/milahu/bin/get-subtitles)
-- [milahu.duckdns.org/bin/get-subtitles](https://milahu.duckdns.org/bin/get-subtitles)
+- [enceladus.feralhosting.com/milahu/bin/get-subtitles](https://enceladus.feralhosting.com/milahu/bin/get-subtitles) (20Gbps uplink)
+- [milahu.duckdns.org/bin/get-subtitles](https://milahu.duckdns.org/bin/get-subtitles) (40Mbps uplink) (rate-limiting: HTTP 429 Too Many Requests)
 
 see also [subtitles-servers.txt](subtitles-servers.txt)
 
