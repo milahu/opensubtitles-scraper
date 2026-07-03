@@ -78,6 +78,18 @@ feel free to add your own subtitles server
 
 
 
+##### can i use your server
+
+because i get stupid questions like "but can i use your server...?"
+
+feel free to download a million subtitles every day from my subtitles server, i dont care.
+i only care about performance issues, in effect "how can i serve more subtitles in less CPU time?"
+
+to make this faster for yourself, you can just run your own subtitles server,
+which requires about 200 GB of disk space for all the database files
+
+
+
 ## based on
 
 - [5719123 subtitles from opensubtitles.org](https://www.reddit.com/r/DataHoarder/comments/w7sgcz/5719123_subtitles_from_opensubtitlesorg/) by `-marked-4life`
