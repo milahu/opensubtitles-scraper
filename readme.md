@@ -85,6 +85,10 @@ because i get stupid questions like "but can i use your server...?"
 feel free to download a million subtitles every day from my subtitles server, i dont care.
 i only care about performance issues, in effect "how can i serve more subtitles in less CPU time?"
 
+for example, i could store the database files on SSD drives,
+but that is too expensive for my taste
+([FeralHosting Neon - 150 GB SSD - 15 GBP/month = 17.50 EUR/month = 20 USD/month](https://www.feralhosting.com/pricing))
+
 to make this faster for yourself, you can just run your own subtitles server,
 which requires about 200 GB of disk space for all the database files
 
