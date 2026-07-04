@@ -108,6 +108,12 @@ and you should look at existing opensubtitles clients:
 
 from there it should be trivial to integrate my subtitles server
 
+just please dont hardcode the server URLs,
+but instead, store the server URLs in a config file like `~/.config/my-subs-client.yaml`,
+so users can change the server URLs when my servers go down.
+support for multiple subtitles servers should be a first-class feature,
+similar to [bittorrent trackers](https://github.com/ngosang/trackerslist)
+
 see also [docs/integration-with-opensubtitles-mirrors.md](docs/integration-with-opensubtitles-mirrors.md)
 
 
