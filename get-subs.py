@@ -5,6 +5,8 @@
 # get subtitles for a video file
 # from local subtitle providers
 
+# https://github.com/milahu/opensubtitles-scraper/blob/main/get-subs.py
+
 # to expose this over an http server, see
 # docs/wsgi/lighttpd.conf
 # docs/cgi/lighttpd.conf
